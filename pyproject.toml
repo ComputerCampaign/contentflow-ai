@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "web-crawler"
+version = "0.1.0"
+description = "网页图片和标题爬虫"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+packages = [{include = "utils"}]
+
+dependencies = [
+    "requests>=2.28.1",
+    "beautifulsoup4>=4.11.1",
+    "lxml>=4.9.1",
+    "argparse>=1.4.0",
+    "tqdm>=4.64.0",
+    "pandas>=1.4.3",
+    "selenium>=4.4.3",
+    "webdriver-manager>=3.8.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+]
+
+[tool.uv]
+packages = []
+
+[tool.hatch.build.targets.wheel]
+packages = ["utils", "."]
