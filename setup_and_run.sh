@@ -3,10 +3,15 @@
 # 环境设置和测试运行脚本
 # 该脚本合并了setup.sh和run_tests.sh的功能
 # 可以一步完成环境设置、激活虚拟环境和运行测试
+#
+# 重要：此脚本必须使用source命令运行才能正确激活虚拟环境
+# 正确用法: source ./setup_and_run.sh 或 . ./setup_and_run.sh
 
 # 显示帮助信息的函数
 show_help() {
-    echo "用法: ./setup_and_run.sh [选项]"
+    echo "用法: source ./setup_and_run.sh [选项]  或  . ./setup_and_run.sh [选项]"
+    echo ""
+    echo "注意: 必须使用source命令运行此脚本，才能正确激活虚拟环境"
     echo ""
     echo "选项:"
     echo "  --help, -h     显示帮助信息"
@@ -15,10 +20,13 @@ show_help() {
     echo "                 不提供参数则运行所有测试"
     echo ""
     echo "示例:"
-    echo "  ./setup_and_run.sh             # 设置环境并激活虚拟环境"
-    echo "  ./setup_and_run.sh --test      # 设置环境并运行所有测试"
-    echo "  ./setup_and_run.sh -t tests/your_test_file.py  # 运行特定测试"
-    exit 0
+    echo "  source ./setup_and_run.sh             # 设置环境并激活虚拟环境"
+    echo "  source ./setup_and_run.sh --test      # 设置环境并运行所有测试"
+    echo "  source ./setup_and_run.sh -t tests/your_test_file.py  # 运行特定测试"
+    echo ""
+    echo "错误用法(虚拟环境不会生效):"
+    echo "  ./setup_and_run.sh  # 不要这样运行！"
+    return 0
 }
 
 echo "=== 开始设置爬虫项目环境 ==="
@@ -31,7 +39,8 @@ if ! command -v uv &> /dev/null; then
     # 检查安装结果
     if ! command -v uv &> /dev/null; then
         echo "uv安装失败，请手动安装: https://github.com/astral-sh/uv"
-        exit 1
+        echo "脚本终止"
+        return 1
     fi
     echo "uv安装成功！"
 else
@@ -69,7 +78,8 @@ if [[ $PYTHON_PATH != *".venv/bin/python"* ]]; then
     echo "当前使用: $PYTHON_PATH"
     echo "应该使用: $(pwd)/.venv/bin/python"
     echo "请确保正确激活了虚拟环境"
-    exit 1
+    echo "脚本终止"
+    return 1
 fi
 
 # 处理命令行参数
@@ -107,6 +117,17 @@ else
     echo "4. 运行示例: 查看examples目录中的示例脚本"
 fi
 
-# 保持虚拟环境处于激活状态
-echo "\n虚拟环境已激活，可以直接运行Python命令"
+# 关于虚拟环境激活的重要说明
+echo "\n重要提示：虚拟环境激活只在当前shell会话中有效"
+echo "如果您是通过 ./setup_and_run.sh 方式运行此脚本，虚拟环境可能不会在您的终端中生效"
+echo "请使用以下方式运行此脚本以确保虚拟环境正确激活："
+echo "  source ./setup_and_run.sh 或 . ./setup_and_run.sh"
+echo ""
+echo "当前虚拟环境状态："
+if [[ "$VIRTUAL_ENV" != "" ]]; then
+    echo "  已激活: $VIRTUAL_ENV"
+else
+    echo "  未激活，请使用上述命令重新运行脚本"
+fi
+echo ""
 echo "退出终端或运行 'deactivate' 命令可以退出虚拟环境"
