@@ -136,7 +136,119 @@ uv pip freeze > requirements.txt
 
 ## 配置文件
 
-项目使用JSON格式的配置文件（默认为`config.json`）来管理各种设置。主要配置项包括：
+项目使用JSON格式的配置文件（默认为`config.json`）来管理各种设置。您需要创建自己的`config.json`文件来配置项目。
+
+### 配置文件安全性
+
+**重要提示：** 项目使用环境变量管理敏感信息（如API密钥、访问令牌等），请遵循以下安全实践：
+
+1. **永远不要**将包含真实凭证的`.env`文件提交到版本控制系统
+2. 项目的`.gitignore`已配置为忽略`.env`文件
+3. 所有敏感信息应存储在`.env`文件中（推荐）
+4. 配置文件`config.json`中的敏感字段应留空，系统会自动从环境变量中读取值
+
+### 使用环境变量管理敏感信息
+
+项目支持从环境变量读取敏感信息，这是管理凭证的推荐方式。有两种方法可以设置环境变量：
+
+#### 方法1：使用.env文件（推荐）
+
+1. 复制项目根目录中的`.env.example`文件并重命名为`.env`
+2. 在`.env`文件中填入您的实际值
+
+```bash
+# .env文件示例
+CRAWLER_EMAIL_PASSWORD=your-email-password
+CRAWLER_GITHUB_TOKEN=your-github-token
+```
+
+**注意：** 
+- 项目已包含`python-dotenv`库作为依赖，通过`uv sync`命令安装
+- 如果您使用`setup_and_run.sh`脚本，它会自动检查`.env`文件是否存在，并提示您创建
+
+#### 方法2：直接设置系统环境变量
+
+在macOS或Linux系统上：
+
+```bash
+# 设置邮件密码
+export CRAWLER_EMAIL_PASSWORD="your-email-password"
+
+# 设置GitHub令牌
+export CRAWLER_GITHUB_TOKEN="your-github-token"
+```
+
+您可以将这些命令添加到`~/.bashrc`、`~/.zshrc`或类似的shell配置文件中。
+
+在Windows系统上：
+
+```cmd
+SET CRAWLER_EMAIL_PASSWORD=your-email-password
+SET CRAWLER_GITHUB_TOKEN=your-github-token
+```
+
+或者通过系统设置添加环境变量。
+
+**注意：** 使用环境变量后，您可以在配置文件中将敏感字段留空，系统会自动从环境变量中读取值。
+
+### 创建配置文件
+
+```bash
+# 创建配置文件
+touch config/config.json
+
+# 编辑配置文件，添加您的设置
+# 注意：所有敏感信息应存储在.env文件中，config.json可以安全地提交到版本控制系统
+```
+
+以下是一个基本的配置文件结构示例：
+
+```json
+{
+    "crawler": {
+        "output_dir": "output",
+        "data_dir": "data",
+        "timeout": 10,
+        "retry": 3,
+        "use_selenium": false
+    },
+    "email": {
+        "enabled": false,
+        "smtp_server": "smtp.example.com",
+        "smtp_port": 587,
+        "sender_email": "your_email@example.com",
+        "sender_password": "",
+        "receiver_emails": ["receiver@example.com"],
+        "subject_prefix": "[爬虫通知] "
+    },
+    "blog": {
+        "enabled": false,
+        "template_path": "config/templates/blog_template.md",
+        "templates_dir": "config/templates",
+        "output_path": "blogs",
+        "image_storage": {
+            "type": "local",
+            "base_url": "http://example.com/images/",
+            "local_path": "static/images",
+            "github": {
+                "enabled": false,
+                "repo_owner": "your-github-username",
+                "repo_name": "your-image-repo",
+                "branch": "main",
+                "token": "",
+                "image_path": "images",
+                "base_url": ""
+            }
+        }
+    }
+}
+```
+
+**注意：** 配置文件中的敏感字段（如`sender_password`和`token`）应留空，系统会自动从环境变量中读取值：
+- `sender_password` 从环境变量 `CRAWLER_EMAIL_PASSWORD` 中读取
+- GitHub `token` 从环境变量 `CRAWLER_GITHUB_TOKEN` 中读取
+
+### 主要配置项
 
 ### 爬虫配置
 

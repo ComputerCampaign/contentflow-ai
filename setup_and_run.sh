@@ -41,7 +41,14 @@ fi
 # 一步创建虚拟环境并安装所有依赖
 echo "\n创建虚拟环境并安装依赖..."
 uv sync
-uv pip install bs4
+
+# 检查.env文件是否存在，如果不存在则提示创建
+if [ ! -f ".env" ] && [ -f ".env.example" ]; then
+    echo "\n提示：未找到.env文件，但发现.env.example文件"
+    echo "建议复制.env.example为.env并填入您的敏感信息："
+    echo "cp .env.example .env"
+    echo "然后编辑.env文件填入您的实际值"
+fi
 
 echo "\n=== 环境设置完成! ==="
 

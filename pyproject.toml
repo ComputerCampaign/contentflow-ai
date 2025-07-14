@@ -21,6 +21,7 @@ dependencies = [
     "pandas>=1.4.3",
     "selenium>=4.4.3",
     "webdriver-manager>=3.8.3",
+    "python-dotenv>=1.0.0",  # 用于加载.env文件中的环境变量
 ]
 
 [project.optional-dependencies]

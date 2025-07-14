@@ -8,6 +8,18 @@
 import os
 import json
 import logging
+from os import environ
+
+# 尝试加载.env文件中的环境变量
+try:
+    from dotenv import load_dotenv
+    # 加载.env文件中的环境变量
+    load_dotenv()
+    logger = logging.getLogger(__name__)
+    logger.info("已加载.env文件中的环境变量")
+except ImportError:
+    logger = logging.getLogger(__name__)
+    logger.warning("未安装python-dotenv库，无法从.env文件加载环境变量。该库已包含在项目依赖中，请使用uv sync安装所有依赖")
 
 # 设置日志
 logging.basicConfig(level=logging.INFO,
@@ -90,6 +102,9 @@ class Config:
             except Exception as e:
                 logger.error(f"创建默认配置文件失败: {str(e)}")
         
+        # 从环境变量加载敏感信息
+        self._load_from_environment(default_config)
+        
         return default_config
     
     def _merge_config(self, default_config, user_config):
@@ -107,6 +122,30 @@ class Config:
                     default_config[key] = value
             else:
                 default_config[key] = value
+    
+    def _load_from_environment(self, config):
+        """从环境变量加载敏感信息
+        
+        环境变量命名规则：
+        - CRAWLER_EMAIL_PASSWORD: 邮件密码
+        - CRAWLER_GITHUB_TOKEN: GitHub令牌
+        
+        Args:
+            config (dict): 配置字典
+        """
+        # 加载邮件密码
+        email_password = environ.get('CRAWLER_EMAIL_PASSWORD')
+        if email_password:
+            config['email']['sender_password'] = email_password
+            logger.info("已从环境变量加载邮件密码")
+        
+        # 加载GitHub令牌
+        github_token = environ.get('CRAWLER_GITHUB_TOKEN')
+        if github_token and 'blog' in config and 'image_storage' in config['blog'] and 'github' in config['blog']['image_storage']:
+            config['blog']['image_storage']['github']['token'] = github_token
+            logger.info("已从环境变量加载GitHub令牌")
+        
+        # 可以根据需要添加更多敏感信息的加载
     
     def get(self, section, key=None, default=None):
         """获取配置值

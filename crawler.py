@@ -85,7 +85,7 @@ class Crawler:
             logger.info("Selenium WebDriver初始化成功")
             
         except ImportError:
-            logger.error("未安装Selenium或相关依赖，请先安装: pip install selenium webdriver-manager")
+            logger.error("未安装Selenium或相关依赖，这些依赖已包含在项目中，请使用uv sync安装所有依赖")
             sys.exit(1)
         except Exception as e:
             logger.error(f"初始化Selenium失败: {str(e)}")
