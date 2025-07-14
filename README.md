@@ -22,16 +22,30 @@
 
 ### 快速设置（推荐）
 
-项目使用uv进行依赖管理，提供了简单的一步式环境设置：
+项目使用uv进行依赖管理，推荐使用以下脚本快速设置环境：
 
 ```bash
-./setup.sh
+./setup_and_run.sh
 ```
 
 这个脚本会自动：
 1. 检查并安装uv（如果需要）
-2. 创建虚拟环境
-3. 安装所有项目依赖
+2. 创建虚拟环境并安装所有依赖
+3. 自动激活虚拟环境
+4. 验证Python环境是否正确
+5. 提供后续操作指导
+
+您还可以使用此脚本直接运行测试：
+
+```bash
+./setup_and_run.sh --test [可选的测试文件路径]
+```
+
+或查看帮助信息：
+
+```bash
+./setup_and_run.sh --help
+```
 
 ### 手动设置
 
@@ -57,9 +71,68 @@ uv pip install -e ".[dev]"
 
 ### 虚拟环境管理
 
-详细的虚拟环境管理指南请参考：
-- [UV_VENV_GUIDE.md](UV_VENV_GUIDE.md) - 详细的uv虚拟环境指南
-- [UV_GUIDE.md](UV_GUIDE.md) - uv依赖管理指南
+#### 什么是虚拟环境？
+
+虚拟环境是一个独立的Python环境，它允许您为不同的项目安装不同版本的包，而不会相互干扰。这对于管理项目依赖非常重要，特别是当不同项目需要不同版本的同一个包时。
+
+#### uv虚拟环境的优势
+
+- **速度快**：uv创建虚拟环境比传统工具快10-100倍
+- **简单**：单一命令即可创建和管理虚拟环境
+- **兼容性**：与现有的virtualenv和venv格式兼容
+- **轻量级**：最小化依赖，减少出错可能
+
+#### 基本虚拟环境操作
+
+```bash
+# 手动创建虚拟环境
+uv venv
+
+# 激活虚拟环境
+source .venv/bin/activate
+
+# 退出虚拟环境
+deactivate
+
+# 删除虚拟环境
+rm -rf .venv
+```
+
+#### uv依赖管理常用命令
+
+```bash
+# 安装特定包
+uv pip install package_name
+
+# 更新依赖
+uv pip install --upgrade .
+
+# 查看已安装的包
+uv pip list
+
+# 卸载包
+uv pip uninstall package_name
+
+# 导出当前环境的依赖
+uv pip freeze > requirements.txt
+```
+
+#### uv与pip的区别
+
+- uv比pip快10-100倍
+- uv内置了虚拟环境管理功能
+- uv使用Rust编写，内存安全且高效
+- uv可以直接从pyproject.toml安装依赖
+- uv支持并行下载和安装
+- uv提供sync命令，一步完成环境设置
+
+#### 最佳实践
+
+1. **为每个项目创建单独的虚拟环境**：避免依赖冲突
+2. **使用版本控制忽略虚拟环境目录**：在.gitignore中添加`.venv/`
+3. **记录项目依赖**：使用pyproject.toml或requirements.txt
+4. **使用uv sync简化环境设置**：一步完成环境创建和依赖安装
+5. **定期更新依赖**：使用`uv pip install --upgrade`
 
 ## 配置文件
 
@@ -102,10 +175,30 @@ uv pip install -e ".[dev]"
     "image_storage": {
         "type": "local",
         "base_url": "http://example.com/images/",
-        "local_path": "static/images"
+        "local_path": "static/images",
+        "github": {
+            "enabled": false,
+            "repo_owner": "your-github-username",
+            "repo_name": "your-image-repo",
+            "branch": "main",
+            "token": "",
+            "image_path": "images",
+            "base_url": ""
+        }
     }
 }
 ```
+
+图片存储支持两种类型：
+- `local`: 将图片存储在本地目录
+- `github`: 将图片上传到GitHub仓库作为图床
+
+要使用GitHub图床，需要设置以下参数：
+1. 将 `image_storage.type` 设置为 `github`
+2. 将 `image_storage.github.enabled` 设置为 `true`
+3. 设置 `repo_owner` 和 `repo_name` 为您的GitHub用户名和仓库名
+4. 设置 `token` 为您的GitHub个人访问令牌（需要有repo权限）
+5. 可选：自定义 `branch`、`image_path` 和 `base_url`
 
 您可以通过编辑配置文件或使用命令行参数来修改这些设置。
 
@@ -168,8 +261,6 @@ python generate_blog.py --images image1.jpg image2.jpg --metadata metadata.json 
 .
 ├── .uv/                # uv配置目录
 ├── README.md           # 项目说明文档
-├── UV_GUIDE.md         # uv依赖管理指南
-├── UV_VENV_GUIDE.md    # uv虚拟环境详细指南
 ├── pyproject.toml      # 项目配置和依赖管理（uv）
 ├── config/             # 配置目录
 │   ├── __init__.py     # 配置包初始化文件
@@ -181,7 +272,7 @@ python generate_blog.py --images image1.jpg image2.jpg --metadata metadata.json 
 │       └── detailed_template.md # 详细博客模板
 ├── crawler.py          # 主爬虫脚本
 ├── generate_blog.py    # 独立博客生成脚本
-├── setup.sh            # 简化的环境设置脚本
+├── setup_and_run.sh    # 环境设置和运行脚本
 ├── examples/           # 示例目录
 │   ├── metadata_example.json # 示例元数据文件
 │   ├── generate_blog_example.sh # 博客生成示例脚本

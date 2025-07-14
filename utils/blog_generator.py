@@ -20,6 +20,9 @@ from bs4 import BeautifulSoup
 # 导入配置
 from config import config
 
+# 导入GitHub图床上传器
+from utils.github_image_uploader import GitHubImageUploader
+
 # 设置日志
 logging.basicConfig(level=logging.INFO,
                    format='%(asctime)s - %(levelname)s - %(message)s')
@@ -39,6 +42,9 @@ class BlogGenerator:
         self.image_storage_type = config.get('blog', 'image_storage', {}).get('type', 'local')
         self.image_base_url = config.get('blog', 'image_storage', {}).get('base_url', 'http://example.com/images/')
         self.image_local_path = config.get('blog', 'image_storage', {}).get('local_path', 'static/images')
+        
+        # 初始化GitHub图床上传器
+        self.github_uploader = GitHubImageUploader()
         
         # 检查是否启用了博客生成
         if not self.enabled:
@@ -140,6 +146,27 @@ class BlogGenerator:
                 return os.path.join(self.image_base_url, new_file_name)
             except Exception as e:
                 logger.error(f"复制图片失败: {str(e)}")
+                return ""
+        elif self.image_storage_type == 'github':
+            # GitHub图床存储
+            if self.github_uploader.is_configured():
+                # 使用GitHub图床上传器上传图片
+                image_url = self.github_uploader.upload_image(image_path)
+                if image_url:
+                    return image_url
+                else:
+                    logger.warning("上传图片到GitHub失败，将使用本地存储作为备选")
+            else:
+                logger.warning("GitHub图床未正确配置，将使用本地存储作为备选")
+                
+            # 如果GitHub上传失败或未配置，使用本地存储作为备选
+            dest_path = os.path.join(self.image_local_path, new_file_name)
+            try:
+                shutil.copy2(image_path, dest_path)
+                logger.info(f"图片已复制到本地存储(备选): {dest_path}")
+                return os.path.join(self.image_base_url, new_file_name)
+            except Exception as e:
+                logger.error(f"复制图片到本地存储(备选)失败: {str(e)}")
                 return ""
         else:
             # 其他存储类型（如S3、OSS等）可以在这里扩展
