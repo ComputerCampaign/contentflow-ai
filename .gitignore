@@ -77,7 +77,6 @@ static/images/*
 # 示例输出目录
 example_output/
 example_selenium_output/
-data/
 *.log
 
 # 操作系统
