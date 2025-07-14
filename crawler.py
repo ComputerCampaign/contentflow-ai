@@ -11,7 +11,7 @@ import json
 from urllib.parse import urlparse
 
 # 导入自定义模块
-from utils import Downloader, Parser, notifier, blog_generator
+from utils import Downloader, Parser, notifier, blog_generator, xpath_manager
 from config import config
 
 # 设置日志
@@ -261,17 +261,9 @@ def main():
     config.save()
     
     # 如果指定了列出规则
-    if args.list_rules and 'xpath_manager' in dir(utils):
-        print("\n可用的XPath规则列表:")
-        print("-" * 80)
-        print(f"{'ID':<15} {'名称':<20} {'描述':<30} {'域名匹配':<20}")
-        print("-" * 80)
-        for rule in utils.xpath_manager.rules:
-            domain_patterns = ', '.join(rule.get('domain_patterns', [])[:3])
-            if len(rule.get('domain_patterns', [])) > 3:
-                domain_patterns += '...' 
-            print(f"{rule.get('id', ''):<15} {rule.get('name', ''):<20} {rule.get('description', ''):<30} {domain_patterns:<20}")
-        print("-" * 80)
+    if args.list_rules:
+        from utils.xpath_manager import list_rules
+        print(list_rules())
         sys.exit(0)
     
     # 验证URL

@@ -126,5 +126,29 @@ class XPathManager:
 # 创建全局XPath规则管理器实例
 xpath_manager = XPathManager()
 
+def list_rules():
+    """列出所有可用的XPath规则
+    
+    Returns:
+        str: 格式化的规则列表字符串
+    """
+    if not xpath_manager.rules:
+        return "未找到任何XPath规则。请确保规则文件存在且格式正确。"
+    
+    output = "\n可用的XPath规则列表:\n"
+    output += "-" * 80 + "\n"
+    output += f"{'ID':<15} {'名称':<20} {'描述':<30} {'域名匹配':<20}\n"
+    output += "-" * 80 + "\n"
+    
+    for rule in xpath_manager.rules:
+        domain_patterns = ', '.join(rule.get('domain_patterns', [])[:3])
+        if len(rule.get('domain_patterns', [])) > 3:
+            domain_patterns += '...'
+        output += f"{rule.get('id', ''):<15} {rule.get('name', ''):<20} {rule.get('description', ''):<30} {domain_patterns:<20}\n"
+    
+    output += "-" * 80 + "\n"
+    output += "\n使用方法: python crawler.py --url <URL> --rule-id <规则ID>\n"
+    return output
+
 # 导出XPath规则管理器实例，方便其他模块导入
-__all__ = ['xpath_manager']
+__all__ = ['xpath_manager', 'list_rules']
