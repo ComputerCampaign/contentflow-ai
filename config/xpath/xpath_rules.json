@@ -1,0 +1,25 @@
+{
+    "rules": [
+        {
+            "id": "reddit_media",
+            "name": "Reddit媒体图片",
+            "description": "Reddit网站媒体图片区域",
+            "domain_patterns": ["reddit.com", "www.reddit.com"],
+            "xpath": "//div[contains(@class, 'media-lightbox-img')]"
+        },
+        {
+            "id": "twitter_media",
+            "name": "Twitter媒体图片",
+            "description": "Twitter网站媒体图片区域",
+            "domain_patterns": ["twitter.com", "x.com", "www.twitter.com", "www.x.com"],
+            "xpath": "//div[contains(@data-testid, 'tweetPhoto')]"
+        },
+        {
+            "id": "general_article",
+            "name": "通用文章内容",
+            "description": "通用网站文章内容区域",
+            "domain_patterns": [],
+            "xpath": "//article | //div[contains(@class, 'article')] | //div[contains(@class, 'content')]"
+        }
+    ]
+}

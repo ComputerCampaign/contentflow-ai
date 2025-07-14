@@ -5,5 +5,6 @@ from .downloader import Downloader
 from .parser import Parser
 from .notifier import notifier
 from .blog_generator import blog_generator
+from .xpath_manager import xpath_manager
 
-__all__ = ['Downloader', 'Parser', 'notifier', 'blog_generator']
+__all__ = ['Downloader', 'Parser', 'notifier', 'blog_generator', 'xpath_manager']

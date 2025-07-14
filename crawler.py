@@ -137,11 +137,12 @@ class Crawler:
                     logger.error(f"Selenium请求失败: {url}, 错误: {str(e)}")
                     return False, str(e)
     
-    def crawl(self, url):
+    def crawl(self, url, rule_id=None):
         """爬取指定URL的图片和标题
         
         Args:
             url (str): 要爬取的URL
+            rule_id (str, optional): XPath规则ID，用于指定使用哪个XPath规则
             
         Returns:
             bool: 是否成功
@@ -157,8 +158,29 @@ class Crawler:
                 notifier.send_crawler_report(url, self.data_dir, success=False)
             return False
         
+        # 获取XPath规则
+        xpath_selector = None
+        if 'xpath_manager' in dir(utils):
+            # 如果指定了规则ID，则使用指定的规则
+            if rule_id:
+                xpath_selector = utils.xpath_manager.get_xpath_by_id(rule_id)
+                if xpath_selector:
+                    logger.info(f"使用指定的XPath规则ID: {rule_id}")
+                else:
+                    logger.warning(f"未找到指定的XPath规则ID: {rule_id}，将使用自动匹配")
+            
+            # 如果没有指定规则ID或指定的规则不存在，则根据URL自动匹配
+            if not xpath_selector:
+                xpath_selector = utils.xpath_manager.get_xpath_by_url(url)
+                if xpath_selector:
+                    logger.info(f"根据URL自动匹配XPath规则: {xpath_selector}")
+        
         # 解析HTML
-        parsed_data = self.parser.parse_html(content, url)
+        if xpath_selector:
+            parsed_data = self.parser.parse_with_xpath(content, xpath_selector, url)
+        else:
+            parsed_data = self.parser.parse_html(content, url)
+        
         logger.info(f"解析完成，找到 {len(parsed_data['images'])} 张图片")
         
         # 导出解析结果
@@ -215,6 +237,8 @@ def main():
     parser.add_argument("--disable-email", action="store_true", help="禁用邮件通知")
     parser.add_argument("--enable-blog", action="store_true", help="启用博客生成")
     parser.add_argument("--disable-blog", action="store_true", help="禁用博客生成")
+    parser.add_argument("--rule-id", help="XPath规则ID，用于指定使用哪个XPath规则（例如：reddit_media, twitter_media, general_article）")
+    parser.add_argument("--list-rules", action="store_true", help="列出所有可用的XPath规则")
     
     args = parser.parse_args()
     
@@ -236,6 +260,20 @@ def main():
     # 保存配置更改
     config.save()
     
+    # 如果指定了列出规则
+    if args.list_rules and 'xpath_manager' in dir(utils):
+        print("\n可用的XPath规则列表:")
+        print("-" * 80)
+        print(f"{'ID':<15} {'名称':<20} {'描述':<30} {'域名匹配':<20}")
+        print("-" * 80)
+        for rule in utils.xpath_manager.rules:
+            domain_patterns = ', '.join(rule.get('domain_patterns', [])[:3])
+            if len(rule.get('domain_patterns', [])) > 3:
+                domain_patterns += '...' 
+            print(f"{rule.get('id', ''):<15} {rule.get('name', ''):<20} {rule.get('description', ''):<30} {domain_patterns:<20}")
+        print("-" * 80)
+        sys.exit(0)
+    
     # 验证URL
     try:
         result = urlparse(args.url)
@@ -256,8 +294,8 @@ def main():
     )
     
     try:
-        # 开始爬取
-        success = crawler.crawl(args.url)
+        # 开始爬取，传入规则ID
+        success = crawler.crawl(args.url, args.rule_id)
         if not success:
             sys.exit(1)
     except KeyboardInterrupt:

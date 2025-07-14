@@ -32,7 +32,6 @@ dev = [
 ]
 
 [tool.uv]
-virtualenv = ".venv"
 
 [tool.hatch.build.targets.wheel]
 packages = ["utils", "."]
