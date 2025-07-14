@@ -107,9 +107,10 @@ class Downloader:
             base_url (str, optional): 基础URL，用于处理相对路径
             
         Returns:
-            dict: 下载结果，键为URL，值为本地路径或错误信息
+            list: 下载成功的图片信息列表，每个元素为包含url和local_path的字典
         """
         results = {}
+        downloaded_images = []
         
         for img_url in img_urls:
             success, result = self.download_image(img_url, base_url)
@@ -117,9 +118,16 @@ class Downloader:
                 'success': success,
                 'local_path' if success else 'error': result
             }
+            
+            # 如果下载成功，添加到下载图片列表
+            if success:
+                downloaded_images.append({
+                    'url': img_url,
+                    'local_path': result
+                })
         
         # 统计下载结果
         success_count = sum(1 for r in results.values() if r['success'])
         self.logger.info(f"图片下载完成: {success_count}/{len(img_urls)} 成功")
         
-        return results
+        return downloaded_images

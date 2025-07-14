@@ -48,7 +48,33 @@ venv.bak/
 *.swo
 
 # 项目特定
-output/
+# 数据目录内容，但保留.gitkeep文件
+data/*
+!data/.gitkeep
+!data/*/
+data/*/*
+!data/*/.gitkeep
+!data/README.md
+
+# 输出目录内容，但保留.gitkeep文件
+output/*
+!output/.gitkeep
+!output/README.md
+
+# 博客目录内容，但保留.gitkeep文件
+blogs/*
+!blogs/.gitkeep
+!blogs/*/
+blogs/*/*
+!blogs/*/.gitkeep
+!blogs/README.md
+
+# 静态资源目录内容，但保留.gitkeep文件
+static/images/*
+!static/images/.gitkeep
+!static/images/README.md
+
+# 示例输出目录
 example_output/
 example_selenium_output/
 data/
