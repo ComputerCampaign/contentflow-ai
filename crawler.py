@@ -11,7 +11,8 @@ import json
 from urllib.parse import urlparse
 
 # 导入自定义模块
-from utils import Downloader, Parser, notifier, blog_generator, xpath_manager
+from utils import notifier, blog_generator
+from crawler_utils import StorageManager, BatchDownloader, HtmlParser, ImageDownloader, XPathManager
 from config import config
 
 # 设置日志
@@ -22,7 +23,7 @@ logger = logging.getLogger(__name__)
 class Crawler:
     """网页爬虫，用于抓取图片和标题信息"""
     
-    def __init__(self, output_dir=None, data_dir=None, timeout=None, retry=None, use_selenium=None):
+    def __init__(self, output_dir=None, data_dir=None, timeout=None, retry=None, use_selenium=None, max_workers=5):
         """初始化爬虫
         
         Args:
@@ -31,6 +32,7 @@ class Crawler:
             timeout (int, optional): 请求超时时间（秒）
             retry (int, optional): 失败重试次数
             use_selenium (bool, optional): 是否使用Selenium
+            max_workers (int, optional): 最大并发下载数
         """
         # 从配置中加载设置，如果参数提供则覆盖配置
         self.output_dir = output_dir or config.get('crawler', 'output_dir', 'output')
@@ -38,14 +40,17 @@ class Crawler:
         self.timeout = timeout or config.get('crawler', 'timeout', 10)
         self.retry = retry or config.get('crawler', 'retry', 3)
         self.use_selenium = use_selenium if use_selenium is not None else config.get('crawler', 'use_selenium', False)
+        self.max_workers = max_workers
         
         # 创建输出目录和数据目录
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.data_dir, exist_ok=True)
         
-        # 初始化下载器和解析器
-        self.downloader = Downloader(self.data_dir, self.timeout, self.retry)
-        self.parser = Parser()
+        # 初始化存储管理器
+        self.storage_manager = StorageManager(self.data_dir)
+        
+        # 初始化解析器
+        self.html_parser = HtmlParser()
         
         # 初始化会话
         self.session = requests.Session()
@@ -137,18 +142,25 @@ class Crawler:
                     logger.error(f"Selenium请求失败: {url}, 错误: {str(e)}")
                     return False, str(e)
     
-    def crawl(self, url, rule_id=None):
+    def crawl(self, url, rule_id=None, task_id=None):
         """爬取指定URL的图片和标题
         
         Args:
             url (str): 要爬取的URL
             rule_id (str, optional): XPath规则ID，用于指定使用哪个XPath规则
+            task_id (str, optional): 任务ID，如果不提供则自动生成
             
         Returns:
-            bool: 是否成功
+            tuple: (是否成功, 任务ID, 任务目录) 如果使用基于任务的爬取
+            bool: 是否成功 如果使用传统爬取方式
         """
         logger.info(f"开始爬取: {url}")
         
+        # 如果提供了任务ID，使用基于任务的爬取方式
+        if task_id is not None or config.get('crawler', 'use_task_based', False):
+            return self.crawl_task_based(url, task_id, rule_id)
+        
+        # 否则使用传统爬取方式（保持向后兼容性）
         # 获取URL内容
         success, content = self.fetch_url(url)
         if not success:
@@ -160,31 +172,36 @@ class Crawler:
         
         # 获取XPath规则
         xpath_selector = None
-        if 'xpath_manager' in dir(utils):
-            # 如果指定了规则ID，则使用指定的规则
-            if rule_id:
-                xpath_selector = utils.xpath_manager.get_xpath_by_id(rule_id)
-                if xpath_selector:
-                    logger.info(f"使用指定的XPath规则ID: {rule_id}")
-                else:
-                    logger.warning(f"未找到指定的XPath规则ID: {rule_id}，将使用自动匹配")
-            
-            # 如果没有指定规则ID或指定的规则不存在，则根据URL自动匹配
-            if not xpath_selector:
-                xpath_selector = utils.xpath_manager.get_xpath_by_url(url)
-                if xpath_selector:
-                    logger.info(f"根据URL自动匹配XPath规则: {xpath_selector}")
+        # 初始化XPath管理器
+        xpath_manager = XPathManager()
+        # 如果指定了规则ID，则使用指定的规则
+        if rule_id:
+            rule = xpath_manager.get_rule_by_id(rule_id)
+            if rule:
+                xpath_selector = xpath_manager.get_xpath_selector(rule)
+                logger.info(f"使用指定的XPath规则ID: {rule_id}")
+            else:
+                logger.warning(f"未找到指定的XPath规则ID: {rule_id}，将使用自动匹配")
+        
+        # 如果没有指定规则ID或指定的规则不存在，则根据URL自动匹配
+        if not xpath_selector:
+            rule = xpath_manager.get_rule_for_url(url)
+            if rule:
+                xpath_selector = xpath_manager.get_xpath_selector(rule)
+                logger.info(f"根据URL自动匹配XPath规则: {rule.get('id', 'unknown')}")
+
         
         # 解析HTML
         if xpath_selector:
-            parsed_data = self.parser.parse_with_xpath(content, xpath_selector, url)
+            parsed_data = self.html_parser.parse_with_xpath(content, xpath_selector, url)
         else:
-            parsed_data = self.parser.parse_html(content, url)
+            parsed_data = self.html_parser.parse_html(content, url)
         
         logger.info(f"解析完成，找到 {len(parsed_data['images'])} 张图片")
         
         # 导出解析结果
-        self.parser.export_to_csv(parsed_data, self.data_dir)
+        images_csv_path = self.storage_manager.save_images_csv(self.data_dir, parsed_data['images'])
+        logger.info(f"图片数据已导出到: {images_csv_path}")
         
         # 保存页面信息到JSON
         try:
@@ -198,8 +215,10 @@ class Crawler:
         # 下载图片
         downloaded_images = []
         if parsed_data['images']:
-            img_urls = [img['url'] for img in parsed_data['images']]
-            downloaded_images = self.downloader.download_images(img_urls, url)
+            # 初始化批量下载器
+            batch_downloader = BatchDownloader(self.storage_manager, self.timeout, self.retry, self.max_workers)
+            # 下载图片
+            downloaded_images = batch_downloader.download_images(parsed_data['images'], url, self.data_dir)
         
         # 生成博客
         if blog_generator.enabled:
@@ -215,6 +234,102 @@ class Crawler:
         
         logger.info(f"爬取完成: {url}")
         return True
+        
+    def crawl_task_based(self, url, task_id=None, rule_id=None):
+        """基于任务的爬取方式
+        
+        Args:
+            url (str): 要爬取的URL
+            task_id (str, optional): 任务ID，如果不提供则自动生成
+            rule_id (str, optional): XPath规则ID，用于指定使用哪个XPath规则
+            
+        Returns:
+            tuple: (是否成功, 任务ID, 任务目录)
+        """
+        # 创建任务目录
+        task_id, task_dir = self.storage_manager.create_task_directory(task_id, url)
+        logger.info(f"任务ID: {task_id}, 任务目录: {task_dir}")
+        
+        # 获取URL内容
+        success, content = self.fetch_url(url)
+        if not success:
+            logger.error(f"获取页面失败: {content}")
+            # 发送失败通知
+            if notifier.enabled:
+                notifier.send_crawler_report(url, task_dir, success=False)
+            return False, task_id, task_dir
+        
+        # 保存页面HTML
+        html_path = self.storage_manager.save_page_html(task_dir, url, content)
+        
+        # 获取XPath规则
+        xpath_selector = None
+        # 如果指定了规则ID，则使用指定的规则
+        if rule_id:
+            xpath_selector = xpath_manager.get_xpath_by_id(rule_id)
+            if xpath_selector:
+                logger.info(f"使用指定的XPath规则ID: {rule_id}")
+            else:
+                logger.warning(f"未找到指定的XPath规则ID: {rule_id}，将使用自动匹配")
+        
+        # 如果没有指定规则ID或指定的规则不存在，则根据URL自动匹配
+        if not xpath_selector:
+            xpath_selector = xpath_manager.get_xpath_by_url(url)
+            if xpath_selector:
+                logger.info(f"根据URL自动匹配XPath规则: {xpath_selector}")
+        
+        # 解析HTML
+        if xpath_selector:
+            parsed_data = self.html_parser.parse_with_xpath(content, xpath_selector, url)
+        else:
+            parsed_data = self.html_parser.parse_html(content, url)
+        
+        logger.info(f"解析完成，找到 {len(parsed_data['images'])} 张图片")
+        
+        # 保存页面信息到JSON
+        page_info_path = self.storage_manager.save_page_info(task_dir, parsed_data)
+        
+        # 下载图片
+        if parsed_data['images']:
+            # 初始化批量下载器
+            batch_downloader = BatchDownloader(
+                self.storage_manager,
+                self.timeout,
+                self.retry,
+                self.max_workers
+            )
+            
+            # 下载图片
+            downloaded_images = batch_downloader.download_images(
+                parsed_data['images'],
+                url,
+                task_dir
+            )
+            
+            # 更新图片数据
+            parsed_data['images'] = downloaded_images
+            
+            # 保存更新后的页面信息
+            self.storage_manager.save_page_info(task_dir, parsed_data)
+            
+            # 导出图片数据到CSV
+            if downloaded_images:
+                self.storage_manager.save_images_csv(task_dir, downloaded_images)
+        
+        # 生成博客
+        if blog_generator.enabled:
+            blog_success, blog_path = blog_generator.generate_blog(url, content, parsed_data, task_dir)
+            if blog_success:
+                logger.info(f"博客已生成: {blog_path}")
+            else:
+                logger.warning("博客生成失败")
+        
+        # 发送邮件通知
+        if notifier.enabled:
+            notifier.send_crawler_report(url, task_dir, success=True)
+        
+        logger.info(f"爬取完成: {url}")
+        return True, task_id, task_dir
     
     def close(self):
         """关闭资源"""
@@ -227,6 +342,7 @@ def main():
     # 解析命令行参数
     parser = argparse.ArgumentParser(description="网页图片和标题爬虫")
     parser.add_argument("--url", required=True, help="要爬取的网页URL")
+    parser.add_argument("--task-id", help="任务ID，如果不提供则自动生成")
     parser.add_argument("--output", help="输出目录，用于临时文件和日志（默认使用配置文件设置）")
     parser.add_argument("--data-dir", help="数据存储目录，用于保存图片和元数据（默认使用配置文件设置）")
     parser.add_argument("--use-selenium", action="store_true", help="使用Selenium和ChromeDriver进行爬取")
@@ -286,8 +402,8 @@ def main():
     )
     
     try:
-        # 开始爬取，传入规则ID
-        success = crawler.crawl(args.url, args.rule_id)
+        # 开始爬取，传入规则ID和任务ID
+        success = crawler.crawl(args.url, args.rule_id, args.task_id)
         if not success:
             sys.exit(1)
     except KeyboardInterrupt:

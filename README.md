@@ -12,6 +12,8 @@
 - 支持邮件通知功能，可在爬取完成后发送结果报告
 - 支持自动生成Markdown格式的博客文章
 - 支持图片上传到本地或远程存储
+- 支持XPath规则配置，精确定位网页内容
+- 支持基于任务ID的爬取，便于管理多个爬取任务
 
 ## 环境要求
 
@@ -25,26 +27,33 @@
 项目使用uv进行依赖管理，推荐使用以下脚本快速设置环境：
 
 ```bash
-./setup_and_run.sh
+source ./setup_and_run.sh
+# 或
+. ./setup_and_run.sh
 ```
 
+**注意：** 必须使用source命令运行此脚本，才能正确激活虚拟环境。
+
 这个脚本会自动：
-1. 检查并安装uv（如果需要）
-2. 创建虚拟环境并安装所有依赖
-3. 自动激活虚拟环境
-4. 验证Python环境是否正确
-5. 提供后续操作指导
+1. 创建虚拟环境并安装所有依赖
+2. 自动激活虚拟环境
+3. 验证Python环境是否正确
+4. 检查.env文件是否存在，如果不存在则提示创建
 
 您还可以使用此脚本直接运行测试：
 
 ```bash
-./setup_and_run.sh --test [可选的测试文件路径]
+source ./setup_and_run.sh --test [可选的测试文件路径]
+# 或
+. ./setup_and_run.sh --test [可选的测试文件路径]
 ```
 
 或查看帮助信息：
 
 ```bash
-./setup_and_run.sh --help
+source ./setup_and_run.sh --help
+# 或
+. ./setup_and_run.sh --help
 ```
 
 ### 手动设置
@@ -61,78 +70,11 @@ uv sync
 source .venv/bin/activate
 ```
 
-### 安装开发依赖
-
-如果需要安装开发依赖（如测试工具），可以使用：
+### 退出虚拟环境
 
 ```bash
-uv pip install -e ".[dev]"
-```
-
-### 虚拟环境管理
-
-#### 什么是虚拟环境？
-
-虚拟环境是一个独立的Python环境，它允许您为不同的项目安装不同版本的包，而不会相互干扰。这对于管理项目依赖非常重要，特别是当不同项目需要不同版本的同一个包时。
-
-#### uv虚拟环境的优势
-
-- **速度快**：uv创建虚拟环境比传统工具快10-100倍
-- **简单**：单一命令即可创建和管理虚拟环境
-- **兼容性**：与现有的virtualenv和venv格式兼容
-- **轻量级**：最小化依赖，减少出错可能
-
-#### 基本虚拟环境操作
-
-```bash
-# 手动创建虚拟环境
-uv venv
-
-# 激活虚拟环境
-source .venv/bin/activate
-
-# 退出虚拟环境
 deactivate
-
-# 删除虚拟环境
-rm -rf .venv
 ```
-
-#### uv依赖管理常用命令
-
-```bash
-# 安装特定包
-uv pip install package_name
-
-# 更新依赖
-uv pip install --upgrade .
-
-# 查看已安装的包
-uv pip list
-
-# 卸载包
-uv pip uninstall package_name
-
-# 导出当前环境的依赖
-uv pip freeze > requirements.txt
-```
-
-#### uv与pip的区别
-
-- uv比pip快10-100倍
-- uv内置了虚拟环境管理功能
-- uv使用Rust编写，内存安全且高效
-- uv可以直接从pyproject.toml安装依赖
-- uv支持并行下载和安装
-- uv提供sync命令，一步完成环境设置
-
-#### 最佳实践
-
-1. **为每个项目创建单独的虚拟环境**：避免依赖冲突
-2. **使用版本控制忽略虚拟环境目录**：在.gitignore中添加`.venv/`
-3. **记录项目依赖**：使用pyproject.toml或requirements.txt
-4. **使用uv sync简化环境设置**：一步完成环境创建和依赖安装
-5. **定期更新依赖**：使用`uv pip install --upgrade`
 
 ## 配置文件
 
@@ -163,7 +105,7 @@ CRAWLER_GITHUB_TOKEN=your-github-token
 ```
 
 **注意：** 
-- 项目已包含`python-dotenv`库作为依赖，通过`uv sync`命令安装
+- 项目已包含`python-dotenv`库作为依赖
 - 如果您使用`setup_and_run.sh`脚本，它会自动检查`.env`文件是否存在，并提示您创建
 
 #### 方法2：直接设置系统环境变量
@@ -319,12 +261,23 @@ touch config/config.json
 ### 基本用法
 
 ```bash
+# 基本爬取
 python crawler.py --url "https://example.com" --output "output_folder" --data-dir "data_folder"
+
+# 使用任务ID爬取
+python crawler.py --url "https://example.com" --task-id "my_task" --output "output_folder"
+
+# 使用XPath规则爬取
+python crawler.py --url "https://www.reddit.com/r/pics" --rule-id "reddit_media"
+
+# 列出所有可用的XPath规则
+python crawler.py --list-rules
 ```
 
 ### 参数说明
 
 - `--url`: 要爬取的网页URL（必需）
+- `--task-id`: 任务ID，如果不提供则自动生成，用于管理多个爬取任务
 - `--output`: 输出目录，用于临时文件和日志（默认使用配置文件设置）
 - `--data-dir`: 数据存储目录，用于保存图片和元数据（默认使用配置文件设置）
 - `--use-selenium`: 使用Selenium和ChromeDriver进行爬取（默认使用配置文件设置）
@@ -335,6 +288,8 @@ python crawler.py --url "https://example.com" --output "output_folder" --data-di
 - `--disable-email`: 禁用邮件通知
 - `--enable-blog`: 启用博客生成
 - `--disable-blog`: 禁用博客生成
+- `--rule-id`: XPath规则ID，用于指定使用哪个XPath规则（例如：reddit_media, twitter_media, general_article）
+- `--list-rules`: 列出所有可用的XPath规则
 
 ### 独立博客生成
 
@@ -371,31 +326,40 @@ python generate_blog.py --images image1.jpg image2.jpg --metadata metadata.json 
 
 ```
 .
-├── .uv/                # uv配置目录
 ├── README.md           # 项目说明文档
-├── pyproject.toml      # 项目配置和依赖管理（uv）
+├── pyproject.toml      # 项目配置和依赖管理
 ├── config/             # 配置目录
 │   ├── __init__.py     # 配置包初始化文件
 │   ├── config.py       # 配置管理模块
 │   ├── config.json     # 配置文件
-│   └── templates/      # 模板目录
-│       ├── blog_template.md  # 默认博客模板
-│       ├── simple_template.md # 简单博客模板
-│       └── detailed_template.md # 详细博客模板
+│   ├── templates/      # 模板目录
+│   │   ├── blog_template.md  # 默认博客模板
+│   │   ├── simple_template.md # 简单博客模板
+│   │   └── detailed_template.md # 详细博客模板
+│   └── xpath/          # XPath规则目录
+│       ├── README_XPATH.md # XPath规则说明文档
+│       └── xpath_rules.json # XPath规则配置文件
 ├── crawler.py          # 主爬虫脚本
 ├── generate_blog.py    # 独立博客生成脚本
 ├── setup_and_run.sh    # 环境设置和运行脚本
 ├── examples/           # 示例目录
 │   ├── metadata_example.json # 示例元数据文件
 │   ├── generate_blog_example.sh # 博客生成示例脚本
+│   ├── crawler_example.sh # 爬虫功能示例脚本
 │   ├── images/         # 示例图片目录
 │   └── output/         # 示例输出目录
 ├── utils/              # 工具函数
 │   ├── __init__.py
-│   ├── downloader.py   # 下载器
-│   ├── parser.py       # 解析器
 │   ├── notifier.py     # 邮件通知模块
-│   └── blog_generator.py # 博客生成模块
+│   ├── blog_generator.py # 博客生成模块
+│   └── github_image_uploader.py # GitHub图片上传模块
+├── crawler_utils/      # 爬虫工具函数
+│   ├── __init__.py
+│   ├── batch_downloader.py # 批量下载器
+│   ├── html_parser.py  # HTML解析器
+│   ├── image_downloader.py # 图片下载器
+│   ├── storage_manager.py # 存储管理器
+│   └── xpath_manager.py # XPath管理器
 ├── blogs/              # 生成的博客目录
 │   ├── drafts/         # 博客草稿目录
 │   └── published/      # 已发布博客目录
@@ -406,6 +370,56 @@ python generate_blog.py --images image1.jpg image2.jpg --metadata metadata.json 
     ├── images/         # 原始图片存储目录
     └── metadata/       # 元数据存储目录
 ```
+
+## XPath规则配置
+
+项目支持使用XPath规则来精确定位网页内容，提高爬取效率和准确性。
+
+### XPath规则文件
+
+XPath规则存储在 `config/xpath/xpath_rules.json` 文件中，采用JSON格式。每条规则包含以下字段：
+
+- `id`: 规则的唯一标识符
+- `name`: 规则的名称
+- `description`: 规则的描述
+- `domain_patterns`: 适用的域名模式列表，用于自动匹配
+- `xpath`: XPath表达式，用于限定爬取区域
+
+### 使用XPath规则
+
+1. 使用指定的XPath规则ID爬取网页：
+
+```bash
+python crawler.py --url https://www.reddit.com/r/pics --rule-id reddit_media
+```
+
+2. 使用自动匹配的XPath规则爬取网页（根据域名自动选择规则）：
+
+```bash
+python crawler.py --url https://www.reddit.com/r/pics
+```
+
+3. 列出所有可用的XPath规则：
+
+```bash
+python crawler.py --list-rules
+```
+
+更多关于XPath规则的详细信息，请参阅 `config/xpath/README_XPATH.md` 文件。
+
+## 基于任务ID的爬取
+
+项目支持基于任务ID的爬取，便于管理多个爬取任务。
+
+### 使用任务ID
+
+```bash
+python crawler.py --url https://example.com --task-id my_task_name
+```
+
+如果不提供任务ID，系统会自动生成一个基于时间戳的任务ID。
+
+任务ID将用于创建任务目录，所有与该任务相关的数据（图片、元数据等）都会存储在该目录中。
 
 ## 许可证
 

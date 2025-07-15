@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# 这个脚本展示了如何使用generate_blog.py脚本生成博客
+# 博客生成示例脚本
+# 此脚本展示了generate_blog.py的各种使用方式和功能
 
 # 确保当前目录是项目根目录
 cd "$(dirname "$0")/.." || exit
@@ -16,28 +17,53 @@ if [ ! -f examples/images/image1.jpg ]; then
     touch examples/images/image3.jpg
 fi
 
-# 列出可用的模板
-echo "列出可用的模板:"
+# 创建输出目录
+mkdir -p examples/output
+
+# 示例1：列出可用的模板
+echo "示例1：列出可用的模板"
+echo "==================================================="
 python generate_blog.py --list-templates
 
-echo "\n使用默认模板生成博客:"
+# 示例2：使用默认模板生成博客
+echo "\n\n示例2：使用默认模板生成博客"
+echo "==================================================="
 python generate_blog.py \
     --images examples/images/image1.jpg examples/images/image2.jpg examples/images/image3.jpg \
     --metadata examples/metadata_example.json \
     --output examples/output/default_blog.md
 
-echo "\n使用简单模板生成博客:"
+# 示例3：使用简单模板生成博客
+echo "\n\n示例3：使用简单模板生成博客"
+echo "==================================================="
 python generate_blog.py \
     --images examples/images/image1.jpg examples/images/image2.jpg examples/images/image3.jpg \
     --metadata examples/metadata_example.json \
     --template simple_template \
     --output examples/output/simple_blog.md
 
-echo "\n使用详细模板生成博客:"
+# 示例4：使用详细模板生成博客
+echo "\n\n示例4：使用详细模板生成博客"
+echo "==================================================="
 python generate_blog.py \
     --images examples/images/image1.jpg examples/images/image2.jpg examples/images/image3.jpg \
     --metadata examples/metadata_example.json \
     --template detailed_template \
     --output examples/output/detailed_blog.md
+
+# 示例5：不指定图片，仅使用元数据生成博客
+echo "\n\n示例5：不指定图片，仅使用元数据生成博客"
+echo "==================================================="
+python generate_blog.py \
+    --metadata examples/metadata_example.json \
+    --output examples/output/no_images_blog.md
+
+# 示例6：不指定输出路径，使用默认输出目录
+echo "\n\n示例6：不指定输出路径，使用默认输出目录"
+echo "==================================================="
+python generate_blog.py \
+    --images examples/images/image1.jpg \
+    --metadata examples/metadata_example.json \
+    --template simple_template
 
 echo "\n所有博客已生成到 examples/output/ 目录"

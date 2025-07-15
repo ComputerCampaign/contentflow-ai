@@ -102,8 +102,8 @@ if [ "$1" = "--test" ] || [ "$1" = "-t" ]; then
         
         # 提示：已删除测试文件
         echo "\n注意：以下测试文件已移除，因为examples目录中已有完整示例："
-        echo "1. GitHub上传测试文件"
-        echo "   如需测试GitHub上传功能，请参考 examples/github_image_example.py 和 examples/github_image_example.sh"
+        echo "1. 爬虫功能测试文件"
+        echo "   如需测试爬虫功能，请参考 examples/crawler_example.sh"
         echo "2. 博客生成测试文件"
         echo "   如需测试博客生成功能，请参考 examples/generate_blog_example.sh"
     fi

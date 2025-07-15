@@ -1,21 +1,20 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 from bs4 import BeautifulSoup
 import logging
 from urllib.parse import urljoin
-import pandas as pd
-import os
-import json
 from lxml import etree
 
-class Parser:
+logger = logging.getLogger(__name__)
+
+class HtmlParser:
     """HTML解析器，负责从网页中提取图片和标题信息"""
     
     def __init__(self):
         """初始化解析器"""
-        # 设置日志
-        logging.basicConfig(level=logging.INFO, 
-                           format='%(asctime)s - %(levelname)s - %(message)s')
-        self.logger = logging.getLogger(__name__)
-        
+        pass
+    
     def parse_with_xpath(self, html_content, xpath_selector=None, base_url=None):
         """使用XPath解析HTML内容，提取图片和标题
         
@@ -34,7 +33,7 @@ class Parser:
         # 提取页面标题
         title_elements = tree.xpath('//title/text()')
         title = title_elements[0].strip() if title_elements else "未知标题"
-        self.logger.info(f"页面标题: {title}")
+        logger.info(f"页面标题: {title}")
         
         # 如果提供了XPath选择器，则只在指定区域内查找图片
         if xpath_selector:
@@ -42,9 +41,10 @@ class Parser:
             selected_elements = tree.xpath(xpath_selector)
             
             if not selected_elements:
-                self.logger.warning(f"未找到匹配XPath选择器的元素: {xpath_selector}")
+                logger.warning(f"未找到匹配XPath选择器的元素: {xpath_selector}")
                 return {
                     'page_title': title,
+                    'page_url': base_url,
                     'images': [],
                     'headings': []
                 }
@@ -57,9 +57,9 @@ class Parser:
             # 如果没有提供XPath选择器，则在整个页面中查找图片
             img_elements = tree.xpath('//img')
         
-        self.logger.info(f"找到 {len(img_elements)} 个图片标签")
+        logger.info(f"找到 {len(img_elements)} 个图片标签")
         if xpath_selector:
-            self.logger.info(f"使用XPath选择器: {xpath_selector}")
+            logger.info(f"使用XPath选择器: {xpath_selector}")
 
         
         # 提取图片URL和alt文本
@@ -78,7 +78,7 @@ class Parser:
             
             # 提取图片所在的父元素的文本
             parent_text = ''
-            parent_elements = tree.xpath(f"//img[@src='{img_url}']/parent::*/text()")
+            parent_elements = tree.xpath(f"//img[@src='{img.get('src')}']/parent::*/text()")
             if parent_elements:
                 parent_text = ' '.join([text.strip() for text in parent_elements])
                 if len(parent_text) > 200:
@@ -101,6 +101,7 @@ class Parser:
         
         return {
             'page_title': title,
+            'page_url': base_url,
             'images': images,
             'headings': headings
         }
@@ -119,11 +120,11 @@ class Parser:
         
         # 提取页面标题
         title = soup.title.text.strip() if soup.title else "未知标题"
-        self.logger.info(f"页面标题: {title}")
+        logger.info(f"页面标题: {title}")
         
         # 提取所有图片
         img_tags = soup.find_all('img')
-        self.logger.info(f"找到 {len(img_tags)} 个图片标签")
+        logger.info(f"找到 {len(img_tags)} 个图片标签")
         
         # 提取图片URL和alt文本
         images = []
@@ -165,37 +166,7 @@ class Parser:
         
         return {
             'page_title': title,
+            'page_url': base_url,
             'images': images,
             'headings': headings
         }
-    
-    def export_to_csv(self, parsed_data, output_dir):
-        """将解析结果导出为CSV文件
-        
-        Args:
-            parsed_data (dict): 解析结果
-            output_dir (str): 输出目录
-            
-        Returns:
-            str: CSV文件路径
-        """
-        # 确保输出目录存在
-        os.makedirs(output_dir, exist_ok=True)
-        
-        # 创建图片数据框
-        if parsed_data['images']:
-            df_images = pd.DataFrame(parsed_data['images'])
-            csv_path = os.path.join(output_dir, 'images.csv')
-            df_images.to_csv(csv_path, index=False, encoding='utf-8-sig')
-            self.logger.info(f"图片数据已导出到: {csv_path}")
-        else:
-            csv_path = None
-            self.logger.warning("没有找到图片数据，跳过CSV导出")
-        
-        # 导出页面信息为JSON
-        json_path = os.path.join(output_dir, 'page_info.json')
-        with open(json_path, 'w', encoding='utf-8') as f:
-            json.dump(parsed_data, f, ensure_ascii=False, indent=2)
-        self.logger.info(f"页面信息已导出到: {json_path}")
-        
-        return csv_path

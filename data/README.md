@@ -4,8 +4,20 @@
 
 ## 目录结构
 
-- `images/`: 存储爬虫下载的原始图片
-- `metadata/`: 存储爬虫抓取的元数据（如标题、描述等）
+```
+data/
+  └── task_id/
+      ├── images/
+      │   ├── page_name_1.jpg
+      │   ├── page_name_2.png
+      │   └── ...
+      ├── metadata/
+      │   ├── images.csv
+      │   └── page_info.json
+      └── page.html
+```
+
+每个爬取任务都有一个唯一的任务ID，所有相关数据都存储在以任务ID命名的目录中。
 
 ## 注意事项
 
