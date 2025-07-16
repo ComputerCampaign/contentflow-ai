@@ -11,7 +11,6 @@
 import os
 import sys
 import json
-import logging
 import argparse
 import shutil
 import hashlib
@@ -22,10 +21,11 @@ from urllib.parse import urlparse
 # 导入配置
 from config import config
 
+# 导入日志配置
+from utils.logger import setup_logger
+
 # 设置日志
-logging.basicConfig(level=logging.INFO,
-                   format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__, file_path=__file__)
 
 class BlogGenerator:
     """博客生成器，用于根据提供的图片和元数据生成博客文章"""

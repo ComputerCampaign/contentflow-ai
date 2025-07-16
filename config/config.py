@@ -10,21 +10,29 @@ import json
 import logging
 from os import environ
 
+# 设置日志
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# 创建控制台处理器
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+
+# 创建格式化器
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(formatter)
+
+# 添加处理器到日志记录器
+logger.addHandler(console_handler)
+
 # 尝试加载.env文件中的环境变量
 try:
     from dotenv import load_dotenv
     # 加载.env文件中的环境变量
     load_dotenv()
-    logger = logging.getLogger(__name__)
     logger.info("已加载.env文件中的环境变量")
 except ImportError:
-    logger = logging.getLogger(__name__)
     logger.warning("未安装python-dotenv库，无法从.env文件加载环境变量。该库已包含在项目依赖中，请使用uv sync安装所有依赖")
-
-# 设置日志
-logging.basicConfig(level=logging.INFO,
-                   format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
 
 class Config:
     """配置类，用于管理项目的各种配置"""
@@ -139,8 +147,8 @@ class Config:
         
         # 加载GitHub令牌
         github_token = environ.get('CRAWLER_GITHUB_TOKEN')
-        if github_token and 'blog' in config and 'image_storage' in config['blog'] and 'github' in config['blog']['image_storage']:
-            config['blog']['image_storage']['github']['token'] = github_token
+        if github_token and 'crawler' in config and 'image_storage' in config['crawler'] and 'github' in config['crawler']['image_storage']:
+            config['crawler']['image_storage']['github']['token'] = github_token
             logger.info("已从环境变量加载GitHub令牌")
         
         # 可以根据需要添加更多敏感信息的加载

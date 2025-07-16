@@ -7,7 +7,6 @@
 
 import os
 import smtplib
-import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
@@ -18,10 +17,11 @@ import pandas as pd
 # 导入配置
 from config import config
 
+# 导入日志配置
+from utils.logger import setup_logger
+
 # 设置日志
-logging.basicConfig(level=logging.INFO,
-                   format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__, file_path=__file__)
 
 class EmailNotifier:
     """邮件通知类，用于发送爬虫结果通知"""

@@ -5,7 +5,6 @@ import argparse
 import os
 import sys
 import requests
-import logging
 import time
 import json
 from urllib.parse import urlparse
@@ -15,10 +14,11 @@ from utils import notifier
 from crawler_utils import StorageManager, BatchDownloader, HtmlParser, ImageDownloader, XPathManager
 from config import config
 
+# 导入日志配置
+from utils.logger import setup_logger
+
 # 设置日志
-logging.basicConfig(level=logging.INFO,
-                   format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__, file_path=__file__)
 
 class Crawler:
     """网页爬虫，用于抓取图片和标题信息"""
@@ -271,19 +271,23 @@ class Crawler:
         
         # 获取XPath规则
         xpath_selector = None
+        # 初始化XPath管理器
+        xpath_manager = XPathManager()
         # 如果指定了规则ID，则使用指定的规则
         if rule_id:
-            xpath_selector = xpath_manager.get_xpath_by_id(rule_id)
-            if xpath_selector:
+            rule = xpath_manager.get_rule_by_id(rule_id)
+            if rule:
+                xpath_selector = xpath_manager.get_xpath_selector(rule)
                 logger.info(f"使用指定的XPath规则ID: {rule_id}")
             else:
                 logger.warning(f"未找到指定的XPath规则ID: {rule_id}，将使用自动匹配")
         
         # 如果没有指定规则ID或指定的规则不存在，则根据URL自动匹配
         if not xpath_selector:
-            xpath_selector = xpath_manager.get_xpath_by_url(url)
-            if xpath_selector:
-                logger.info(f"根据URL自动匹配XPath规则: {xpath_selector}")
+            rule = xpath_manager.get_rule_for_url(url)
+            if rule:
+                xpath_selector = xpath_manager.get_xpath_selector(rule)
+                logger.info(f"根据URL自动匹配XPath规则: {rule.get('id', 'unknown')}")
         
         # 解析HTML
         if xpath_selector:
@@ -345,7 +349,7 @@ def main():
     """主函数"""
     # 解析命令行参数
     parser = argparse.ArgumentParser(description="网页图片和标题爬虫")
-    parser.add_argument("--url", required=True, help="要爬取的网页URL")
+    parser.add_argument("--url", help="要爬取的网页URL")
     parser.add_argument("--task-id", help="任务ID，如果不提供则自动生成")
     parser.add_argument("--output", help="输出目录，用于临时文件和日志（默认使用配置文件设置）")
     parser.add_argument("--data-dir", help="数据存储目录，用于保存图片和元数据（默认使用配置文件设置）")
@@ -378,10 +382,19 @@ def main():
     
     # 如果指定了列出规则
     if args.list_rules:
-        from utils.xpath_manager import list_rules
-        print(list_rules())
+        # 从正确的模块导入XPathManager
+        from crawler_utils.xpath_manager import XPathManager
+        # 创建XPathManager实例并调用list_rules方法
+        xpath_manager = XPathManager()
+        print(xpath_manager.list_rules())
         sys.exit(0)
     
+    # 检查是否提供了URL
+    if not args.url:
+        logger.error("未提供URL，请使用--url参数指定要爬取的网页URL")
+        parser.print_help()
+        sys.exit(1)
+        
     # 验证URL
     try:
         result = urlparse(args.url)

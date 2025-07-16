@@ -2,11 +2,14 @@
 # -*- coding: utf-8 -*-
 
 from bs4 import BeautifulSoup
-import logging
 from urllib.parse import urljoin
 from lxml import etree
 
-logger = logging.getLogger(__name__)
+# 导入日志配置
+from utils.logger import setup_logger
+
+# 设置日志
+logger = setup_logger(__name__, file_path=__file__)
 
 class HtmlParser:
     """HTML解析器，负责从网页中提取图片和标题信息"""

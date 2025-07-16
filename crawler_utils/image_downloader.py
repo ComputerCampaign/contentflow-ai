@@ -4,12 +4,15 @@
 import os
 import re
 import hashlib
-import logging
 import requests
 from urllib.parse import urljoin, urlparse
 from tqdm import tqdm
 
-logger = logging.getLogger(__name__)
+# 导入日志配置
+from utils.logger import setup_logger
+
+# 设置日志
+logger = setup_logger(__name__, file_path=__file__)
 
 class ImageDownloader:
     """图片下载器，负责下载单个图片"""

@@ -7,14 +7,14 @@ XPath规则管理器，用于加载和管理XPath规则
 
 import os
 import json
-import logging
 from urllib.parse import urlparse
 from config import config
 
+# 导入日志配置
+from utils.logger import setup_logger
+
 # 设置日志
-logging.basicConfig(level=logging.INFO,
-                   format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__, file_path=__file__)
 
 class XPathManager:
     """XPath规则管理器，用于加载和管理XPath规则"""
@@ -34,7 +34,9 @@ class XPathManager:
         try:
             if os.path.exists(self.rules_path):
                 with open(self.rules_path, 'r', encoding='utf-8') as f:
-                    self.rules = json.load(f)
+                    data = json.load(f)
+                    # 确保我们获取的是规则列表，而不是整个JSON对象
+                    self.rules = data.get('rules', [])
                 logger.info(f"已加载 {len(self.rules)} 条XPath规则")
             else:
                 logger.warning(f"XPath规则文件不存在: {self.rules_path}")

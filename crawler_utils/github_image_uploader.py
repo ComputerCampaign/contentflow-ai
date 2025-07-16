@@ -8,7 +8,6 @@ GitHub图床模块，用于将图片上传到GitHub仓库并获取URL
 import os
 import base64
 import hashlib
-import logging
 import requests
 from datetime import datetime
 from urllib.parse import quote
@@ -16,8 +15,11 @@ from urllib.parse import quote
 # 导入配置
 from config import config
 
+# 导入日志配置
+from utils.logger import setup_logger
+
 # 设置日志
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__, file_path=__file__)
 
 class GitHubImageUploader:
     """GitHub图床上传器，用于将图片上传到GitHub仓库并获取URL"""

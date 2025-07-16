@@ -22,7 +22,6 @@
 import os
 import sys
 import json
-import logging
 import argparse
 import pandas as pd
 from urllib.parse import urlparse
@@ -33,10 +32,11 @@ from config import config
 # 导入博客生成器
 from utils.generate_blog import BlogGenerator, list_available_templates
 
+# 导入日志配置
+from utils.logger import setup_logger
+
 # 设置日志
-logging.basicConfig(level=logging.INFO,
-                   format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__, file_path=__file__)
 
 
 def load_page_info(task_dir):

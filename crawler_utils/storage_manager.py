@@ -5,12 +5,15 @@ import os
 import re
 import json
 import hashlib
-import logging
 import shutil
 from urllib.parse import urlparse
 from datetime import datetime
 
-logger = logging.getLogger(__name__)
+# 导入日志配置
+from utils.logger import setup_logger
+
+# 设置日志
+logger = setup_logger(__name__, file_path=__file__)
 
 class StorageManager:
     """存储管理器，负责管理爬虫数据的存储结构"""

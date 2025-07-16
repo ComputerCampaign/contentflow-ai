@@ -2,14 +2,17 @@
 # -*- coding: utf-8 -*-
 
 import os
-import logging
 from urllib.parse import urljoin
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .image_downloader import ImageDownloader
 from .storage_manager import StorageManager
 
-logger = logging.getLogger(__name__)
+# 导入日志配置
+from utils.logger import setup_logger
+
+# 设置日志
+logger = setup_logger(__name__, file_path=__file__)
 
 class BatchDownloader:
     """批量图片下载器，负责管理多个图片的下载任务"""

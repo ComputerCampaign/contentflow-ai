@@ -7,7 +7,6 @@
 
 import os
 import json
-import logging
 import pandas as pd
 from datetime import datetime
 import shutil
@@ -23,10 +22,11 @@ from config import config
 # 导入GitHub图床上传器
 from crawler_utils.github_image_uploader import GitHubImageUploader
 
+# 导入日志配置
+from utils.logger import setup_logger
+
 # 设置日志
-logging.basicConfig(level=logging.INFO,
-                   format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__, file_path=__file__)
 
 class BlogGenerator:
     """博客生成器，用于根据爬虫结果自动生成博客文章"""
