@@ -32,27 +32,19 @@ class StorageManager:
         
         Args:
             task_id (str, optional): 任务ID，如果不提供则自动生成
-            page_url (str, optional): 页面URL，用于生成任务ID
+            page_url (str, optional): 页面URL
             
         Returns:
             tuple: (任务ID, 任务目录路径)
         """
         # 如果没有提供任务ID，则自动生成
         if not task_id:
-            if page_url:
-                # 从URL生成任务ID
-                parsed_url = urlparse(page_url)
-                path_parts = parsed_url.path.strip('/').split('/')
-                if path_parts and path_parts[-1]:
-                    # 使用URL最后一部分作为任务ID的一部分
-                    task_id = self._sanitize_filename(path_parts[-1])
-                else:
-                    # 使用域名作为任务ID的一部分
-                    task_id = self._sanitize_filename(parsed_url.netloc)
-            
-            # 添加时间戳确保唯一性
+            # 使用时间戳或UUID生成任务ID
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            task_id = f"{task_id}_{timestamp}" if task_id else timestamp
+            # 可以选择使用UUID增加唯一性
+            import uuid
+            random_id = str(uuid.uuid4())[:8]  # 使用UUID的前8位
+            task_id = f"task_{timestamp}_{random_id}"
         
         # 创建任务目录
         task_dir = os.path.join(self.base_dir, task_id)

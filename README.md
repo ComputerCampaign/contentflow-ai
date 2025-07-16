@@ -367,7 +367,7 @@ python crawler.py --list-rules
 python crawler.py --url https://example.com --task-id my_task_name
 ```
 
-如果不提供任务ID，系统会自动生成一个基于时间戳的任务ID。
+如果不提供任务ID，系统会自动生成一个基于时间戳和随机UUID的任务ID，格式为`task_时间戳_随机字符串`。
 
 任务ID将用于创建任务目录，所有与该任务相关的数据（图片、元数据等）都会存储在该目录中。
 
