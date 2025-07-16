@@ -42,53 +42,7 @@ class XPathManager:
                 logger.warning(f"XPath规则文件不存在: {self.rules_path}")
         except Exception as e:
             logger.error(f"加载XPath规则失败: {str(e)}")
-    
-    def get_rule_for_url(self, url):
-        """根据URL获取匹配的XPath规则
-        
-        Args:
-            url (str): 网页URL
-            
-        Returns:
-            dict: 匹配的XPath规则，如果没有匹配则返回默认规则
-        """
-        if not self.enabled or not self.rules:
-            return None
-        
-        # 解析URL
-        parsed_url = urlparse(url)
-        domain = parsed_url.netloc
-        path = parsed_url.path
-        
-        # 查找匹配的规则
-        for rule in self.rules:
-            # 检查域名匹配
-            if 'domain' in rule and domain:
-                if isinstance(rule['domain'], list):
-                    if not any(d in domain for d in rule['domain']):
-                        continue
-                elif rule['domain'] not in domain:
-                    continue
-            
-            # 检查路径匹配
-            if 'path_pattern' in rule and path:
-                import re
-                if not re.search(rule['path_pattern'], path):
-                    continue
-            
-            # 找到匹配的规则
-            logger.info(f"找到匹配的XPath规则: {rule.get('id', 'unknown')}")
-            return rule
-        
-        # 如果没有匹配的规则，返回默认规则
-        default_rule = next((r for r in self.rules if r.get('id') == self.default_rule_id), None)
-        if default_rule:
-            logger.info(f"使用默认XPath规则: {self.default_rule_id}")
-            return default_rule
-        
-        logger.warning("未找到匹配的XPath规则，也没有默认规则")
-        return None
-    
+
     def get_rule_by_id(self, rule_id):
         """根据规则ID获取XPath规则
         

@@ -23,7 +23,7 @@ logger = setup_logger(__name__, file_path=__file__)
 class Crawler:
     """网页爬虫，用于抓取图片和标题信息"""
     
-    def __init__(self, output_dir=None, data_dir=None, timeout=None, retry=None, use_selenium=None, max_workers=5):
+    def __init__(self, output_dir=None, data_dir=None, timeout=None, retry=None, use_selenium=None, enable_xpath=None, max_workers=None):
         """初始化爬虫
         
         Args:
@@ -32,6 +32,7 @@ class Crawler:
             timeout (int, optional): 请求超时时间（秒）
             retry (int, optional): 失败重试次数
             use_selenium (bool, optional): 是否使用Selenium
+            enable_xpath (bool, optional): 是否启用XPath选择器
             max_workers (int, optional): 最大并发下载数
         """
         # 从配置中加载设置，如果参数提供则覆盖配置
@@ -40,6 +41,7 @@ class Crawler:
         self.timeout = timeout or config.get('crawler', 'timeout', 10)
         self.retry = retry or config.get('crawler', 'retry', 3)
         self.use_selenium = use_selenium if use_selenium is not None else config.get('crawler', 'use_selenium', False)
+        self.enable_xpath = enable_xpath if enable_xpath is not None else config.get('crawler', 'xpath_config', {}).get('enabled', False)
         self.max_workers = max_workers
         
         # 创建输出目录和数据目录
@@ -185,28 +187,35 @@ class Crawler:
         
         # 获取XPath规则
         xpath_selector = None
-        # 初始化XPath管理器
-        xpath_manager = XPathManager()
-        # 如果指定了规则ID，则使用指定的规则
-        if rule_id:
-            rule = xpath_manager.get_rule_by_id(rule_id)
-            if rule:
-                xpath_selector = xpath_manager.get_xpath_selector(rule)
-                logger.info(f"使用指定的XPath规则ID: {rule_id}")
+        parsed_data = None
+        
+        # 如果启用XPath选择器，则使用XPath解析页面
+        if self.enable_xpath:
+            # 初始化XPath管理器
+            xpath_manager = XPathManager()
+            # 如果指定了规则ID，则使用指定的规则
+            if rule_id:
+                rule = xpath_manager.get_rule_by_id(rule_id)
+                if rule:
+                    xpath_selector = xpath_manager.get_xpath_selector(rule)
+                    logger.info(f"使用指定的XPath规则ID: {rule_id}")
+                else:
+                    logger.warning(f"未找到指定的XPath规则ID: {rule_id}")
+            
+            # 如果没有指定规则ID或指定的规则不存在，则使用默认规则
+            if not xpath_selector:
+                default_rule = xpath_manager.get_rule_by_id(xpath_manager.default_rule_id)
+                if default_rule:
+                    xpath_selector = xpath_manager.get_xpath_selector(default_rule)
+                    logger.info(f"使用默认XPath规则: {xpath_manager.default_rule_id}")
+            
+            # 解析HTML
+            if xpath_selector:
+                parsed_data = self.html_parser.parse_with_xpath(content, xpath_selector, url)
             else:
-                logger.warning(f"未找到指定的XPath规则ID: {rule_id}，将使用自动匹配")
-        
-        # 如果没有指定规则ID或指定的规则不存在，则根据URL自动匹配
-        if not xpath_selector:
-            rule = xpath_manager.get_rule_for_url(url)
-            if rule:
-                xpath_selector = xpath_manager.get_xpath_selector(rule)
-                logger.info(f"根据URL自动匹配XPath规则: {rule.get('id', 'unknown')}")
-        
-        # 解析HTML
-        if xpath_selector:
-            parsed_data = self.html_parser.parse_with_xpath(content, xpath_selector, url)
+                parsed_data = self.html_parser.parse_html(content, url)
         else:
+            logger.info("已禁用XPath选择器，将使用BeautifulSoup解析整个页面")
             parsed_data = self.html_parser.parse_html(content, url)
         
         logger.info(f"解析完成，找到 {len(parsed_data['images'])} 张图片")
@@ -274,6 +283,7 @@ def main():
     parser.add_argument("--email-notification", type=lambda x: x.lower() == 'true',help="是否启用邮件通知，值为true或false")
     # 博客生成现在通过独立脚本generate_blog_from_crawler.py完成
     parser.add_argument("--rule-id", help="XPath规则ID，用于指定使用哪个XPath规则（例如：reddit_media, twitter_media, general_article）")
+    parser.add_argument("--enable-xpath", type=lambda x: x.lower() == 'true', help="启用XPath选择器，使用XPath规则解析页面，值为true或false（默认值取决于config.json中xpath_config.enabled的值）")
     parser.add_argument("--list-rules", action="store_true", help="列出所有可用的XPath规则")
     
     args = parser.parse_args()
@@ -317,7 +327,8 @@ def main():
         data_dir=args.data_dir,
         timeout=args.timeout,
         retry=args.retry,
-        use_selenium=args.use_selenium
+        use_selenium=args.use_selenium,
+        enable_xpath=args.enable_xpath
     )
     
     try:
