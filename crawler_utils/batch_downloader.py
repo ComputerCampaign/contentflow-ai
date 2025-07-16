@@ -92,6 +92,19 @@ class BatchDownloader:
                     if success:
                         # 添加本地文件路径到图片数据
                         task['img_data']['local_path'] = task['save_path']
+                        
+                        # 下载成功后立即上传到GitHub图床
+                        if hasattr(self.storage_manager, 'upload_to_github') and callable(getattr(self.storage_manager, 'upload_to_github')):
+                            try:
+                                github_url = self.storage_manager.upload_to_github(task['save_path'])
+                                if github_url:
+                                    logger.info(f"图片已上传到GitHub: {github_url}")
+                                    task['img_data']['github_url'] = github_url
+                                else:
+                                    logger.error(f"上传图片到GitHub失败: {task['save_path']}")
+                            except Exception as e:
+                                logger.error(f"上传图片到GitHub时发生错误: {str(e)}")
+                        
                         successful_downloads.append(task['img_data'])
                     else:
                         failed_downloads.append(task['img_data'])

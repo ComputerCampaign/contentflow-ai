@@ -11,7 +11,7 @@ import json
 from urllib.parse import urlparse
 
 # 导入自定义模块
-from utils import notifier, blog_generator
+from utils import notifier
 from crawler_utils import StorageManager, BatchDownloader, HtmlParser, ImageDownloader, XPathManager
 from config import config
 
@@ -66,7 +66,7 @@ class Crawler:
             
         logger.info(f"爬虫初始化完成，输出目录: {self.output_dir}, 数据目录: {self.data_dir}")
         logger.info(f"邮件通知: {'已启用' if notifier.enabled else '未启用'}")
-        logger.info(f"博客生成: {'已启用' if blog_generator.enabled else '未启用'}")
+        logger.info("博客生成：请在爬虫完成后使用generate_blog_from_crawler.py脚本")
 
     
     def _init_selenium(self):
@@ -203,15 +203,7 @@ class Crawler:
         images_csv_path = self.storage_manager.save_images_csv(self.data_dir, parsed_data['images'])
         logger.info(f"图片数据已导出到: {images_csv_path}")
         
-        # 保存页面信息到JSON
-        try:
-            page_info_path = os.path.join(self.data_dir, 'page_info.json')
-            with open(page_info_path, 'w', encoding='utf-8') as f:
-                json.dump(parsed_data, f, indent=4, ensure_ascii=False)
-            logger.info(f"页面信息已保存到: {page_info_path}")
-        except Exception as e:
-            logger.error(f"保存页面信息失败: {str(e)}")
-        
+
         # 下载图片
         downloaded_images = []
         if parsed_data['images']:
@@ -219,14 +211,29 @@ class Crawler:
             batch_downloader = BatchDownloader(self.storage_manager, self.timeout, self.retry, self.max_workers)
             # 下载图片
             downloaded_images = batch_downloader.download_images(parsed_data['images'], url, self.data_dir)
+            
+            # 更新解析数据中的图片信息，添加本地路径和GitHub URL
+            for img_data in parsed_data['images']:
+                # 查找对应的下载图片数据
+                for downloaded_img in downloaded_images:
+                    if img_data['url'] == downloaded_img['url']:
+                        # 添加本地路径
+                        if 'local_path' in downloaded_img:
+                            img_data['local_path'] = downloaded_img['local_path']
+                        # 添加GitHub URL
+                        if 'github_url' in downloaded_img:
+                            img_data['github_url'] = downloaded_img['github_url']
+                        break
         
-        # 生成博客
-        if blog_generator.enabled:
-            blog_success, blog_path = blog_generator.generate_blog(url, content, parsed_data, self.data_dir)
-            if blog_success:
-                logger.info(f"博客已生成: {blog_path}")
-            else:
-                logger.warning("博客生成失败")
+        # 保存更新后的页面信息到JSON
+        try:
+            page_info_path = self.storage_manager.save_page_info(self.data_dir, parsed_data)
+            logger.info(f"更新后的页面信息已保存到: {page_info_path}")
+        except Exception as e:
+            logger.error(f"保存更新后的页面信息失败: {str(e)}")
+        
+        # 不再直接生成博客，改为在爬虫完成后手动运行generate_blog_from_crawler.py脚本
+        logger.info("爬虫数据已保存，可以使用generate_blog_from_crawler.py脚本生成博客")
         
         # 发送邮件通知
         if notifier.enabled:
@@ -316,13 +323,10 @@ class Crawler:
             if downloaded_images:
                 self.storage_manager.save_images_csv(task_dir, downloaded_images)
         
-        # 生成博客
-        if blog_generator.enabled:
-            blog_success, blog_path = blog_generator.generate_blog(url, content, parsed_data, task_dir)
-            if blog_success:
-                logger.info(f"博客已生成: {blog_path}")
-            else:
-                logger.warning("博客生成失败")
+        # 不再直接生成博客，改为在爬虫完成后手动运行generate_blog_from_crawler.py脚本
+        logger.info(f"爬虫任务完成，数据已保存到: {task_dir}")
+        logger.info("可以使用generate_blog_from_crawler.py脚本生成博客，例如:")
+        logger.info(f"python generate_blog_from_crawler.py --task-dir {task_dir}")
         
         # 发送邮件通知
         if notifier.enabled:
@@ -351,8 +355,7 @@ def main():
     parser.add_argument("--config", help="配置文件路径（默认为'config.json'）")
     parser.add_argument("--enable-email", action="store_true", help="启用邮件通知")
     parser.add_argument("--disable-email", action="store_true", help="禁用邮件通知")
-    parser.add_argument("--enable-blog", action="store_true", help="启用博客生成")
-    parser.add_argument("--disable-blog", action="store_true", help="禁用博客生成")
+    # 博客生成现在通过独立脚本generate_blog_from_crawler.py完成
     parser.add_argument("--rule-id", help="XPath规则ID，用于指定使用哪个XPath规则（例如：reddit_media, twitter_media, general_article）")
     parser.add_argument("--list-rules", action="store_true", help="列出所有可用的XPath规则")
     
@@ -368,10 +371,7 @@ def main():
     elif args.disable_email:
         config.set('email', 'enabled', False)
     
-    if args.enable_blog:
-        config.set('blog', 'enabled', True)
-    elif args.disable_blog:
-        config.set('blog', 'enabled', False)
+    # 博客生成现在通过独立脚本generate_blog_from_crawler.py完成
     
     # 保存配置更改
     config.save()

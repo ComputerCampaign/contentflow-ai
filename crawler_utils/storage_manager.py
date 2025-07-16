@@ -78,18 +78,8 @@ class StorageManager:
         Returns:
             str: 图片保存路径
         """
-        # 从页面URL中提取名称部分
-        parsed_url = urlparse(page_url)
-        path_parts = parsed_url.path.strip('/').split('/')
-        page_name = ''
-        
-        # 尝试从URL路径中提取有意义的名称
-        if path_parts and path_parts[-1]:
-            page_name = self._sanitize_filename(path_parts[-1])
-        elif len(path_parts) > 1 and path_parts[-2]:
-            page_name = self._sanitize_filename(path_parts[-2])
-        else:
-            page_name = self._sanitize_filename(parsed_url.netloc)
+        # 获取任务ID（从任务目录路径中提取）
+        task_id = os.path.basename(task_dir)
         
         # 从图片URL中提取扩展名
         img_parsed = urlparse(img_url)
@@ -100,13 +90,13 @@ class StorageManager:
         if not ext:
             ext = '.jpg'
         
-        # 生成图片文件名
+        # 生成图片文件名，使用task_id加索引的形式
         if index is not None:
-            filename = f"{page_name}_{index}{ext}"
+            filename = f"{task_id}_{index}{ext}"
         else:
-            # 使用图片URL的哈希值作为文件名
+            # 使用图片URL的哈希值作为索引
             hash_obj = hashlib.md5(img_url.encode('utf-8'))
-            filename = f"{page_name}_{hash_obj.hexdigest()[:8]}{ext}"
+            filename = f"{task_id}_{hash_obj.hexdigest()[:8]}{ext}"
         
         # 返回完整路径
         return os.path.join(task_dir, 'images', filename)
@@ -203,3 +193,36 @@ class StorageManager:
         if len(name) > 50:
             name = name[:50]
         return name.lower()
+        
+    def upload_to_github(self, image_path):
+        """上传图片到GitHub
+        
+        Args:
+            image_path (str): 图片本地路径
+            
+        Returns:
+            str: GitHub图片URL，上传失败则返回空字符串
+        """
+        try:
+            # 导入GitHub图床上传器
+            from crawler_utils.github_image_uploader import GitHubImageUploader
+            
+            # 创建GitHub图床上传器实例
+            github_uploader = GitHubImageUploader()
+            
+            # 检查是否配置正确
+            if not github_uploader.is_configured():
+                logger.warning("GitHub图床未正确配置，无法上传图片")
+                return ""
+            
+            # 上传图片
+            github_url = github_uploader.upload_image(image_path)
+            if github_url:
+                logger.info(f"图片已上传到GitHub: {github_url}")
+                return github_url
+            else:
+                logger.warning("上传图片到GitHub失败")
+                return ""
+        except Exception as e:
+            logger.error(f"上传图片到GitHub时发生错误: {str(e)}")
+            return ""

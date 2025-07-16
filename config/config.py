@@ -73,9 +73,7 @@ class Config:
                 "template_path": "templates/blog_template.md",
                 "output_path": "blogs",
                 "image_storage": {
-                    "type": "local",  # local, s3, oss等
-                    "base_url": "http://example.com/images/",  # 图片访问的基础URL
-                    "local_path": "static/images"  # 本地存储路径
+                    "type": "github"  # 只支持github图床
                 }
             }
         }

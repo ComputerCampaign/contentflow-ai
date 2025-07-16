@@ -69,10 +69,7 @@ blogs/*/*
 !blogs/*/.gitkeep
 !blogs/README.md
 
-# 静态资源目录内容，但保留.gitkeep文件
-static/images/*
-!static/images/.gitkeep
-!static/images/README.md
+# 静态资源目录已移除，不再使用
 
 # 敏感信息文件
 # 所有敏感信息都存储在.env文件中，config.json可以提交到版本控制系统
@@ -80,6 +77,8 @@ static/images/*
 # 示例输出目录
 example_output/
 example_selenium_output/
+examples/images/
+examples/output/
 *.log
 
 # 操作系统

@@ -9,6 +9,18 @@
             "enabled": true,
             "rules_path": "config/xpath/xpath_rules.json",
             "default_rule_id": "general_article"
+        },
+        "image_storage": {
+            "type": "github",
+            "github": {
+                "enabled": true,
+                "repo_owner": "ComputerCampaign",
+                "repo_name": "material_warehouse",
+                "branch": "main",
+                "token": "",
+                "image_path": "images",
+                "base_url": "https://raw.githubusercontent.com/ComputerCampaign/material_warehouse/main/images/"
+            }
         }
     },
     "email": {
@@ -21,23 +33,10 @@
         "subject_prefix": "[爬虫通知] "
     },
     "blog": {
-        "enabled": false,
+        "enabled": true,
         "template_path": "config/templates/blog_template.md",
         "templates_dir": "config/templates",
         "output_path": "blogs",
-        "image_storage": {
-            "type": "local",
-            "base_url": "http://example.com/images/",
-            "local_path": "static/images",
-            "github": {
-                "enabled": true,
-                "repo_owner": "ComputerCampaign",
-                "repo_name": "material_warehouse",
-                "branch": "main",
-                "token": "",
-                "image_path": "images",
-                "base_url": "https://raw.githubusercontent.com/ComputerCampaign/material_warehouse/main/images/"
-            }
-        }
+        "use_crawler_image_storage": true
     }
 }

@@ -1,305 +1,244 @@
-# 网页图片和标题爬虫
+# 网页图片爬虫与博客生成器
 
-这是一个Python爬虫项目，用于从给定网页中抓取图片和标题信息，并提供邮件通知和博客生成功能。
+这是一个集成了网页图片爬取和博客生成功能的工具，可以自动抓取网页中的图片和标题，并根据抓取的内容生成博客文章。
 
 ## 功能特点
 
-- 支持从指定URL抓取图片和标题
-- 可以保存图片到本地目录
-- 可以导出标题和图片URL到CSV文件
-- 支持基本的错误处理和重试机制
-- 可选择使用requests或selenium+chromedriver进行爬取
-- 支持邮件通知功能，可在爬取完成后发送结果报告
-- 支持自动生成Markdown格式的博客文章
-- 支持图片上传到本地或远程存储
-- 支持XPath规则配置，精确定位网页内容
-- 支持基于任务ID的爬取，便于管理多个爬取任务
+### 爬虫模块
+
+- 支持图片和标题抓取：自动从网页中提取图片和标题
+- 支持XPath规则配置：通过配置XPath规则，精确定位网页内容
+- 支持任务ID管理：便于管理多个爬取任务
+- 支持邮件通知：爬取完成后自动发送邮件通知
+- 支持自定义输出目录：灵活设置爬取结果的存储位置
+- 支持Selenium模式：处理动态加载的网页内容
+
+### 博客生成模块
+
+- 支持两种生成模式：从爬虫数据生成和从自定义数据生成
+- 支持多种模板：可以选择不同的博客模板
+- 支持图片上传：自动将图片上传到GitHub图床
+- 支持元数据定制：可以自定义博客的标题、内容、标签等
+- 支持自动标签生成：根据内容自动生成标签
 
 ## 环境要求
 
 - Python 3.8+
-- uv (Python包管理工具)
+- 依赖库：见`pyproject.toml`文件
 
 ## 环境设置
 
-### 快速设置（推荐）
+### 快速设置
 
-项目使用uv进行依赖管理，推荐使用以下脚本快速设置环境：
+使用`uv`进行依赖管理（推荐）：
 
 ```bash
-source ./setup_and_run.sh
-# 或
-. ./setup_and_run.sh
+# 安装uv（如果尚未安装）
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 使用setup_and_run.sh脚本自动设置环境
+./setup_and_run.sh
 ```
 
-**注意：** 必须使用source命令运行此脚本，才能正确激活虚拟环境。
-
-这个脚本会自动：
-1. 创建虚拟环境并安装所有依赖
-2. 自动激活虚拟环境
-3. 验证Python环境是否正确
-4. 检查.env文件是否存在，如果不存在则提示创建
-
-您还可以使用此脚本直接运行测试：
+### 查看帮助
 
 ```bash
-source ./setup_and_run.sh --test [可选的测试文件路径]
-# 或
-. ./setup_and_run.sh --test [可选的测试文件路径]
-```
+# 查看爬虫帮助
+python crawler.py --help
 
-或查看帮助信息：
-
-```bash
-source ./setup_and_run.sh --help
-# 或
-. ./setup_and_run.sh --help
+# 查看博客生成帮助
+python generate_blog.py --help
 ```
 
 ### 手动设置
 
-如果您已经安装了uv，可以直接使用以下命令一步完成环境设置：
-
 ```bash
+# 使用uv同步依赖
 uv sync
-```
 
-### 激活虚拟环境
-
-```bash
+# 激活虚拟环境
 source .venv/bin/activate
-```
 
-### 退出虚拟环境
-
-```bash
+# 退出虚拟环境
 deactivate
 ```
 
-## 配置文件
+## 配置
 
-项目使用JSON格式的配置文件（默认为`config.json`）来管理各种设置。您需要创建自己的`config.json`文件来配置项目。
+### 配置文件
 
-### 配置文件安全性
+项目使用`config/config.json`作为配置文件。首次运行时，如果配置文件不存在，将自动创建默认配置文件。
 
-**重要提示：** 项目使用环境变量管理敏感信息（如API密钥、访问令牌等），请遵循以下安全实践：
+**注意**：敏感信息（如邮箱密码、GitHub token）应通过环境变量管理，而不是直接写入配置文件。
 
-1. **永远不要**将包含真实凭证的`.env`文件提交到版本控制系统
-2. 项目的`.gitignore`已配置为忽略`.env`文件
-3. 所有敏感信息应存储在`.env`文件中（推荐）
-4. 配置文件`config.json`中的敏感字段应留空，系统会自动从环境变量中读取值
+### 环境变量
 
-### 使用环境变量管理敏感信息
+推荐使用`.env`文件管理敏感信息：
 
-项目支持从环境变量读取敏感信息，这是管理凭证的推荐方式。有两种方法可以设置环境变量：
+1. 在项目根目录创建`.env`文件
+2. 添加敏感信息，例如：
 
-#### 方法1：使用.env文件（推荐）
+```
+EMAIL_PASSWORD=your_email_password
+GITHUB_TOKEN=your_github_token
+```
 
-1. 复制项目根目录中的`.env.example`文件并重命名为`.env`
-2. 在`.env`文件中填入您的实际值
+3. 项目会自动加载`.env`文件中的环境变量
+
+也可以直接设置系统环境变量：
 
 ```bash
-# .env文件示例
-CRAWLER_EMAIL_PASSWORD=your-email-password
-CRAWLER_GITHUB_TOKEN=your-github-token
+# Linux/macOS
+export EMAIL_PASSWORD=your_email_password
+export GITHUB_TOKEN=your_github_token
+
+# Windows
+set EMAIL_PASSWORD=your_email_password
+set GITHUB_TOKEN=your_github_token
 ```
-
-**注意：** 
-- 项目已包含`python-dotenv`库作为依赖
-- 如果您使用`setup_and_run.sh`脚本，它会自动检查`.env`文件是否存在，并提示您创建
-
-#### 方法2：直接设置系统环境变量
-
-在macOS或Linux系统上：
-
-```bash
-# 设置邮件密码
-export CRAWLER_EMAIL_PASSWORD="your-email-password"
-
-# 设置GitHub令牌
-export CRAWLER_GITHUB_TOKEN="your-github-token"
-```
-
-您可以将这些命令添加到`~/.bashrc`、`~/.zshrc`或类似的shell配置文件中。
-
-在Windows系统上：
-
-```cmd
-SET CRAWLER_EMAIL_PASSWORD=your-email-password
-SET CRAWLER_GITHUB_TOKEN=your-github-token
-```
-
-或者通过系统设置添加环境变量。
-
-**注意：** 使用环境变量后，您可以在配置文件中将敏感字段留空，系统会自动从环境变量中读取值。
 
 ### 创建配置文件
 
-```bash
-# 创建配置文件
-touch config/config.json
-
-# 编辑配置文件，添加您的设置
-# 注意：所有敏感信息应存储在.env文件中，config.json可以安全地提交到版本控制系统
-```
-
-以下是一个基本的配置文件结构示例：
+如果需要手动创建配置文件，可以参考以下结构：
 
 ```json
 {
-    "crawler": {
-        "output_dir": "output",
-        "data_dir": "data",
-        "timeout": 10,
-        "retry": 3,
-        "use_selenium": false
-    },
-    "email": {
-        "enabled": false,
-        "smtp_server": "smtp.example.com",
-        "smtp_port": 587,
-        "sender_email": "your_email@example.com",
-        "sender_password": "",
-        "receiver_emails": ["receiver@example.com"],
-        "subject_prefix": "[爬虫通知] "
-    },
-    "blog": {
-        "enabled": false,
-        "template_path": "config/templates/blog_template.md",
-        "templates_dir": "config/templates",
-        "output_path": "blogs",
-        "image_storage": {
-            "type": "local",
-            "base_url": "http://example.com/images/",
-            "local_path": "static/images",
-            "github": {
-                "enabled": false,
-                "repo_owner": "your-github-username",
-                "repo_name": "your-image-repo",
-                "branch": "main",
-                "token": "",
-                "image_path": "images",
-                "base_url": ""
-            }
-        }
-    }
-}
-```
-
-**注意：** 配置文件中的敏感字段（如`sender_password`和`token`）应留空，系统会自动从环境变量中读取值：
-- `sender_password` 从环境变量 `CRAWLER_EMAIL_PASSWORD` 中读取
-- GitHub `token` 从环境变量 `CRAWLER_GITHUB_TOKEN` 中读取
-
-### 主要配置项
-
-### 爬虫配置
-
-```json
-"crawler": {
-    "output_dir": "output",
+  "crawler": {
     "data_dir": "data",
-    "timeout": 10,
-    "retry": 3,
-    "use_selenium": false
+    "use_selenium": false,
+    "timeout": 30,
+    "retry": 3
+  },
+  "email": {
+    "enable": true,
+    "sender": "your_email@example.com",
+    "receiver": "receiver_email@example.com",
+    "smtp_server": "smtp.example.com",
+    "smtp_port": 587
+  },
+  "blog": {
+    "templates_dir": "config/templates",
+    "output_path": "blogs",
+    "use_crawler_image_storage": true,
+    "github": {
+      "repo_owner": "your_github_username",
+      "repo_name": "your_repo_name"
+    }
+  }
 }
 ```
+
+**注意**：敏感信息如`sender_password`和GitHub `token`应通过环境变量设置，不要直接写入配置文件。
 
 ### 邮件通知配置
 
-```json
-"email": {
-    "enabled": false,
-    "smtp_server": "smtp.example.com",
-    "smtp_port": 587,
-    "sender_email": "your_email@example.com",
-    "sender_password": "",
-    "receiver_emails": ["receiver@example.com"],
-    "subject_prefix": "[爬虫通知] "
-}
-```
+邮件通知功能需要配置以下参数：
+
+- `enable`: 是否启用邮件通知
+- `sender`: 发件人邮箱
+- `receiver`: 收件人邮箱
+- `smtp_server`: SMTP服务器地址
+- `smtp_port`: SMTP服务器端口
+
+发件人密码通过环境变量`EMAIL_PASSWORD`设置。
 
 ### 博客生成配置
 
-```json
-"blog": {
-    "enabled": false,
-    "template_path": "config/templates/blog_template.md",
-    "templates_dir": "config/templates",
-    "output_path": "blogs",
-    "image_storage": {
-        "type": "local",
-        "base_url": "http://example.com/images/",
-        "local_path": "static/images",
-        "github": {
-            "enabled": false,
-            "repo_owner": "your-github-username",
-            "repo_name": "your-image-repo",
-            "branch": "main",
-            "token": "",
-            "image_path": "images",
-            "base_url": ""
-        }
-    }
-}
-```
+博客生成功能需要配置以下参数：
 
-图片存储支持两种类型：
-- `local`: 将图片存储在本地目录
-- `github`: 将图片上传到GitHub仓库作为图床
+- `templates_dir`: 模板目录路径
+- `output_path`: 博客输出目录路径
+- `use_crawler_image_storage`: 是否使用爬虫的图片存储设置
 
-要使用GitHub图床，需要设置以下参数：
-1. 将 `image_storage.type` 设置为 `github`
-2. 将 `image_storage.github.enabled` 设置为 `true`
-3. 设置 `repo_owner` 和 `repo_name` 为您的GitHub用户名和仓库名
-4. 设置 `token` 为您的GitHub个人访问令牌（需要有repo权限）
-5. 可选：自定义 `branch`、`image_path` 和 `base_url`
+图片存储目前仅支持GitHub图床，需要配置：
 
-您可以通过编辑配置文件或使用命令行参数来修改这些设置。
+- `github.repo_owner`: GitHub用户名
+- `github.repo_name`: GitHub仓库名
+
+GitHub token通过环境变量`GITHUB_TOKEN`设置。
 
 ## 使用方法
 
-### 基本用法
+### 爬虫功能
+
+#### 基本爬取
 
 ```bash
-# 基本爬取
-python crawler.py --url "https://example.com" --output "output_folder" --data-dir "data_folder"
+python crawler.py --url https://example.com
+```
 
-# 使用任务ID爬取
-python crawler.py --url "https://example.com" --task-id "my_task" --output "output_folder"
+#### 使用任务ID爬取
 
-# 使用XPath规则爬取
-python crawler.py --url "https://www.reddit.com/r/pics" --rule-id "reddit_media"
+```bash
+python crawler.py --url https://example.com --task-id my_task
+```
 
-# 列出所有可用的XPath规则
+#### 使用XPath规则爬取
+
+```bash
+python crawler.py --url https://example.com --rule-id rule_name
+```
+
+#### 列出所有可用XPath规则
+
+```bash
 python crawler.py --list-rules
 ```
 
-### 参数说明
+#### 参数说明
 
-- `--url`: 要爬取的网页URL（必需）
-- `--task-id`: 任务ID，如果不提供则自动生成，用于管理多个爬取任务
-- `--output`: 输出目录，用于临时文件和日志（默认使用配置文件设置）
-- `--data-dir`: 数据存储目录，用于保存图片和元数据（默认使用配置文件设置）
-- `--use-selenium`: 使用Selenium和ChromeDriver进行爬取（默认使用配置文件设置）
-- `--timeout`: 请求超时时间，单位为秒（默认使用配置文件设置）
-- `--retry`: 失败重试次数（默认使用配置文件设置）
-- `--config`: 配置文件路径（默认为'config.json'）
+- `--url`: 要爬取的网页URL
+- `--task-id`: 任务ID，用于管理多个爬取任务
+- `--output`: 输出目录路径
+- `--data-dir`: 数据存储目录路径
+- `--use-selenium`: 使用Selenium模式爬取
+- `--timeout`: 请求超时时间（秒）
+- `--retry`: 请求重试次数
+- `--config`: 配置文件路径
 - `--enable-email`: 启用邮件通知
 - `--disable-email`: 禁用邮件通知
-- `--enable-blog`: 启用博客生成
-- `--disable-blog`: 禁用博客生成
-- `--rule-id`: XPath规则ID，用于指定使用哪个XPath规则（例如：reddit_media, twitter_media, general_article）
+- `--rule-id`: 使用指定的XPath规则ID
 - `--list-rules`: 列出所有可用的XPath规则
 
-### 独立博客生成
+### 博客生成功能
 
-项目提供了一个独立的博客生成脚本，可以根据提供的图片列表、元数据和模板生成博客文章：
+博客生成支持两种模式：从爬虫数据生成和从自定义数据生成。
+
+#### 1. 从爬虫数据生成博客
 
 ```bash
-python generate_blog.py --images image1.jpg image2.jpg --metadata metadata.json --template template_name --output output.md
+python generate_blog.py --task-dir "data/tasks/task_123456789" [--template template_name] [--output output.md]
 ```
 
-#### 参数说明
+##### 参数说明
+
+- `--task-dir`: 爬虫任务目录路径（必需），包含page_info.json和images.csv文件
+- `--template`: 模板名称（可选，默认使用'default'模板）
+- `--output`: 输出文件路径（可选，默认生成到配置的博客目录）
+- `--list-templates`: 列出可用的模板
+
+##### 示例
+
+查看示例目录中的`examples/generate_blog_from_crawler_example.sh`脚本，了解如何使用从爬虫数据生成博客功能：
+
+```bash
+# 列出可用的模板
+python generate_blog.py --list-templates
+
+# 使用默认模板从爬虫任务目录生成博客
+python generate_blog.py --task-dir "data/tasks/task_123456789"
+
+# 使用指定模板和输出路径从爬虫任务目录生成博客
+python generate_blog.py --task-dir "data/tasks/task_123456789" --template simple_template --output "blogs/my_blog.md"
+```
+
+#### 2. 从自定义数据生成博客
+
+```bash
+python generate_blog.py --images image1.jpg image2.jpg --metadata metadata.json [--template template_name] [--output output.md]
+```
+
+##### 参数说明
 
 - `--images`: 图片路径列表（可选）
 - `--metadata`: 元数据文件路径（必需），JSON格式
@@ -307,9 +246,9 @@ python generate_blog.py --images image1.jpg image2.jpg --metadata metadata.json 
 - `--output`: 输出文件路径（可选，默认生成到配置的博客目录）
 - `--list-templates`: 列出可用的模板
 
-#### 示例
+##### 示例
 
-查看示例目录中的`examples/generate_blog_example.sh`脚本，了解如何使用独立博客生成功能：
+查看示例目录中的`examples/generate_blog_example.sh`脚本，了解如何使用自定义数据生成博客功能：
 
 ```bash
 # 列出可用的模板
@@ -320,6 +259,15 @@ python generate_blog.py --images image1.jpg image2.jpg --metadata metadata.json
 
 # 使用指定模板生成博客
 python generate_blog.py --images image1.jpg image2.jpg --metadata metadata.json --template simple_template
+```
+
+#### 综合示例
+
+查看`examples/generate_blog_combined_example.sh`脚本，了解如何使用两种模式生成博客：
+
+```bash
+# 运行综合示例脚本
+./examples/generate_blog_combined_example.sh [爬虫任务目录路径]
 ```
 
 ## 项目结构
@@ -340,18 +288,20 @@ python generate_blog.py --images image1.jpg image2.jpg --metadata metadata.json 
 │       ├── README_XPATH.md # XPath规则说明文档
 │       └── xpath_rules.json # XPath规则配置文件
 ├── crawler.py          # 主爬虫脚本
-├── generate_blog.py    # 独立博客生成脚本
+├── generate_blog.py    # 博客生成脚本（支持两种模式）
 ├── setup_and_run.sh    # 环境设置和运行脚本
 ├── examples/           # 示例目录
 │   ├── metadata_example.json # 示例元数据文件
-│   ├── generate_blog_example.sh # 博客生成示例脚本
+│   ├── generate_blog_example.sh # 自定义数据博客生成示例脚本
+│   ├── generate_blog_from_crawler_example.sh # 爬虫数据博客生成示例脚本
+│   ├── generate_blog_combined_example.sh # 综合博客生成示例脚本
 │   ├── crawler_example.sh # 爬虫功能示例脚本
 │   ├── images/         # 示例图片目录
 │   └── output/         # 示例输出目录
 ├── utils/              # 工具函数
 │   ├── __init__.py
 │   ├── notifier.py     # 邮件通知模块
-│   ├── blog_generator.py # 博客生成模块
+│   ├── generate_blog.py # 博客生成模块
 │   └── github_image_uploader.py # GitHub图片上传模块
 ├── crawler_utils/      # 爬虫工具函数
 │   ├── __init__.py
@@ -363,8 +313,6 @@ python generate_blog.py --images image1.jpg image2.jpg --metadata metadata.json 
 ├── blogs/              # 生成的博客目录
 │   ├── drafts/         # 博客草稿目录
 │   └── published/      # 已发布博客目录
-├── static/             # 静态资源目录
-│   └── images/         # 博客图片存储目录
 ├── output/             # 默认输出目录（日志和临时文件）
 └── data/               # 数据存储目录（不包含在版本控制中）
     ├── images/         # 原始图片存储目录

@@ -17,8 +17,6 @@ from urllib.parse import quote
 from config import config
 
 # 设置日志
-logging.basicConfig(level=logging.INFO,
-                   format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 class GitHubImageUploader:
@@ -26,8 +24,8 @@ class GitHubImageUploader:
     
     def __init__(self):
         """初始化GitHub图床上传器"""
-        # 从配置中加载GitHub图床设置
-        self.github_config = config.get('blog', 'image_storage', {}).get('github', {})
+        # 从配置中加载GitHub图床设置（从crawler模块读取）
+        self.github_config = config.get('crawler', 'image_storage', {}).get('github', {})
         self.enabled = self.github_config.get('enabled', False)
         self.repo_owner = self.github_config.get('repo_owner', '')
         self.repo_name = self.github_config.get('repo_name', '')
@@ -59,8 +57,16 @@ class GitHubImageUploader:
         Returns:
             str: 图片URL，上传失败则返回空字符串
         """
-        if not self.enabled or not self.token or not self.repo_owner or not self.repo_name:
-            logger.warning("GitHub图床功能未正确配置，无法上传图片")
+        if not self.enabled:
+            logger.warning("GitHub图床功能未启用，无法上传图片")
+            return ""
+        
+        if not self.token:
+            logger.error("GitHub图床功能已启用，但未设置访问令牌(token)，无法上传图片")
+            return ""
+            
+        if not self.repo_owner or not self.repo_name:
+            logger.error("GitHub图床功能已启用，但未设置仓库信息(repo_owner/repo_name)，无法上传图片")
             return ""
         
         if not os.path.exists(image_path):
@@ -72,12 +78,28 @@ class GitHubImageUploader:
             with open(image_path, 'rb') as f:
                 file_content = f.read()
             
-            # 生成唯一文件名
+            # 生成唯一文件名，保持与storage_manager.py中的命名一致
             file_name = os.path.basename(image_path)
             file_ext = os.path.splitext(file_name)[1]
-            file_hash = hashlib.md5(file_content).hexdigest()
-            date_prefix = datetime.now().strftime('%Y%m%d')
-            new_file_name = f"{date_prefix}_{file_hash}{file_ext}"
+            
+            # 从图片路径中提取任务ID
+            # 假设图片路径格式为 .../data/task_id/images/filename
+            path_parts = image_path.split(os.sep)
+            task_id = None
+            for i, part in enumerate(path_parts):
+                if part == 'data' and i+1 < len(path_parts):
+                    task_id = path_parts[i+1]
+                    break
+            
+            # 如果找不到任务ID，则使用日期作为前缀
+            if not task_id:
+                date_prefix = datetime.now().strftime('%Y%m%d')
+                file_hash = hashlib.md5(file_content).hexdigest()[:8]
+                new_file_name = f"{date_prefix}_{file_hash}{file_ext}"
+            else:
+                # 使用任务ID作为文件名前缀
+                file_hash = hashlib.md5(file_content).hexdigest()[:8]
+                new_file_name = f"{task_id}_{file_hash}{file_ext}"
             
             # 构建API URL
             # 确保image_path不以斜杠开头或结尾，以避免URL中出现双斜杠

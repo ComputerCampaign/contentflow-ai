@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 博客生成示例脚本
-# 此脚本展示了generate_blog.py的各种使用方式和功能
+# 此脚本展示了generate_blog.py的自定义数据生成模式的各种使用方式和功能
 
 # 确保当前目录是项目根目录
 cd "$(dirname "$0")/.." || exit

@@ -6,7 +6,9 @@ from .image_downloader import ImageDownloader
 from .storage_manager import StorageManager
 from .batch_downloader import BatchDownloader
 from .xpath_manager import XPathManager
+from .github_image_uploader import GitHubImageUploader
 
 __all__ = [
-    'HtmlParser', 'ImageDownloader', 'StorageManager', 'BatchDownloader', 'XPathManager'
+    'HtmlParser', 'ImageDownloader', 'StorageManager', 'BatchDownloader', 'XPathManager',
+    'GitHubImageUploader'
 ]

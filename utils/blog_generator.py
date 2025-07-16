@@ -21,7 +21,7 @@ from bs4 import BeautifulSoup
 from config import config
 
 # 导入GitHub图床上传器
-from utils.github_image_uploader import GitHubImageUploader
+from crawler_utils.github_image_uploader import GitHubImageUploader
 
 # 设置日志
 logging.basicConfig(level=logging.INFO,
@@ -38,10 +38,11 @@ class BlogGenerator:
         self.template_path = config.get('blog', 'template_path', 'config/templates/blog_template.md')
         self.output_path = config.get('blog', 'output_path', 'blogs')
         
-        # 图片存储配置
-        self.image_storage_type = config.get('blog', 'image_storage', {}).get('type', 'local')
-        self.image_base_url = config.get('blog', 'image_storage', {}).get('base_url', 'http://example.com/images/')
-        self.image_local_path = config.get('blog', 'image_storage', {}).get('local_path', 'static/images')
+        # 图片存储配置 - 强制使用GitHub
+        self.image_storage_type = 'github'
+        
+        # 检查是否使用爬虫的图片存储配置
+        self.use_crawler_image_storage = config.get('blog', 'use_crawler_image_storage', True)
         
         # 初始化GitHub图床上传器
         self.github_uploader = GitHubImageUploader()
@@ -50,12 +51,9 @@ class BlogGenerator:
         if not self.enabled:
             logger.info("博客生成功能未启用")
         else:
-            # 创建输出目录
-            os.makedirs(self.output_path, exist_ok=True)
-            
-            # 创建图片存储目录（如果是本地存储）
-            if self.image_storage_type == 'local':
-                os.makedirs(self.image_local_path, exist_ok=True)
+            # 创建输出目录结构
+            os.makedirs(os.path.join(self.output_path, 'published'), exist_ok=True)
+            os.makedirs(os.path.join(self.output_path, 'drafts'), exist_ok=True)
             
             # 检查模板文件
             if not os.path.exists(self.template_path):
@@ -118,7 +116,7 @@ class BlogGenerator:
             return "# {title}\n\n{content}\n\n{image_gallery}"
     
     def _upload_image(self, image_path):
-        """上传图片到存储
+        """上传图片到GitHub图床或获取已上传的URL
         
         Args:
             image_path (str): 图片本地路径
@@ -129,57 +127,46 @@ class BlogGenerator:
         if not os.path.exists(image_path):
             logger.warning(f"图片不存在: {image_path}")
             return ""
+            
+        # 优先使用已存在的GitHub URL（在元数据中）
+        try:
+            # 从图片路径推断任务目录
+            task_dir = os.path.dirname(os.path.dirname(image_path))
+            metadata_file = os.path.join(task_dir, 'metadata', 'page_info.json')
+            
+            if os.path.exists(metadata_file):
+                with open(metadata_file, 'r', encoding='utf-8') as f:
+                    page_info = json.load(f)
+                    
+                # 查找图片在元数据中的记录
+                for img in page_info.get('images', []):
+                    if img.get('local_path') == image_path and img.get('github_url'):
+                        logger.info(f"使用已存在的GitHub URL: {img['github_url']}")
+                        return img['github_url']
+        except Exception as e:
+            logger.warning(f"检查已存在的GitHub URL时出错: {str(e)}")
         
-        # 生成唯一文件名
-        file_name = os.path.basename(image_path)
-        file_ext = os.path.splitext(file_name)[1]
-        file_hash = hashlib.md5(open(image_path, 'rb').read()).hexdigest()
-        new_file_name = f"{file_hash}{file_ext}"
+        # 如果配置为使用爬虫的图片存储，则尝试使用StorageManager上传
+        if self.use_crawler_image_storage:
+            try:
+                from crawler_utils.storage_manager import StorageManager
+                storage_manager = StorageManager()
+                github_url = storage_manager.upload_to_github(image_path)
+                if github_url:
+                    logger.info(f"使用爬虫的GitHub图床上传图片成功: {github_url}")
+                    return github_url
+            except Exception as e:
+                logger.warning(f"使用爬虫的GitHub图床上传图片失败: {str(e)}")
         
-        # 根据存储类型处理图片
-        if self.image_storage_type == 'local':
-            # 本地存储
-            dest_path = os.path.join(self.image_local_path, new_file_name)
-            try:
-                shutil.copy2(image_path, dest_path)
-                logger.info(f"图片已复制到本地存储: {dest_path}")
-                return os.path.join(self.image_base_url, new_file_name)
-            except Exception as e:
-                logger.error(f"复制图片失败: {str(e)}")
-                return ""
-        elif self.image_storage_type == 'github':
-            # GitHub图床存储
-            if self.github_uploader.is_configured():
-                # 使用GitHub图床上传器上传图片
-                image_url = self.github_uploader.upload_image(image_path)
-                if image_url:
-                    return image_url
-                else:
-                    logger.warning("上传图片到GitHub失败，将使用本地存储作为备选")
-            else:
-                logger.warning("GitHub图床未正确配置，将使用本地存储作为备选")
-                
-            # 如果GitHub上传失败或未配置，使用本地存储作为备选
-            dest_path = os.path.join(self.image_local_path, new_file_name)
-            try:
-                shutil.copy2(image_path, dest_path)
-                logger.info(f"图片已复制到本地存储(备选): {dest_path}")
-                return os.path.join(self.image_base_url, new_file_name)
-            except Exception as e:
-                logger.error(f"复制图片到本地存储(备选)失败: {str(e)}")
-                return ""
+        # 使用博客模块自己的GitHub图床上传器
+        image_url = self.github_uploader.upload_image(image_path)
+        if image_url:
+            logger.info(f"图片已上传到GitHub: {image_url}")
+            return image_url
         else:
-            # 其他存储类型（如S3、OSS等）可以在这里扩展
-            logger.warning(f"不支持的图片存储类型: {self.image_storage_type}，将使用本地存储")
-            # 默认使用本地存储
-            dest_path = os.path.join(self.image_local_path, new_file_name)
-            try:
-                shutil.copy2(image_path, dest_path)
-                logger.info(f"图片已复制到本地存储: {dest_path}")
-                return os.path.join(self.image_base_url, new_file_name)
-            except Exception as e:
-                logger.error(f"复制图片失败: {str(e)}")
-                return ""
+            logger.error(f"上传图片到GitHub失败: {image_path}")
+            # 不考虑上传失败的情况，直接返回空字符串
+            return ""
     
     def _extract_summary(self, html_content, max_length=200):
         """从HTML内容中提取摘要
@@ -214,7 +201,7 @@ class BlogGenerator:
             return ""
     
     def _generate_image_gallery(self, images):
-        """生成图片画廊Markdown
+        """生成图片画廊Markdown，使用GitHub图床地址
         
         Args:
             images (list): 图片信息列表，每个元素为包含url和local_path的字典
@@ -229,7 +216,11 @@ class BlogGenerator:
         
         # 最多显示6张图片
         for i, img in enumerate(images[:6]):
-            if 'local_path' in img and os.path.exists(img['local_path']):
+            # 优先使用GitHub图片URL
+            if 'github_url' in img and img['github_url']:
+                alt_text = img.get('alt', '') or f"图片{i+1}"
+                gallery += f"![{alt_text}]({img['github_url']})\n\n"
+            elif 'local_path' in img and os.path.exists(img['local_path']):
                 # 上传图片并获取URL
                 img_url = self._upload_image(img['local_path'])
                 if img_url:
@@ -305,29 +296,58 @@ class BlogGenerator:
             
             # 处理图片
             images = []
-            csv_path = os.path.join(data_dir, 'images.csv')
-            if os.path.exists(csv_path):
+            
+            # 首先尝试从page_info.json获取图片信息（包含GitHub URL）
+            page_info_path = os.path.join(data_dir, 'metadata', 'page_info.json')
+            if os.path.exists(page_info_path):
                 try:
-                    df = pd.read_csv(csv_path)
-                    for _, row in df.iterrows():
-                        img_url = row['url']
-                        img_alt = row.get('alt', '')
-                        
-                        # 查找本地图片路径
-                        img_filename = os.path.basename(urlparse(img_url).path)
-                        if not img_filename or '.' not in img_filename:
-                            img_filename = f"{hash(img_url) & 0xffffffff}.jpg"
-                        
-                        local_path = os.path.join(data_dir, 'images', img_filename)
-                        
-                        if os.path.exists(local_path):
-                            images.append({
-                                'url': img_url,
-                                'alt': img_alt,
-                                'local_path': local_path
-                            })
+                    with open(page_info_path, 'r', encoding='utf-8') as f:
+                        page_info = json.load(f)
+                    
+                    if 'images' in page_info:
+                        for img in page_info['images']:
+                            img_data = {
+                                'url': img['url'],
+                                'alt': img.get('alt', '')
+                            }
+                            
+                            # 添加本地路径
+                            if 'local_path' in img and os.path.exists(img['local_path']):
+                                img_data['local_path'] = img['local_path']
+                            
+                            # 添加GitHub URL
+                            if 'github_url' in img and img['github_url']:
+                                img_data['github_url'] = img['github_url']
+                            
+                            images.append(img_data)
                 except Exception as e:
-                    logger.error(f"处理图片CSV文件失败: {str(e)}")
+                    logger.error(f"从page_info.json读取图片信息失败: {str(e)}")
+            
+            # 如果从page_info.json获取失败，则尝试从CSV文件获取
+            if not images:
+                csv_path = os.path.join(data_dir, 'images.csv')
+                if os.path.exists(csv_path):
+                    try:
+                        df = pd.read_csv(csv_path)
+                        for _, row in df.iterrows():
+                            img_url = row['url']
+                            img_alt = row.get('alt', '')
+                            
+                            # 查找本地图片路径
+                            img_filename = os.path.basename(urlparse(img_url).path)
+                            if not img_filename or '.' not in img_filename:
+                                img_filename = f"{hash(img_url) & 0xffffffff}.jpg"
+                            
+                            local_path = os.path.join(data_dir, 'images', img_filename)
+                            
+                            if os.path.exists(local_path):
+                                images.append({
+                                    'url': img_url,
+                                    'alt': img_alt,
+                                    'local_path': local_path
+                                })
+                    except Exception as e:
+                        logger.error(f"处理图片CSV文件失败: {str(e)}")
             
             # 生成图片画廊
             image_gallery = self._generate_image_gallery(images)
@@ -364,13 +384,13 @@ class BlogGenerator:
             date_prefix = datetime.now().strftime('%Y%m%d')
             filename = f"{date_prefix}-{safe_title}.md"
             
-            # 保存博客文件
-            blog_path = os.path.join(self.output_path, filename)
-            with open(blog_path, 'w', encoding='utf-8') as f:
+            # 保存博客文件到草稿目录
+            draft_path = os.path.join(self.output_path, 'drafts', filename)
+            with open(draft_path, 'w', encoding='utf-8') as f:
                 f.write(blog_content)
             
-            logger.info(f"博客已生成: {blog_path}")
-            return True, blog_path
+            logger.info(f"博客草稿已生成: {draft_path}")
+            return True, draft_path
             
         except Exception as e:
             logger.error(f"生成博客失败: {str(e)}")
