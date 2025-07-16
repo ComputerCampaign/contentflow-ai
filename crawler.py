@@ -375,11 +375,6 @@ def main():
     elif args.disable_email:
         config.set('email', 'enabled', False)
     
-    # 博客生成现在通过独立脚本generate_blog_from_crawler.py完成
-    
-    # 保存配置更改
-    config.save()
-    
     # 如果指定了列出规则
     if args.list_rules:
         # 从正确的模块导入XPathManager

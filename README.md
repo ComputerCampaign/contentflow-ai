@@ -79,22 +79,24 @@ deactivate
 2. 添加敏感信息，例如：
 
 ```
-EMAIL_PASSWORD=your_email_password
-GITHUB_TOKEN=your_github_token
+CRAWLER_EMAIL_PASSWORD=your-email-password
+CRAWLER_GITHUB_TOKEN=your-github-token
 ```
 
 3. 项目会自动加载`.env`文件中的环境变量
+
+**重要提示**：程序不会保存配置文件，所有配置都是重新读取的，敏感信息只会存在于内存中。强烈建议使用环境变量管理敏感信息，而不是直接写入配置文件。
 
 也可以直接设置系统环境变量：
 
 ```bash
 # Linux/macOS
-export EMAIL_PASSWORD=your_email_password
-export GITHUB_TOKEN=your_github_token
+export CRAWLER_EMAIL_PASSWORD=your-email-password
+export CRAWLER_GITHUB_TOKEN=your-github-token
 
 # Windows
-set EMAIL_PASSWORD=your_email_password
-set GITHUB_TOKEN=your_github_token
+set CRAWLER_EMAIL_PASSWORD=your-email-password
+set CRAWLER_GITHUB_TOKEN=your-github-token
 ```
 
 ### 创建配置文件

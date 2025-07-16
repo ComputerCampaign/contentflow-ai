@@ -184,22 +184,6 @@ class Config:
             self.config[section] = {}
         
         self.config[section][key] = value
-    
-    def save(self):
-        """保存配置到文件
-        
-        Returns:
-            bool: 是否成功
-        """
-        try:
-            os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
-            with open(self.config_path, 'w', encoding='utf-8') as f:
-                json.dump(self.config, f, indent=4, ensure_ascii=False)
-            logger.info(f"配置已保存到: {self.config_path}")
-            return True
-        except Exception as e:
-            logger.error(f"保存配置失败: {str(e)}")
-            return False
 
 # 创建全局配置实例
 config = Config()
