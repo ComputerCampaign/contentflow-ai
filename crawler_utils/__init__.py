@@ -7,8 +7,9 @@ from .storage_manager import StorageManager
 from .batch_downloader import BatchDownloader
 from .xpath_manager import XPathManager
 from .github_image_uploader import GitHubImageUploader
+from .crawler_core import CrawlerCore
 
 __all__ = [
     'HtmlParser', 'ImageDownloader', 'StorageManager', 'BatchDownloader', 'XPathManager',
-    'GitHubImageUploader'
+    'GitHubImageUploader', 'CrawlerCore'
 ]

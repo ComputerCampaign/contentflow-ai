@@ -278,6 +278,9 @@ python generate_blog.py --images image1.jpg image2.jpg --metadata metadata.json 
 .
 ├── README.md           # 项目说明文档
 ├── pyproject.toml      # 项目配置和依赖管理
+├── uv.lock             # uv依赖锁定文件
+├── .env.example        # 环境变量示例文件
+├── .uv/                # uv配置目录
 ├── config/             # 配置目录
 │   ├── __init__.py     # 配置包初始化文件
 │   ├── config.py       # 配置管理模块
@@ -298,27 +301,40 @@ python generate_blog.py --images image1.jpg image2.jpg --metadata metadata.json 
 │   ├── generate_blog_from_crawler_example.sh # 爬虫数据博客生成示例脚本
 │   ├── generate_blog_combined_example.sh # 综合博客生成示例脚本
 │   ├── crawler_example.sh # 爬虫功能示例脚本
-│   ├── images/         # 示例图片目录
-│   └── output/         # 示例输出目录
 ├── utils/              # 工具函数
 │   ├── __init__.py
 │   ├── notifier.py     # 邮件通知模块
+│   ├── blog_generator.py # 博客生成器模块
 │   ├── generate_blog.py # 博客生成模块
-│   └── github_image_uploader.py # GitHub图片上传模块
+│   └── logger.py       # 日志模块
 ├── crawler_utils/      # 爬虫工具函数
 │   ├── __init__.py
 │   ├── batch_downloader.py # 批量下载器
+│   ├── crawler_core.py # 爬虫核心功能
+│   ├── github_image_uploader.py # GitHub图片上传模块
 │   ├── html_parser.py  # HTML解析器
 │   ├── image_downloader.py # 图片下载器
 │   ├── storage_manager.py # 存储管理器
 │   └── xpath_manager.py # XPath管理器
+├── tests/              # 测试目录
+│   ├── __init__.py
+│   ├── test_crawler_basic.py # 爬虫基础测试
+│   ├── test_enable_xpath.py # XPath功能测试
+│   └── test_xpath_rules.py # XPath规则测试
+├── logs/               # 日志目录
 ├── blogs/              # 生成的博客目录
+│   ├── .gitkeep
+│   ├── README.md       # 博客目录说明文档
 │   ├── drafts/         # 博客草稿目录
+│   │   └── .gitkeep
 │   └── published/      # 已发布博客目录
-├── output/             # 默认输出目录（日志和临时文件）
+│       └── .gitkeep
+├── output/             # 默认输出目录（临时文件）
+│   ├── .gitkeep
+│   └── README.md       # 输出目录说明文档
 └── data/               # 数据存储目录（不包含在版本控制中）
-    ├── images/         # 原始图片存储目录
-    └── metadata/       # 元数据存储目录
+    ├── .gitkeep
+    └── README.md       # 数据目录说明文档
 ```
 
 ## XPath规则配置
