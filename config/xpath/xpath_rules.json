@@ -5,7 +5,7 @@
             "name": "Reddit媒体图片",
             "description": "Reddit网站媒体图片区域",
             "domain_patterns": ["reddit.com", "www.reddit.com"],
-            "xpath": "//div[contains(@class, 'media-lightbox-img')]"
+            "xpath": "//img[contains(@class, 'media-lightbox-img')]"
         },
         {
             "id": "twitter_media",

@@ -52,10 +52,16 @@ class HtmlParser:
                     'headings': []
                 }
             
-            # 在选中的元素内查找图片
-            img_elements = []
-            for elem in selected_elements:
-                img_elements.extend(elem.xpath('.//img'))
+            # 检查选择器是否已经直接选择了img标签
+            if xpath_selector.lower().startswith('//img') or xpath_selector.endswith('img'):
+                # 如果选择器已经直接选择了img标签，直接使用选中的元素
+                img_elements = selected_elements
+                logger.info("XPath选择器直接选择了img标签，跳过内部img查找")
+            else:
+                # 否则，在选中的元素内查找img标签
+                img_elements = []
+                for elem in selected_elements:
+                    img_elements.extend(elem.xpath('.//img'))
         else:
             # 如果没有提供XPath选择器，则在整个页面中查找图片
             img_elements = tree.xpath('//img')
