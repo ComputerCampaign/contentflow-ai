@@ -464,16 +464,16 @@ python crawler.py --url https://example.com --use-selenium
 
 ```bash
 # 使用本地测试页面验证（有头模式）
-python verify_js_injection.py
+python tests/verify_js_injection.py
 
 # 使用本地测试页面验证（无头模式）
-python verify_js_injection.py --headless
+python tests/verify_js_injection.py --headless
 
 # 验证特定URL（有头模式）
-python verify_js_injection.py --url https://example.com
+python tests/verify_js_injection.py --url https://example.com
 
 # 验证特定URL（无头模式）
-python verify_js_injection.py --headless --url https://example.com
+python tests/verify_js_injection.py --headless --url https://example.com
 ```
 
 验证工具会检查以下关键属性：
