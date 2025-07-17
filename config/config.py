@@ -63,7 +63,17 @@ class Config:
                 "data_dir": "data",
                 "timeout": 10,
                 "retry": 3,
-                "use_selenium": False
+                "use_selenium": False,
+                "selenium_config": {
+                    "headless": True,
+                    "proxy": None,
+                    "page_load_wait": 6,
+                    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+                    "disable_gpu": True,
+                    "no_sandbox": True,
+                    "disable_dev_shm_usage": True,
+                    "window_size": "1920,1080"
+                }
             },
             # 邮件配置
             "email": {
@@ -172,18 +182,24 @@ class Config:
         
         return self.config[section].get(key, default)
     
-    def set(self, section, key, value):
+    def set(self, section, key, sub_key=None, value=None):
         """设置配置值
         
         Args:
             section (str): 配置节
             key (str): 配置键
-            value (any): 配置值
+            sub_key (str, optional): 子配置键，用于嵌套配置
+            value (any): 配置值，如果sub_key为None，则value为key对应的值
         """
         if section not in self.config:
             self.config[section] = {}
         
-        self.config[section][key] = value
+        if sub_key is None:
+            self.config[section][key] = value
+        else:
+            if key not in self.config[section]:
+                self.config[section][key] = {}
+            self.config[section][key][sub_key] = value
 
 # 创建全局配置实例
 config = Config()

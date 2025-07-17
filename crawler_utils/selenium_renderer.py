@@ -45,6 +45,11 @@ class SeleniumRenderer:
         self.page_load_wait = page_load_wait
         self.retry = retry
         
+        # 从配置中获取Selenium设置
+        if self.config:
+            selenium_config = self.config.get('crawler', 'selenium_config', {})
+            self.page_load_wait = selenium_config.get('page_load_wait', self.page_load_wait)
+        
         # 获取stealth.min.js文件路径
         self.js_file_path = os.path.abspath(os.path.join(
             os.path.dirname(os.path.dirname(__file__)), 
@@ -60,24 +65,39 @@ class SeleniumRenderer:
         # 设置Chrome选项
         chrome_options = Options()
         
+        # 从配置中获取Selenium设置
+        selenium_config = {}
+        if self.config:
+            selenium_config = self.config.get('crawler', 'selenium_config', {})
+        
         # 根据配置决定是否使用无头模式
-        if self.headless:
+        headless = selenium_config.get('headless', self.headless)
+        if headless:
             chrome_options.add_argument('--headless')
-            chrome_options.add_argument('--disable-gpu')
+            if selenium_config.get('disable_gpu', True):
+                chrome_options.add_argument('--disable-gpu')
         
         # 添加其他常用选项
-        chrome_options.add_argument('--no-sandbox')
-        chrome_options.add_argument('--disable-dev-shm-usage')
+        if selenium_config.get('no_sandbox', True):
+            chrome_options.add_argument('--no-sandbox')
+        if selenium_config.get('disable_dev_shm_usage', True):
+            chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--disable-blink-features=AutomationControlled')
         
+        # 设置窗口大小
+        window_size = selenium_config.get('window_size', '1920,1080')
+        chrome_options.add_argument(f'--window-size={window_size}')
+        
         # 设置用户代理
-        chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-                                   'AppleWebKit/537.36 (KHTML, like Gecko) '
-                                   'Chrome/91.0.4472.124 Safari/537.36')
+        user_agent = selenium_config.get('user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                                        'AppleWebKit/537.36 (KHTML, like Gecko) '
+                                        'Chrome/91.0.4472.124 Safari/537.36')
+        chrome_options.add_argument(f'--user-agent={user_agent}')
         
         # 如果提供了代理，则使用代理
-        if self.proxy:
-            chrome_options.add_argument(f'--proxy-server={self.proxy}')
+        proxy = selenium_config.get('proxy', self.proxy)
+        if proxy:
+            chrome_options.add_argument(f'--proxy-server={proxy}')
         
         # 初始化WebDriver
         service = Service(ChromeDriverManager().install())
@@ -124,7 +144,8 @@ class SeleniumRenderer:
                 
                 # 获取URL
                 self.get_url(url)
-                
+
+                logger.info(f"等待{self.page_load_wait}秒, 等待页面加载完成")
                 # 等待页面加载完成
                 time.sleep(self.page_load_wait)
                 

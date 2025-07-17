@@ -66,8 +66,8 @@ class CrawlerCore:
                           '(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         })
         
-        # Selenium WebDriver
-        self.driver = None
+        # Selenium 渲染器
+        self.renderer = None
         if self.use_selenium:
             self._init_selenium()
             
@@ -78,9 +78,10 @@ class CrawlerCore:
         """初始化Selenium渲染器"""
         try:
             # 从配置中获取Selenium相关设置
-            headless = self.config.get('crawler', 'selenium_config', {}).get('headless', True)
-            proxy = self.config.get('crawler', 'selenium_config', {}).get('proxy', None)
-            page_load_wait = self.config.get('crawler', 'selenium_config', {}).get('page_load_wait', 6)
+            selenium_config = self.config.get('crawler', 'selenium_config', {})
+            headless = selenium_config.get('headless', True)
+            proxy = selenium_config.get('proxy', None)
+            page_load_wait = selenium_config.get('page_load_wait', 6)
             
             # 初始化SeleniumRenderer
             self.renderer = SeleniumRenderer(
@@ -109,7 +110,7 @@ class CrawlerCore:
         Returns:
             tuple: (是否成功, HTML内容或错误信息)
         """
-        if self.use_selenium and self.driver:
+        if self.use_selenium and self.renderer:
             return self._fetch_with_selenium(url)
         else:
             return self._fetch_with_requests(url)

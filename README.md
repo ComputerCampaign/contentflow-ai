@@ -119,7 +119,12 @@ set CRAWLER_GITHUB_TOKEN=your-github-token
     "selenium_config": {
       "headless": true,
       "proxy": null,
-      "page_load_wait": 6
+      "page_load_wait": 6,
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      "disable_gpu": true,
+      "no_sandbox": true,
+      "disable_dev_shm_usage": true,
+      "window_size": "1920,1080"
     }
   },
   "email": {
@@ -142,6 +147,21 @@ set CRAWLER_GITHUB_TOKEN=your-github-token
 ```
 
 **注意**：敏感信息如`sender_password`和GitHub `token`应通过环境变量设置，不要直接写入配置文件。
+
+### Selenium 配置
+
+Selenium 模式用于处理动态加载的网页内容，可以通过以下参数进行配置：
+
+- `headless`: 是否使用无头模式（不显示浏览器界面），默认为 `true`
+- `proxy`: 代理服务器地址，格式为 `http://host:port` 或 `socks5://host:port`，默认为 `null`
+- `page_load_wait`: 页面加载等待时间（秒），默认为 `6`
+- `user_agent`: 自定义用户代理字符串，用于模拟特定浏览器
+- `disable_gpu`: 是否禁用 GPU 加速，默认为 `true`
+- `no_sandbox`: 是否禁用沙盒模式，默认为 `true`
+- `disable_dev_shm_usage`: 是否禁用 /dev/shm 使用，默认为 `true`
+- `window_size`: 浏览器窗口大小，格式为 `宽度,高度`，默认为 `1920,1080`
+
+这些配置可以在 `config.json` 文件中的 `crawler.selenium_config` 部分进行设置，也可以通过命令行参数 `--use-selenium` 启用 Selenium 模式。
 
 ### 邮件通知配置
 
@@ -400,6 +420,7 @@ python crawler.py --list-rules
 
 - **自动驱动管理**：使用ChromeDriverManager自动下载和管理chromedriver，无需手动下载和配置chromedriver路径
 - **反爬虫检测绕过**：通过注入特殊JavaScript脚本，绕过网站的WebDriver检测机制
+- **JavaScript脚本注入验证**：提供工具验证JavaScript脚本是否正确注入，确保反爬虫检测绕过有效
 - **无头模式支持**：支持无头模式运行，提高性能和稳定性
 - **代理支持**：支持配置代理服务器，便于处理IP限制
 - **自动重试**：自动处理页面加载失败的情况，支持多次重试
@@ -436,6 +457,33 @@ python crawler.py --list-rules
 ```bash
 python crawler.py --url https://example.com --use-selenium
 ```
+
+### JavaScript脚本注入验证
+
+为了确保反爬虫检测绕过脚本（stealth.min.js）正确注入，我们提供了验证工具：
+
+```bash
+# 使用本地测试页面验证（有头模式）
+python verify_js_injection.py
+
+# 使用本地测试页面验证（无头模式）
+python verify_js_injection.py --headless
+
+# 验证特定URL（有头模式）
+python verify_js_injection.py --url https://example.com
+
+# 验证特定URL（无头模式）
+python verify_js_injection.py --headless --url https://example.com
+```
+
+验证工具会检查以下关键属性：
+
+- **navigator.webdriver**: 应该是 `undefined` 或 `false`
+- **window.chrome**: 应该存在
+- **navigator.plugins.length**: 应该大于 0
+- **navigator.languages**: 应该存在且非空
+
+更多详细信息，请参阅 `docs/js_injection_verification.md` 文档。
 
 ### 使用任务ID
 

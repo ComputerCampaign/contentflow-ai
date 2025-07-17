@@ -5,6 +5,16 @@
         "timeout": 10,
         "retry": 3,
         "use_selenium": false,
+        "selenium_config": {
+            "headless": true,
+            "proxy": null,
+            "page_load_wait": 20,
+            "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "disable_gpu": true,
+            "no_sandbox": true,
+            "disable_dev_shm_usage": true,
+            "window_size": "1920,1080"
+        },
         "xpath_config": {
             "enabled": true,
             "rules_path": "config/xpath/xpath_rules.json",

@@ -80,6 +80,11 @@ def main():
     parser.add_argument("--retry", type=int, help="失败重试次数（默认使用配置文件设置）")
     parser.add_argument("--config", help="配置文件路径（默认为'config.json'）")
     parser.add_argument("--email-notification", type=lambda x: x.lower() == 'true',help="是否启用邮件通知，值为true或false")
+    # Selenium 配置参数
+    parser.add_argument("--headless", type=lambda x: x.lower() == 'true', help="Selenium是否使用无头模式（不显示浏览器界面），值为true或false")
+    parser.add_argument("--proxy", help="Selenium使用的代理服务器地址，格式为http://host:port或socks5://host:port")
+    parser.add_argument("--page-load-wait", type=int, help="Selenium页面加载等待时间，单位为秒")
+    parser.add_argument("--user-agent", help="Selenium使用的用户代理字符串")
     # 博客生成现在通过独立脚本generate_blog_from_crawler.py完成
     parser.add_argument("--rule-id", help="XPath规则ID，用于指定使用哪个XPath规则（例如：reddit_media, twitter_media, general_article）")
     parser.add_argument("--enable-xpath", type=lambda x: x.lower() == 'true', help="启用XPath选择器，使用XPath规则解析页面，值为true或false（默认值取决于config.json中xpath_config.enabled的值）")
@@ -94,6 +99,16 @@ def main():
     # 处理邮件通知
     if args.email_notification is not None:  # 如果用户明确指定了邮件通知设置
         config.set('email', 'enabled', args.email_notification)
+    
+    # 处理 Selenium 配置参数
+    if args.headless is not None:
+        config.set('crawler', 'selenium_config', 'headless', args.headless)
+    if args.proxy is not None:
+        config.set('crawler', 'selenium_config', 'proxy', args.proxy)
+    if args.page_load_wait is not None:
+        config.set('crawler', 'selenium_config', 'page_load_wait', args.page_load_wait)
+    if args.user_agent is not None:
+        config.set('crawler', 'selenium_config', 'user_agent', args.user_agent)
     
     # 如果指定了列出规则
     if args.list_rules:
