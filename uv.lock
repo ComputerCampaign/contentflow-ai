@@ -1100,6 +1100,12 @@ wheels = [
 ]
 
 [[package]]
+name = "timeout-decorator"
+version = "0.5.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/80/f8/0802dd14c58b5d3d72bb9caa4315535f58787a1dc50b81bbbcaaa15451be/timeout-decorator-0.5.0.tar.gz", hash = "sha256:6a2f2f58db1c5b24a2cc79de6345760377ad8bdc13813f5265f6c3e63d16b3d7", size = 4754 }
+
+[[package]]
 name = "tomli"
 version = "2.2.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1300,6 +1306,7 @@ dependencies = [
     { name = "requests" },
     { name = "selenium", version = "4.27.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "selenium", version = "4.34.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
+    { name = "timeout-decorator" },
     { name = "tqdm" },
     { name = "webdriver-manager" },
 ]
@@ -1327,6 +1334,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "requests", specifier = ">=2.28.1" },
     { name = "selenium", specifier = ">=4.4.3" },
+    { name = "timeout-decorator", specifier = ">=0.5.0" },
     { name = "tqdm", specifier = ">=4.64.0" },
     { name = "webdriver-manager", specifier = ">=3.8.3" },
 ]

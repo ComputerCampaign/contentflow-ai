@@ -22,6 +22,7 @@ dependencies = [
     "selenium>=4.4.3",
     "webdriver-manager>=3.8.3",
     "python-dotenv>=1.0.0",  # 用于加载.env文件中的环境变量
+    "timeout-decorator>=0.5.0",  # 用于设置函数超时装饰器
 ]
 
 [project.optional-dependencies]

@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 
 # 导入自定义模块
 from crawler_utils import StorageManager, BatchDownloader, HtmlParser, XPathManager
+from crawler_utils.selenium_renderer import SeleniumRenderer
 
 # 导入日志配置
 from utils.logger import setup_logger
@@ -74,30 +75,29 @@ class CrawlerCore:
 
     
     def _init_selenium(self):
-        """初始化Selenium WebDriver"""
+        """初始化Selenium渲染器"""
         try:
-            from selenium import webdriver
-            from selenium.webdriver.chrome.service import Service
-            from webdriver_manager.chrome import ChromeDriverManager
-            from selenium.webdriver.chrome.options import Options
+            # 从配置中获取Selenium相关设置
+            headless = self.config.get('crawler', 'selenium_config', {}).get('headless', True)
+            proxy = self.config.get('crawler', 'selenium_config', {}).get('proxy', None)
+            page_load_wait = self.config.get('crawler', 'selenium_config', {}).get('page_load_wait', 6)
             
-            # 设置Chrome选项
-            chrome_options = Options()
-            chrome_options.add_argument('--headless')  # 无头模式
-            chrome_options.add_argument('--disable-gpu')
-            chrome_options.add_argument('--no-sandbox')
-            chrome_options.add_argument('--disable-dev-shm-usage')
-            
-            # 初始化WebDriver
-            service = Service(ChromeDriverManager().install())
-            self.driver = webdriver.Chrome(service=service, options=chrome_options)
-            logger.info("Selenium WebDriver初始化成功")
+            # 初始化SeleniumRenderer
+            self.renderer = SeleniumRenderer(
+                config=self.config,
+                headless=headless,
+                proxy=proxy,
+                timeout=self.timeout,
+                page_load_wait=page_load_wait,
+                retry=self.retry
+            )
+            logger.info("Selenium渲染器初始化成功")
             
         except ImportError:
             logger.error("未安装Selenium或相关依赖，这些依赖已包含在项目中，请使用uv sync安装所有依赖")
             sys.exit(1)
         except Exception as e:
-            logger.error(f"初始化Selenium失败: {str(e)}")
+            logger.error(f"初始化Selenium渲染器失败: {str(e)}")
             sys.exit(1)
     
     def fetch_url(self, url):
@@ -130,21 +130,8 @@ class CrawlerCore:
                     return False, str(e)
     
     def _fetch_with_selenium(self, url):
-        """使用Selenium获取URL内容"""
-        for attempt in range(self.retry + 1):
-            try:
-                self.driver.get(url)
-                # 等待页面加载完成
-                time.sleep(6)  # 简单等待，可以改用显式等待
-                html_content = self.driver.page_source
-                return True, html_content
-            except Exception as e:
-                if attempt < self.retry:
-                    logger.warning(f"Selenium请求失败，重试 {attempt+1}/{self.retry}: {url}")
-                    time.sleep(1)  # 等待1秒再重试
-                else:
-                    logger.error(f"Selenium请求失败: {url}, 错误: {str(e)}")
-                    return False, str(e)
+        """使用Selenium渲染器获取URL内容"""
+        return self.renderer.render_page(url)
     
     def crawl(self, url, rule_id=None, task_id=None, notifier=None):
         """爬取指定URL的图片和标题
@@ -267,6 +254,6 @@ class CrawlerCore:
     
     def close(self):
         """关闭资源"""
-        if self.driver:
-            self.driver.quit()
-            logger.info("Selenium WebDriver已关闭")
+        if hasattr(self, 'renderer'):
+            self.renderer.close()
+            logger.info("Selenium渲染器已关闭")

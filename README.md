@@ -12,6 +12,7 @@
 - 支持邮件通知：爬取完成后自动发送邮件通知
 - 支持自定义输出目录：灵活设置爬取结果的存储位置
 - 支持Selenium模式：处理动态加载的网页内容
+- 支持反爬虫检测绕过：通过注入特殊脚本绕过网站的爬虫检测机制
 
 ### 博客生成模块
 
@@ -24,7 +25,12 @@
 ## 环境要求
 
 - Python 3.8+
-- 依赖库：见`pyproject.toml`文件
+- 主要依赖库：
+  - requests：HTTP请求
+  - beautifulsoup4：HTML解析
+  - selenium：浏览器自动化
+  - timeout-decorator：函数超时控制
+  - 更多依赖见`pyproject.toml`文件
 
 ## 环境设置
 
@@ -109,7 +115,12 @@ set CRAWLER_GITHUB_TOKEN=your-github-token
     "data_dir": "data",
     "use_selenium": false,
     "timeout": 30,
-    "retry": 3
+    "retry": 3,
+    "selenium_config": {
+      "headless": true,
+      "proxy": null,
+      "page_load_wait": 6
+    }
   },
   "email": {
     "enable": true,
@@ -314,13 +325,17 @@ python generate_blog.py --images image1.jpg image2.jpg --metadata metadata.json 
 │   ├── github_image_uploader.py # GitHub图片上传模块
 │   ├── html_parser.py  # HTML解析器
 │   ├── image_downloader.py # 图片下载器
+│   ├── selenium_renderer.py # Selenium渲染器模块
 │   ├── storage_manager.py # 存储管理器
 │   └── xpath_manager.py # XPath管理器
 ├── tests/              # 测试目录
 │   ├── __init__.py
 │   ├── test_crawler_basic.py # 爬虫基础测试
+│   ├── test_selenium_renderer.py # Selenium渲染器测试
+│   ├── test_stealth_driver.py # 无头浏览器测试
 │   ├── test_enable_xpath.py # XPath功能测试
-│   └── test_xpath_rules.py # XPath规则测试
+│   ├── test_xpath_rules.py # XPath规则测试
+│   └── test_timeout_decorator.py # 超时控制测试
 ├── logs/               # 日志目录
 ├── blogs/              # 生成的博客目录
 │   ├── .gitkeep
@@ -376,6 +391,51 @@ python crawler.py --list-rules
 ## 基于任务ID的爬取
 
 项目支持基于任务ID的爬取，便于管理多个爬取任务。
+
+## Selenium渲染器
+
+项目提供了强大的Selenium渲染器模块，用于处理动态加载的网页内容和绕过反爬虫检测。
+
+### 功能特点
+
+- **自动驱动管理**：使用ChromeDriverManager自动下载和管理chromedriver，无需手动下载和配置chromedriver路径
+- **反爬虫检测绕过**：通过注入特殊JavaScript脚本，绕过网站的WebDriver检测机制
+- **无头模式支持**：支持无头模式运行，提高性能和稳定性
+- **代理支持**：支持配置代理服务器，便于处理IP限制
+- **自动重试**：自动处理页面加载失败的情况，支持多次重试
+- **元素交互**：支持查找和点击页面元素，便于处理复杂的交互场景
+- **超时控制**：使用timeout_decorator包实现页面加载和操作的超时控制，防止长时间卡住
+
+### 配置方法
+
+在`config.json`中配置Selenium渲染器：
+
+```json
+"selenium_config": {
+  "headless": true,       // 是否使用无头模式
+  "proxy": null,          // 代理服务器地址，例如"http://127.0.0.1:8888"
+  "page_load_wait": 6     // 页面加载后等待时间（秒）
+}
+```
+
+### ChromeDriverManager说明
+
+本项目使用`webdriver_manager`库的`ChromeDriverManager`来自动管理chromedriver：
+
+- **自动下载**：根据当前Chrome浏览器版本自动下载匹配的chromedriver
+- **自动缓存**：下载的chromedriver会被缓存在本地（默认在`~/.wdm`目录），避免重复下载
+- **版本匹配**：自动确保chromedriver版本与Chrome浏览器版本兼容
+- **无需手动配置**：不需要手动下载chromedriver或设置环境变量
+
+这大大简化了环境配置，使用户可以专注于爬虫功能而不必担心驱动程序的兼容性问题。
+
+### 使用方法
+
+启用Selenium模式爬取：
+
+```bash
+python crawler.py --url https://example.com --use-selenium
+```
 
 ### 使用任务ID
 

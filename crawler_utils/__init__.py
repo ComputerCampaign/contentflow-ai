@@ -8,8 +8,9 @@ from .batch_downloader import BatchDownloader
 from .xpath_manager import XPathManager
 from .github_image_uploader import GitHubImageUploader
 from .crawler_core import CrawlerCore
+from .selenium_renderer import SeleniumRenderer
 
 __all__ = [
     'HtmlParser', 'ImageDownloader', 'StorageManager', 'BatchDownloader', 'XPathManager',
-    'GitHubImageUploader', 'CrawlerCore'
+    'GitHubImageUploader', 'CrawlerCore', 'SeleniumRenderer'
 ]
