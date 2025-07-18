@@ -10,11 +10,15 @@ from datetime import datetime
 import os
 import json
 
-from ..models import User, UserXPathRule, db
-from ..auth.permissions import login_required, group_required
-from ..crawler_utils.crawler_core import CrawlerCore
-from ..crawler_utils.xpath_manager import XPathManager
-from ..config.config import Config
+import os
+import sys
+# 添加项目根目录到Python路径，解决相对导入问题
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from backend.models import User, UserXPathRule, db
+from backend.auth.permissions import login_required, group_required
+from backend.crawler_utils.crawler_core import CrawlerCore
+from backend.crawler_utils.xpath_manager import XPathManager
+from backend.config.config import Config
 
 crawler_bp = Blueprint('crawler', __name__)
 

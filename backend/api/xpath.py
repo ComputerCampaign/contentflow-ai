@@ -7,9 +7,13 @@ XPath规则管理相关API接口
 
 from flask import Blueprint, request, jsonify, g
 
-from ..models import UserXPathRule, db
-from ..auth.permissions import login_required, check_xpath_limit
-from ..crawler_utils.xpath_manager import XPathManager
+import os
+import sys
+# 添加项目根目录到Python路径，解决相对导入问题
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from backend.models import UserXPathRule, db
+from backend.auth.permissions import login_required, check_xpath_limit
+from backend.crawler_utils.xpath_manager import XPathManager
 
 xpath_bp = Blueprint('xpath', __name__)
 

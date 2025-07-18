@@ -94,11 +94,8 @@ frontend/.env
 frontend/.env.local
 frontend/.env.*.local
 
-# SQLite数据库
-# Database files
-db/*.db
-db/*.sqlite
-db/*.sqlite3
+# SQLite数据库 - 数据库文件需要加入版本管理
+# 保留.gitkeep文件
 !db/.gitkeep
 
 # 前端构建输出

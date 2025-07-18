@@ -7,7 +7,11 @@ JWT令牌处理模块
 
 from datetime import datetime, timedelta
 import jwt
-from ..config import config
+import os
+import sys
+# 添加项目根目录到Python路径，解决相对导入问题
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from backend.config import config
 
 # 从配置中获取JWT相关设置，如果不存在则使用默认值
 JWT_SECRET = config.get('auth', 'jwt_secret', 'your-secret-key-change-this-in-production')

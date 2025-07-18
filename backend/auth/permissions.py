@@ -7,8 +7,12 @@
 
 from functools import wraps
 from flask import request, jsonify, g
-from .jwt_handler import verify_token
-from ..models import User, UserGroup
+import os
+import sys
+# 添加项目根目录到Python路径，解决相对导入问题
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from backend.auth.jwt_handler import verify_token
+from backend.models import User, UserGroup
 
 def login_required(f):
     """

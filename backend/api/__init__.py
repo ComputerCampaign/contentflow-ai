@@ -11,11 +11,15 @@ from flask import Blueprint
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
 # 导入各个子模块的蓝图
-from .auth import auth_bp
-from .user import user_bp
-from .xpath import xpath_bp
-from .crawler import crawler_bp
-from .backdoor import backdoor_bp
+import os
+import sys
+# 添加项目根目录到Python路径，解决相对导入问题
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from backend.api.auth import auth_bp
+from backend.api.user import user_bp
+from backend.api.xpath import xpath_bp
+from backend.api.crawler import crawler_bp
+from backend.api.backdoor import backdoor_bp
 
 # 注册子蓝图
 api_bp.register_blueprint(auth_bp, url_prefix='/auth')

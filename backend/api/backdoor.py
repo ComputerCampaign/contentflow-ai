@@ -3,11 +3,13 @@ from datetime import datetime
 import uuid
 import os
 import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from crawler_utils.crawler_core import CrawlerCore
-from utils.logger import get_logger
-from config.config import Config
+# 添加项目根目录到Python路径，解决相对导入问题
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+from backend.crawler_utils.crawler_core import CrawlerCore
+from backend.utils.logger import get_logger
+from backend.config.config import Config
 
 backdoor_bp = Blueprint('backdoor', __name__, url_prefix='/api/backdoor')
 logger = get_logger(__name__)

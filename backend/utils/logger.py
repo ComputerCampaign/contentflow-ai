@@ -85,3 +85,19 @@ def setup_logger(name=None, log_file=None, level=logging.INFO, file_path=None):
     logger.addHandler(console_handler)
     
     return logger
+
+
+def get_logger(name=None, log_file=None, level=logging.INFO, file_path=None):
+    """
+    获取日志记录器，是setup_logger的便捷封装
+    
+    Args:
+        name (str, optional): 日志记录器名称
+        log_file (str, optional): 日志文件路径
+        level (int, optional): 日志级别
+        file_path (str, optional): 文件路径
+        
+    Returns:
+        logging.Logger: 日志记录器
+    """
+    return setup_logger(name, log_file, level, file_path)

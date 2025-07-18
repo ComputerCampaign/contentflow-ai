@@ -9,9 +9,13 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify, g
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from ..models import User, db
-from ..auth.jwt_handler import create_access_token
-from ..auth.permissions import login_required
+import os
+import sys
+# 添加项目根目录到Python路径，解决相对导入问题
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from backend.models import User, db
+from backend.auth.jwt_handler import create_access_token
+from backend.auth.permissions import login_required
 
 auth_bp = Blueprint('auth', __name__)
 

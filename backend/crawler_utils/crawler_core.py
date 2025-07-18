@@ -16,7 +16,9 @@ from . import StorageManager, BatchDownloader, HtmlParser, XPathManager
 from .selenium_renderer import SeleniumRenderer
 
 
-from ..utils.logger import setup_logger
+# 添加项目根目录到Python路径，解决相对导入问题
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from backend.utils.logger import setup_logger
 
 # 设置日志
 logger = setup_logger(__name__, file_path=__file__)

@@ -8,7 +8,11 @@
 """
 
 # 从新的模型模块导入
-from ..models import db, User, UserGroup, UserXPathRule
+import os
+import sys
+# 添加项目根目录到Python路径，解决相对导入问题
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from backend.models import db, User, UserGroup, UserXPathRule
 
 # 保持向后兼容
 __all__ = ['db', 'User', 'UserGroup', 'UserXPathRule']
