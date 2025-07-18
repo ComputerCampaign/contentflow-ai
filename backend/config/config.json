@@ -1,6 +1,6 @@
 {
     "auth": {
-        "database_uri": "sqlite:///data/auth.db",
+        "database_uri": "sqlite:///db/auth.db",
         "secret_key": "your-secret-key-change-me",
         "jwt_secret_key": "your-jwt-secret-key-change-me",
         "jwt_access_token_expires": 86400,
@@ -63,5 +63,15 @@
         },
         "templates_dir": "config/templates",
         "use_crawler_image_storage": true
+    },
+    "backdoor": {
+        "enabled": true,
+        "rate_limit": {
+            "enabled": true,
+            "requests_per_minute": 10,
+            "requests_per_hour": 100
+        },
+        "allowed_ips": [],
+        "log_requests": true
     }
 }

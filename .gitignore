@@ -95,9 +95,11 @@ frontend/.env.local
 frontend/.env.*.local
 
 # SQLite数据库
-*.db
-*.sqlite
-*.sqlite3
+# Database files
+db/*.db
+db/*.sqlite
+db/*.sqlite3
+!db/.gitkeep
 
 # 前端构建输出
 /static/
