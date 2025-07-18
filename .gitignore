@@ -84,3 +84,20 @@ examples/output/
 # 操作系统
 .DS_Store
 Thumbs.db
+
+# 前端相关
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# SQLite数据库
+*.db
+*.sqlite
+*.sqlite3
+
+# 前端构建输出
+/static/
