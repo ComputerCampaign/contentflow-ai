@@ -57,7 +57,7 @@ class FileRecord(db.Model):
     related_content_id = db.Column(db.String(36), db.ForeignKey('generated_contents.id'))
     
     # 元数据
-    metadata = db.Column(db.JSON)  # 文件元数据
+    file_metadata = db.Column(db.JSON)  # 文件元数据
     description = db.Column(db.Text)  # 文件描述
     
     # 过期信息
@@ -215,7 +215,7 @@ class FileRecord(db.Model):
             data['md5_hash'] = self.md5_hash
             data['sha256_hash'] = self.sha256_hash
             data['storage_config'] = self.storage_config
-            data['metadata'] = self.metadata
+            data['file_metadata'] = self.file_metadata
         
         return data
     

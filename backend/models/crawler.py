@@ -164,7 +164,7 @@ class CrawlerResult(db.Model):
     
     # 提取的数据
     extracted_data = db.Column(db.JSON)  # 提取的结构化数据
-    metadata = db.Column(db.JSON)  # 页面元数据
+    page_metadata = db.Column(db.JSON)  # 页面元数据
     
     # 状态信息
     status = db.Column(db.Enum('success', 'failed', 'partial', name='result_status'), 
@@ -241,7 +241,7 @@ class CrawlerResult(db.Model):
             'status': self.status,
             'error_message': self.error_message,
             'extracted_data': self.extracted_data,
-            'metadata': self.metadata,
+            'page_metadata': self.page_metadata,
             'response_code': self.response_code,
             'response_time': self.response_time,
             'content_type': self.content_type,

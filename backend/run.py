@@ -61,9 +61,10 @@ def main():
     
     else:
         # 默认运行应用
+        port = int(os.environ.get('PORT', app.config.get('PORT', 5000)))
         app.run(
             host=app.config.get('HOST', '0.0.0.0'),
-            port=app.config.get('PORT', 5000),
+            port=port,
             debug=app.config.get('DEBUG', True)
         )
 

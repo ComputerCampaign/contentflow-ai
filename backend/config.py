@@ -21,7 +21,9 @@ class Config:
     MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD') or 'password'
     MYSQL_DATABASE = os.environ.get('MYSQL_DATABASE') or 'crawler_platform'
     
-    SQLALCHEMY_DATABASE_URI = (
+    # 数据库URI配置
+    # 优先使用DATABASE_URL环境变量，如果没有则使用MySQL配置
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or (
         f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@"
         f"{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}?charset=utf8mb4"
     )

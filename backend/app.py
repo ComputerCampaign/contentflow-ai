@@ -56,10 +56,8 @@ def create_app(config_class=Config):
     # 注册CLI命令
     register_cli_commands(app)
     
-    # 应用上下文处理器
-    @app.before_first_request
-    def create_tables():
-        """创建数据库表"""
+    # 创建数据库表
+    with app.app_context():
         db.create_all()
     
     @app.before_request

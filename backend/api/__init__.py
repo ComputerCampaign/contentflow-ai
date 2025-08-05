@@ -10,7 +10,7 @@ from backend.api.tasks import tasks_bp
 from backend.api.crawler import crawler_bp
 from backend.api.content import content_bp
 from backend.api.files import files_bp
-from backend.api.monitor import monitor_bp
+from backend.api.monitoring import monitoring_bp
 
 
 def register_blueprints(app):
@@ -35,7 +35,7 @@ def register_blueprints(app):
     app.register_blueprint(files_bp, url_prefix=f'{api_prefix}/files')
     
     # 注册监控API
-    app.register_blueprint(monitor_bp, url_prefix=f'{api_prefix}/monitor')
+    app.register_blueprint(monitoring_bp, url_prefix=f'{api_prefix}/monitor')
 
 
 __all__ = [
@@ -45,5 +45,5 @@ __all__ = [
     'crawler_bp',
     'content_bp',
     'files_bp',
-    'monitor_bp'
+    'monitoring_bp'
 ]
