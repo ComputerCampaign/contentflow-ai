@@ -8,13 +8,13 @@ import json
 from urllib.parse import urlparse
 
 # 导入自定义模块
-from .utils import notifier
-from .crawler_utils import XPathManager
-from .crawler_utils.crawler_core import CrawlerCore
-from .config import config
+from backend.utils import notifier
+from backend.crawler_utils import XPathManager
+from backend.crawler_utils.crawler_core import CrawlerCore
+from backend.config import config
 
 # 导入日志配置
-from .utils.logger import setup_logger
+from backend.utils.logger import setup_logger
 
 # 设置日志
 logger = setup_logger(__name__, file_path=__file__)
@@ -113,7 +113,7 @@ def main():
     # 如果指定了列出规则
     if args.list_rules:
         # 从正确的模块导入XPathManager
-        from .crawler_utils.xpath_manager import XPathManager
+        from backend.crawler_utils.xpath_manager import XPathManager
         # 创建XPathManager实例并调用list_rules方法
         xpath_manager = XPathManager()
         print(xpath_manager.list_rules())

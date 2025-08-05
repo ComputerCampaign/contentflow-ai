@@ -27,13 +27,13 @@ import pandas as pd
 from urllib.parse import urlparse
 
 # 导入配置
-from config import config
+from backend.config import config
 
 # 导入博客生成器
-from .utils.generate_blog import BlogGenerator, list_available_templates
+from backend.utils.blog_generator import BlogGenerator, list_available_templates
 
 # 导入日志配置
-from .utils.logger import setup_logger
+from backend.utils.logger import setup_logger
 
 # 设置日志
 logger = setup_logger(__name__, file_path=__file__)
@@ -229,7 +229,7 @@ def main():
             sys.exit(1)
         
         # 加载元数据
-        from .utils.generate_blog import load_metadata
+        from backend.utils.generate_blog import load_metadata
         metadata = load_metadata(args.metadata)
         if not metadata:
             logger.error("错误: 无法加载元数据或元数据为空")

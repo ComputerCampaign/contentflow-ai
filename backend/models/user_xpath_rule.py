@@ -6,7 +6,7 @@
 """
 
 from datetime import datetime
-from .base import db
+from backend.models.base import db
 
 
 class UserXPathRule(db.Model):

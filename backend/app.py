@@ -9,9 +9,9 @@ from flask import Flask, jsonify, send_from_directory, send_file
 from flask_cors import CORS
 import os
 
-from .config.config import Config
-from .models import db, User, UserGroup, UserXPathRule
-from .api import api_bp
+from backend.config.config import Config
+from backend.models import db, User, UserGroup, UserXPathRule
+from backend.api import api_bp
 
 def create_app():
     """

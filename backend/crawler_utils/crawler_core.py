@@ -12,12 +12,8 @@ import time
 from urllib.parse import urlparse
 
 # 导入自定义模块
-from . import StorageManager, BatchDownloader, HtmlParser, XPathManager
-from .selenium_renderer import SeleniumRenderer
-
-
-# 添加项目根目录到Python路径，解决相对导入问题
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from backend.crawler_utils import StorageManager, BatchDownloader, HtmlParser, XPathManager
+from backend.crawler_utils.selenium_renderer import SeleniumRenderer
 from backend.utils.logger import setup_logger
 
 # 设置日志

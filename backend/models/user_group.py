@@ -6,7 +6,7 @@
 """
 
 from sqlalchemy.dialects.sqlite import JSON
-from .base import db
+from backend.models.base import db
 
 
 class UserGroup(db.Model):

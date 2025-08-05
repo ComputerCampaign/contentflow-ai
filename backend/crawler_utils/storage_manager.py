@@ -204,7 +204,7 @@ class StorageManager:
         """
         try:
             # 导入GitHub图床上传器
-            from .github_image_uploader import GitHubImageUploader
+            from backend.crawler_utils.github_image_uploader import GitHubImageUploader
             
             # 创建GitHub图床上传器实例
             github_uploader = GitHubImageUploader()

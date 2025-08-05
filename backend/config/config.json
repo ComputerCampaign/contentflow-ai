@@ -27,7 +27,7 @@
         },
         "xpath_config": {
             "enabled": true,
-            "rules_path": "config/xpath/xpath_rules.json",
+            "rules_path": "backend/config/xpath/xpath_rules.json",
             "default_rule_id": "general_article"
         },
         "image_storage": {

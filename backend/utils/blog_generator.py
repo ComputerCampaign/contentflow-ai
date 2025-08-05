@@ -17,17 +17,14 @@ import requests
 from bs4 import BeautifulSoup
 
 # 导入配置
-import os
-import sys
-# 添加项目根目录到Python路径，解决相对导入问题
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
 from backend.config import config
 
 # 导入GitHub图床上传器
 from backend.crawler_utils.github_image_uploader import GitHubImageUploader
 
 # 导入日志配置
-from .logger import setup_logger
+from backend.utils.logger import setup_logger
 
 # 设置日志
 logger = setup_logger(__name__, file_path=__file__)

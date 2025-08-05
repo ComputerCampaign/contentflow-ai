@@ -5,8 +5,8 @@ import os
 from urllib.parse import urljoin
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from .image_downloader import ImageDownloader
-from .storage_manager import StorageManager
+from backend.crawler_utils.image_downloader import ImageDownloader
+from backend.crawler_utils.storage_manager import StorageManager
 
 # 导入日志配置
 import os

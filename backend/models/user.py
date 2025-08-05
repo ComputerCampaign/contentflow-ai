@@ -7,7 +7,7 @@
 
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
-from .base import db
+from backend.models.base import db
 
 
 class User(db.Model):
