@@ -1,46 +1,49 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
 """
-API模块初始化文件，用于注册所有API蓝图
+API蓝图模块
 """
 
 from flask import Blueprint
-
-# 创建API主蓝图
-api_bp = Blueprint('api', __name__, url_prefix='/api')
-
-# 导入各个子模块的蓝图
-import os
-import sys
-# 添加项目根目录到Python路径，解决相对导入问题
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from backend.api.auth import auth_bp
-from backend.api.user import user_bp
-from backend.api.xpath import xpath_bp
+from backend.api.tasks import tasks_bp
 from backend.api.crawler import crawler_bp
-from backend.api.backdoor import backdoor_bp
+from backend.api.content import content_bp
+from backend.api.files import files_bp
+from backend.api.monitor import monitor_bp
 
-# 注册子蓝图
-api_bp.register_blueprint(auth_bp, url_prefix='/auth')
-api_bp.register_blueprint(user_bp, url_prefix='/user')
-api_bp.register_blueprint(xpath_bp, url_prefix='/xpath')
-api_bp.register_blueprint(crawler_bp, url_prefix='/crawler')
-
-# 导出API蓝图
-__all__ = ['api_bp']
-
-from flask import Blueprint
-from backend.api.auth import auth_bp
-from backend.api.user import user_bp
-from backend.api.crawler import crawler_bp
-from backend.api.xpath import xpath_bp
-from backend.api.backdoor import backdoor_bp
 
 def register_blueprints(app):
-    """注册所有蓝图"""
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(user_bp)
-    app.register_blueprint(crawler_bp)
-    app.register_blueprint(xpath_bp)
-    app.register_blueprint(backdoor_bp)
+    """注册所有API蓝图"""
+    
+    # API版本前缀
+    api_prefix = '/api/v1'
+    
+    # 注册认证相关API
+    app.register_blueprint(auth_bp, url_prefix=f'{api_prefix}/auth')
+    
+    # 注册任务管理API
+    app.register_blueprint(tasks_bp, url_prefix=f'{api_prefix}/tasks')
+    
+    # 注册爬虫配置API
+    app.register_blueprint(crawler_bp, url_prefix=f'{api_prefix}/crawler')
+    
+    # 注册内容生成API
+    app.register_blueprint(content_bp, url_prefix=f'{api_prefix}/content')
+    
+    # 注册文件管理API
+    app.register_blueprint(files_bp, url_prefix=f'{api_prefix}/files')
+    
+    # 注册监控API
+    app.register_blueprint(monitor_bp, url_prefix=f'{api_prefix}/monitor')
+
+
+__all__ = [
+    'register_blueprints',
+    'auth_bp',
+    'tasks_bp', 
+    'crawler_bp',
+    'content_bp',
+    'files_bp',
+    'monitor_bp'
+]

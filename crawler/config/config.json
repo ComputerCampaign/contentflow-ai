@@ -1,0 +1,49 @@
+{
+    "crawler": {
+        "timeout": 30,
+        "retry": 3,
+        "max_workers": 4,
+        "use_selenium": false,
+        "enable_xpath": true,
+        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    },
+    "storage": {
+        "base_dir": "data",
+        "output_dir": "output",
+        "logs_dir": "logs"
+    },
+    "github": {
+        "token": "",
+        "repo": "",
+        "branch": "main",
+        "path": "images"
+    },
+    "selenium": {
+        "headless": true,
+        "disable_gpu": true,
+        "disable_dev_shm_usage": true,
+        "window_size": "1920,1080",
+        "page_load_timeout": 30,
+        "implicit_wait": 10
+    },
+    "xpath": {
+        "enabled": true,
+        "rules_path": "crawler/config/xpath/xpath_rules.json",
+        "default_rule_id": "general_article"
+    },
+    "scripts": {
+        "stealth_path": "crawler/config/scripts/stealth.min.js"
+    },
+    "image_storage": {
+        "type": "github",
+        "github": {
+            "enabled": true,
+            "repo_owner": "ComputerCampaign",
+            "repo_name": "material_warehouse",
+            "branch": "main",
+            "token": "",
+            "image_path": "images",
+            "base_url": "https://raw.githubusercontent.com/ComputerCampaign/material_warehouse/main/images/"
+        }
+    }
+}

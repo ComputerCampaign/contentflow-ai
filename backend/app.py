@@ -1,218 +1,295 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
 """
-后端主应用入口文件
+Flask应用主入口文件
+数据爬取博客发布平台后端API服务
 """
 
-from flask import Flask, jsonify, send_from_directory, send_file
+from flask import Flask, jsonify, request
 from flask_cors import CORS
+from backend.config import Config
+from backend.extensions import db, jwt, limiter, migrate
+from backend.api import register_blueprints
+from backend.models.user import User
+from backend.models.task import Task, TaskExecution
+from backend.models.crawler import CrawlerConfig, CrawlerResult
+from backend.models.content import ContentTemplate, GeneratedContent
+from backend.models.file import FileRecord
+import logging
+from logging.handlers import RotatingFileHandler
 import os
+from datetime import datetime
 
-from backend.config.config import Config
-from backend.models import db, User, UserGroup, UserXPathRule
-from backend.api import api_bp
 
-def create_app():
-    """
-    创建并配置Flask应用
-    """
-    import os
-    # 设置静态文件目录
-    static_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static')
-    app = Flask(__name__, static_folder=static_folder, static_url_path='/static')
-    
-    # 加载配置
-    config = Config()
-    
-    # 配置数据库
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    db_path = os.path.join(project_root, 'db', 'auth.db')
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    
-    # 确保db目录存在
-    os.makedirs(os.path.dirname(db_path), exist_ok=True)
-    app.config['SECRET_KEY'] = config.get('auth', 'secret_key', os.urandom(24).hex())
-    app.config['JWT_SECRET_KEY'] = config.get('auth', 'jwt_secret_key', os.urandom(24).hex())
-    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = config.get('auth', 'jwt_access_token_expires', 86400)  # 默认1天
+def create_app(config_class=Config):
+    """应用工厂函数"""
+    app = Flask(__name__)
+    app.config.from_object(config_class)
     
     # 初始化扩展
     db.init_app(app)
+    jwt.init_app(app)
+    limiter.init_app(app)
+    migrate.init_app(app, db)
     
     # 配置CORS
-    CORS(app, resources={r"/api/*": {"origins": config.get('auth', 'cors_origins', '*')}})
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": app.config.get('CORS_ORIGINS', ['http://localhost:3000']),
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"]
+        }
+    })
     
     # 注册蓝图
-    app.register_blueprint(api_bp)
+    register_blueprints(app)
     
-    # 静态文件路由
-    @app.route('/')
-    def index():
-        """提供前端主页"""
-        try:
-            return send_file(os.path.join(static_folder, 'index.html'))
-        except FileNotFoundError:
-            return jsonify({"error": "前端文件未找到，请先构建前端项目"}), 404
+    # 配置日志
+    configure_logging(app)
     
-    @app.route('/<path:path>')
-    def static_files(path):
-        """提供静态文件"""
-        # 如果是API路径，返回404
-        if path.startswith('api/'):
-            return jsonify({"error": "API路径不存在"}), 404
-        
-        # 尝试提供静态文件
-        try:
-            return send_from_directory(static_folder, path)
-        except FileNotFoundError:
-            # 如果文件不存在，返回index.html（用于SPA路由）
-            try:
-                return send_file(os.path.join(static_folder, 'index.html'))
-            except FileNotFoundError:
-                return jsonify({"error": "前端文件未找到，请先构建前端项目"}), 404
+    # 注册错误处理器
+    register_error_handlers(app)
     
-    # 错误处理
-    @app.errorhandler(404)
-    def not_found(error):
-        return jsonify({"error": "资源不存在"}), 404
+    # 注册JWT回调
+    register_jwt_callbacks(app)
     
-    @app.errorhandler(500)
-    def server_error(error):
-        return jsonify({"error": "服务器内部错误"}), 500
+    # 注册CLI命令
+    register_cli_commands(app)
     
-    # 创建数据库表和初始化管理员账户
-    with app.app_context():
+    # 应用上下文处理器
+    @app.before_first_request
+    def create_tables():
+        """创建数据库表"""
         db.create_all()
-        init_admin_account(config)
+    
+    @app.before_request
+    def log_request_info():
+        """记录请求信息"""
+        if app.config.get('LOG_REQUESTS', False):
+            app.logger.info(f'Request: {request.method} {request.url}')
     
     return app
 
-def init_admin_account(config):
-    """
-    初始化数据库：创建默认用户组、管理员账户和默认XPath规则
-    """
-    from datetime import datetime
-    from backend.utils.logger import get_logger
+
+def configure_logging(app):
+    """配置日志"""
+    if not app.debug and not app.testing:
+        # 确保日志目录存在
+        log_dir = app.config.get('LOG_DIR', 'logs')
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        
+        # 配置文件日志
+        log_file = os.path.join(log_dir, 'app.log')
+        file_handler = RotatingFileHandler(
+            log_file, maxBytes=10240000, backupCount=10
+        )
+        file_handler.setFormatter(logging.Formatter(
+            '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+        ))
+        file_handler.setLevel(logging.INFO)
+        app.logger.addHandler(file_handler)
+        
+        app.logger.setLevel(logging.INFO)
+        app.logger.info('Flask应用启动')
+
+
+def register_error_handlers(app):
+    """注册错误处理器"""
     
-    logger = get_logger(__name__)
+    @app.errorhandler(400)
+    def bad_request(error):
+        return jsonify({
+            'success': False,
+            'message': '请求参数错误',
+            'error_code': 400
+        }), 400
     
-    try:
-        # 创建默认用户组
-        default_groups = [
-            {
-                'name': 'admin',
-                'description': '管理员组，拥有所有权限',
-                'max_xpath_rules': -1,  # 无限制
-                'allowed_templates': ['*']  # 允许所有模板
-            },
-            {
-                'name': 'user',
-                'description': '普通用户组，拥有基本权限',
-                'max_xpath_rules': 10,
-                'allowed_templates': ['basic', 'simple']
-            },
-            {
-                'name': 'guest',
-                'description': '访客组，只有只读权限',
-                'max_xpath_rules': 3,
-                'allowed_templates': ['basic']
-            }
-        ]
+    @app.errorhandler(401)
+    def unauthorized(error):
+        return jsonify({
+            'success': False,
+            'message': '未授权访问',
+            'error_code': 401
+        }), 401
+    
+    @app.errorhandler(403)
+    def forbidden(error):
+        return jsonify({
+            'success': False,
+            'message': '权限不足',
+            'error_code': 403
+        }), 403
+    
+    @app.errorhandler(404)
+    def not_found(error):
+        return jsonify({
+            'success': False,
+            'message': '资源不存在',
+            'error_code': 404
+        }), 404
+    
+    @app.errorhandler(405)
+    def method_not_allowed(error):
+        return jsonify({
+            'success': False,
+            'message': '请求方法不允许',
+            'error_code': 405
+        }), 405
+    
+    @app.errorhandler(413)
+    def request_entity_too_large(error):
+        return jsonify({
+            'success': False,
+            'message': '请求实体过大',
+            'error_code': 413
+        }), 413
+    
+    @app.errorhandler(429)
+    def ratelimit_handler(error):
+        return jsonify({
+            'success': False,
+            'message': '请求过于频繁，请稍后重试',
+            'error_code': 429
+        }), 429
+    
+    @app.errorhandler(500)
+    def internal_error(error):
+        db.session.rollback()
+        app.logger.error(f'服务器内部错误: {str(error)}')
+        return jsonify({
+            'success': False,
+            'message': '服务器内部错误',
+            'error_code': 500
+        }), 500
+
+
+def register_jwt_callbacks(app):
+    """注册JWT回调函数"""
+    
+    @jwt.expired_token_loader
+    def expired_token_callback(jwt_header, jwt_payload):
+        return jsonify({
+            'success': False,
+            'message': '令牌已过期',
+            'error_code': 'TOKEN_EXPIRED'
+        }), 401
+    
+    @jwt.invalid_token_loader
+    def invalid_token_callback(error):
+        return jsonify({
+            'success': False,
+            'message': '无效的令牌',
+            'error_code': 'INVALID_TOKEN'
+        }), 401
+    
+    @jwt.unauthorized_loader
+    def missing_token_callback(error):
+        return jsonify({
+            'success': False,
+            'message': '缺少访问令牌',
+            'error_code': 'MISSING_TOKEN'
+        }), 401
+    
+    @jwt.needs_fresh_token_loader
+    def token_not_fresh_callback(jwt_header, jwt_payload):
+        return jsonify({
+            'success': False,
+            'message': '需要新的令牌',
+            'error_code': 'FRESH_TOKEN_REQUIRED'
+        }), 401
+    
+    @jwt.revoked_token_loader
+    def revoked_token_callback(jwt_header, jwt_payload):
+        return jsonify({
+            'success': False,
+            'message': '令牌已被撤销',
+            'error_code': 'TOKEN_REVOKED'
+        }), 401
+
+
+def register_cli_commands(app):
+    """注册CLI命令"""
+    
+    @app.cli.command()
+    def init_db():
+        """初始化数据库"""
+        db.create_all()
+        print('数据库初始化完成')
+    
+    @app.cli.command()
+    def create_admin():
+        """创建管理员用户"""
+        from backend.models.user import User
         
-        for group_data in default_groups:
-            existing_group = UserGroup.get_by_name(group_data['name'])
-            if not existing_group:
-                UserGroup.create_group(
-                    name=group_data['name'],
-                    description=group_data['description'],
-                    max_xpath_rules=group_data['max_xpath_rules'],
-                    allowed_templates=group_data['allowed_templates']
-                )
-                logger.info(f"创建用户组: {group_data['name']}")
-            else:
-                logger.info(f"用户组已存在: {group_data['name']}")
-        
-        # 创建管理员账户
-        admin_username = config.get('auth', 'admin_username', 'admin')
-        admin_password = config.get('auth', 'admin_password', 'admin123')
-        admin_email = config.get('auth', 'admin_email', 'admin@example.com')
-        
-        admin_group = UserGroup.get_admin_group()
-        if not admin_group:
-            logger.error("管理员组不存在，无法创建管理员用户")
+        admin = User.query.filter_by(username='admin').first()
+        if admin:
+            print('管理员用户已存在')
             return
         
-        admin = User.get_by_username(admin_username)
-        if not admin:
-            admin = User.create_user(
-                username=admin_username,
-                email=admin_email,
-                password=admin_password,
-                group=admin_group
-            )
-            logger.info(f"已创建管理员账户: {admin_username}")
-        else:
-            logger.info(f"管理员账户已存在: {admin_username}")
+        admin = User(
+            username='admin',
+            email='admin@example.com',
+            role='admin'
+        )
+        admin.set_password('admin123')
+        admin.is_active = True
         
-        # 创建默认XPath规则
-        create_default_xpath_rules(admin)
+        db.session.add(admin)
+        db.session.commit()
+        print('管理员用户创建成功: admin/admin123')
+    
+    @app.cli.command()
+    def cleanup_files():
+        """清理过期文件"""
+        from backend.models.file import FileRecord
+        from datetime import datetime, timedelta
         
-        logger.info("数据库初始化完成")
+        # 清理过期文件
+        now = datetime.utcnow()
+        expired_files = FileRecord.query.filter(
+            FileRecord.expires_at < now,
+            FileRecord.auto_delete == True
+        ).all()
         
-    except Exception as e:
-        logger.error(f"数据库初始化失败: {str(e)}")
-        raise
+        cleaned_count = 0
+        for file_record in expired_files:
+            try:
+                file_record.hard_delete()
+                cleaned_count += 1
+            except Exception as e:
+                print(f'清理文件失败 {file_record.id}: {str(e)}')
+        
+        print(f'清理完成，共清理{cleaned_count}个过期文件')
+    
+    @app.cli.command()
+    def show_stats():
+        """显示系统统计信息"""
+        print('=== 系统统计信息 ===')
+        print(f'用户总数: {User.query.count()}')
+        print(f'活跃用户: {User.query.filter_by(is_active=True).count()}')
+        print(f'任务总数: {Task.query.count()}')
+        print(f'运行中任务: {Task.query.filter_by(status="running").count()}')
+        print(f'爬虫配置: {CrawlerConfig.query.count()}')
+        print(f'内容模板: {ContentTemplate.query.count()}')
+        print(f'文件记录: {FileRecord.query.filter_by(status="available").count()}')
+        
+        # 今日活动
+        today = datetime.utcnow().date()
+        today_executions = TaskExecution.query.filter(
+            db.func.date(TaskExecution.created_at) == today
+        ).count()
+        print(f'今日任务执行: {today_executions}')
 
-def create_default_xpath_rules(admin_user):
-    """
-    创建默认XPath规则
-    """
-    from datetime import datetime
-    from backend.utils.logger import get_logger
-    
-    logger = get_logger(__name__)
-    
-    if not admin_user:
-        logger.warning("管理员用户不存在，跳过XPath规则创建")
-        return
-    
-    default_rules = [
-        {
-            'rule_name': '通用文章规则',
-            'domain': 'general',
-            'xpath': '//title/text() | //h1/text() | //h2/text()',
-            'description': '适用于大多数文章页面的通用XPath规则'
-        },
-        {
-            'rule_name': '新闻文章规则',
-            'domain': 'news',
-            'xpath': '//h1[@class="title"] | //div[@class="article-body"]//p',
-            'description': '适用于新闻网站的XPath规则'
-        }
-    ]
-    
-    for rule_data in default_rules:
-        # 检查规则是否已存在
-        existing_rule = UserXPathRule.query.filter_by(
-            rule_name=rule_data['rule_name'],
-            user_id=admin_user.id
-        ).first()
-        
-        if not existing_rule:
-            rule = UserXPathRule(
-                rule_name=rule_data['rule_name'],
-                domain=rule_data['domain'],
-                xpath=rule_data['xpath'],
-                description=rule_data['description'],
-                user_id=admin_user.id,
-                created_at=datetime.utcnow()
-            )
-            db.session.add(rule)
-            logger.info(f"创建XPath规则: {rule_data['rule_name']}")
-    
-    db.session.commit()
+
+# 创建应用实例
+app = create_app()
+
 
 if __name__ == '__main__':
-    app = create_app()
-    app.run(debug=True, host='0.0.0.0', port=8000)
+    # 开发环境运行
+    app.run(
+        host=app.config.get('HOST', '0.0.0.0'),
+        port=app.config.get('PORT', 5000),
+        debug=app.config.get('DEBUG', True)
+    )

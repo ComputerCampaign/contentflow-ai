@@ -1,120 +1,436 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
 """
-认证相关API接口
+认证相关API
 """
 
-from datetime import datetime
-from flask import Blueprint, request, jsonify, g
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask import Blueprint, request, jsonify, current_app
+from flask_jwt_extended import (
+    create_access_token, create_refresh_token, jwt_required, 
+    get_jwt_identity, get_jwt
+)
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from backend.extensions import db, limiter
+from backend.models.user import User
+from datetime import datetime, timedelta
+import re
 
-import os
-import sys
-# 添加项目根目录到Python路径，解决相对导入问题
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from backend.models import User, db
-from backend.auth.jwt_handler import create_access_token
-from backend.auth.permissions import login_required
 
 auth_bp = Blueprint('auth', __name__)
 
+
+def validate_email(email):
+    """验证邮箱格式"""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
+
+
+def validate_password(password):
+    """验证密码强度"""
+    if len(password) < 8:
+        return False, "密码长度至少8位"
+    
+    if not re.search(r'[A-Za-z]', password):
+        return False, "密码必须包含字母"
+    
+    if not re.search(r'\d', password):
+        return False, "密码必须包含数字"
+    
+    return True, "密码格式正确"
+
+
 @auth_bp.route('/register', methods=['POST'])
+@limiter.limit("5 per minute")
 def register():
-    """
-    用户注册接口
-    
-    请求体:
-    {
-        "username": "用户名",
-        "email": "邮箱",
-        "password": "密码",
-        "group_id": 用户组ID (可选，默认为普通用户组)
-    }
-    """
-    data = request.get_json()
-    
-    # 验证必要字段
-    if not all(k in data for k in ('username', 'email', 'password')):
-        return jsonify({"error": "缺少必要字段"}), 400
-    
-    # 检查用户名和邮箱是否已存在
-    if User.query.filter_by(username=data['username']).first():
-        return jsonify({"error": "用户名已存在"}), 400
-    
-    if User.query.filter_by(email=data['email']).first():
-        return jsonify({"error": "邮箱已存在"}), 400
-    
-    # 创建新用户
-    hashed_password = generate_password_hash(data['password'])
-    new_user = User(
-        username=data['username'],
-        email=data['email'],
-        password_hash=hashed_password,
-        group_id=data.get('group_id', 2)  # 默认为普通用户组
-    )
-    
-    db.session.add(new_user)
-    db.session.commit()
-    
-    return jsonify({"message": "用户注册成功"}), 201
+    """用户注册"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                'success': False,
+                'message': '请求数据不能为空'
+            }), 400
+        
+        # 获取必需字段
+        username = data.get('username', '').strip()
+        email = data.get('email', '').strip().lower()
+        password = data.get('password', '')
+        
+        # 验证必需字段
+        if not all([username, email, password]):
+            return jsonify({
+                'success': False,
+                'message': '用户名、邮箱和密码不能为空'
+            }), 400
+        
+        # 验证用户名长度
+        if len(username) < 3 or len(username) > 50:
+            return jsonify({
+                'success': False,
+                'message': '用户名长度必须在3-50个字符之间'
+            }), 400
+        
+        # 验证邮箱格式
+        if not validate_email(email):
+            return jsonify({
+                'success': False,
+                'message': '邮箱格式不正确'
+            }), 400
+        
+        # 验证密码强度
+        is_valid, message = validate_password(password)
+        if not is_valid:
+            return jsonify({
+                'success': False,
+                'message': message
+            }), 400
+        
+        # 检查用户名是否已存在
+        if User.query.filter_by(username=username).first():
+            return jsonify({
+                'success': False,
+                'message': '用户名已存在'
+            }), 409
+        
+        # 检查邮箱是否已存在
+        if User.query.filter_by(email=email).first():
+            return jsonify({
+                'success': False,
+                'message': '邮箱已被注册'
+            }), 409
+        
+        # 创建新用户
+        user = User(
+            username=username,
+            email=email,
+            role=data.get('role', 'user'),
+            profile=data.get('profile', {})
+        )
+        user.set_password(password)
+        
+        db.session.add(user)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '注册成功',
+            'data': {
+                'user': user.to_dict()
+            }
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"注册失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '注册失败，请稍后重试'
+        }), 500
+
 
 @auth_bp.route('/login', methods=['POST'])
+@limiter.limit("10 per minute")
 def login():
-    """
-    用户登录接口
-    
-    请求体:
-    {
-        "username": "用户名",
-        "password": "密码"
-    }
-    """
-    data = request.get_json()
-    
-    if not all(k in data for k in ('username', 'password')):
-        return jsonify({"error": "缺少用户名或密码"}), 400
-    
-    user = User.query.filter_by(username=data['username']).first()
-    
-    if not user or not check_password_hash(user.password_hash, data['password']):
-        return jsonify({"error": "用户名或密码错误"}), 401
-    
-    # 更新最后登录时间
-    user.last_login = datetime.utcnow()
-    db.session.commit()
-    
-    # 生成访问令牌
-    token = create_access_token({"sub": user.id})
-    
-    return jsonify({
-        "access_token": token,
-        "token_type": "bearer",
-        "user": {
-            "id": user.id,
-            "username": user.username,
-            "email": user.email,
-            "group": user.group.name if user.group else None
-        }
-    })
+    """用户登录"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                'success': False,
+                'message': '请求数据不能为空'
+            }), 400
+        
+        # 获取登录凭据
+        identifier = data.get('username') or data.get('email', '')
+        password = data.get('password', '')
+        
+        if not all([identifier, password]):
+            return jsonify({
+                'success': False,
+                'message': '用户名/邮箱和密码不能为空'
+            }), 400
+        
+        # 查找用户（支持用户名或邮箱登录）
+        user = None
+        if '@' in identifier:
+            user = User.query.filter_by(email=identifier.lower()).first()
+        else:
+            user = User.query.filter_by(username=identifier).first()
+        
+        # 验证用户和密码
+        if not user or not user.check_password(password):
+            return jsonify({
+                'success': False,
+                'message': '用户名/邮箱或密码错误'
+            }), 401
+        
+        # 检查账户状态
+        if user.status != 'active':
+            return jsonify({
+                'success': False,
+                'message': f'账户状态异常: {user.status}'
+            }), 403
+        
+        # 更新最后登录时间
+        user.last_login = datetime.utcnow()
+        db.session.commit()
+        
+        # 生成JWT令牌
+        access_token = user.generate_token()
+        refresh_token = create_refresh_token(identity=user.id)
+        
+        return jsonify({
+            'success': True,
+            'message': '登录成功',
+            'data': {
+                'access_token': access_token,
+                'refresh_token': refresh_token,
+                'token_type': 'Bearer',
+                'expires_in': current_app.config.get('JWT_ACCESS_TOKEN_EXPIRES', 3600),
+                'user': user.to_dict()
+            }
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"登录失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '登录失败，请稍后重试'
+        }), 500
 
-@auth_bp.route('/me', methods=['GET'])
-@login_required
-def get_current_user():
-    """
-    获取当前登录用户信息
-    """
-    user = g.current_user
-    
-    return jsonify({
-        "id": user.id,
-        "username": user.username,
-        "email": user.email,
-        "group": {
-            "id": user.group.id,
-            "name": user.group.name,
-            "max_xpath_rules": user.group.max_xpath_rules,
-            "allowed_templates": user.group.allowed_templates
-        } if user.group else None,
-        "xpath_rules_count": len(user.xpath_rules)
-    })
+
+@auth_bp.route('/refresh', methods=['POST'])
+@jwt_required(refresh=True)
+def refresh():
+    """刷新访问令牌"""
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+        
+        if not user or user.status != 'active':
+            return jsonify({
+                'success': False,
+                'message': '用户不存在或账户已被禁用'
+            }), 401
+        
+        # 生成新的访问令牌
+        new_token = user.generate_token()
+        
+        return jsonify({
+            'success': True,
+            'message': '令牌刷新成功',
+            'data': {
+                'access_token': new_token,
+                'token_type': 'Bearer',
+                'expires_in': current_app.config.get('JWT_ACCESS_TOKEN_EXPIRES', 3600)
+            }
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"令牌刷新失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '令牌刷新失败'
+        }), 500
+
+
+@auth_bp.route('/logout', methods=['POST'])
+@jwt_required()
+def logout():
+    """用户登出"""
+    try:
+        # 获取当前JWT令牌
+        jti = get_jwt()['jti']
+        
+        # 这里可以将令牌加入黑名单（需要Redis支持）
+        # 暂时只返回成功响应
+        
+        return jsonify({
+            'success': True,
+            'message': '登出成功'
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"登出失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '登出失败'
+        }), 500
+
+
+@auth_bp.route('/profile', methods=['GET'])
+@jwt_required()
+def get_profile():
+    """获取用户资料"""
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+        
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'message': '获取用户资料成功',
+            'data': {
+                'user': user.to_dict(include_stats=True)
+            }
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"获取用户资料失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '获取用户资料失败'
+        }), 500
+
+
+@auth_bp.route('/profile', methods=['PUT'])
+@jwt_required()
+def update_profile():
+    """更新用户资料"""
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+        
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 404
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'message': '请求数据不能为空'
+            }), 400
+        
+        # 可更新的字段
+        updatable_fields = ['profile']
+        
+        for field in updatable_fields:
+            if field in data:
+                setattr(user, field, data[field])
+        
+        user.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '用户资料更新成功',
+            'data': {
+                'user': user.to_dict()
+            }
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"更新用户资料失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '更新用户资料失败'
+        }), 500
+
+
+@auth_bp.route('/change-password', methods=['POST'])
+@jwt_required()
+@limiter.limit("3 per minute")
+def change_password():
+    """修改密码"""
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+        
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 404
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'message': '请求数据不能为空'
+            }), 400
+        
+        old_password = data.get('old_password', '')
+        new_password = data.get('new_password', '')
+        
+        if not all([old_password, new_password]):
+            return jsonify({
+                'success': False,
+                'message': '旧密码和新密码不能为空'
+            }), 400
+        
+        # 验证旧密码
+        if not user.check_password(old_password):
+            return jsonify({
+                'success': False,
+                'message': '旧密码错误'
+            }), 401
+        
+        # 验证新密码强度
+        is_valid, message = validate_password(new_password)
+        if not is_valid:
+            return jsonify({
+                'success': False,
+                'message': message
+            }), 400
+        
+        # 更新密码
+        user.set_password(new_password)
+        user.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '密码修改成功'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"修改密码失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '修改密码失败'
+        }), 500
+
+
+@auth_bp.route('/verify-token', methods=['POST'])
+@jwt_required()
+def verify_token():
+    """验证令牌有效性"""
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+        
+        if not user or user.status != 'active':
+            return jsonify({
+                'success': False,
+                'message': '令牌无效或用户已被禁用'
+            }), 401
+        
+        return jsonify({
+            'success': True,
+            'message': '令牌有效',
+            'data': {
+                'user_id': user.id,
+                'username': user.username,
+                'role': user.role
+            }
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"验证令牌失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '令牌验证失败'
+        }), 500
