@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据爬取到博客发布全流程平台 - 架构设计文档</title>
+    <link rel="stylesheet" href="架构设计样式.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- 导航栏 -->
+        <nav class="navbar">
+            <div class="nav-brand">
+                <h1>数据爬取博客发布平台</h1>
+                <p>架构设计文档</p>
+            </div>
+            <div class="nav-menu" id="navMenu">
+                <a href="#overview" onclick="scrollToSection('overview')">系统概述</a>
+                <a href="#tech-stack" onclick="scrollToSection('tech-stack')">技术选型</a>
+                <a href="#architecture" onclick="scrollToSection('architecture')">架构设计</a>
+                <a href="#database" onclick="scrollToSection('database')">数据库设计</a>
+                <a href="#airflow" onclick="scrollToSection('airflow')">任务调度</a>
+                <a href="#api-docs" onclick="scrollToSection('api-docs')">API文档</a>
+                <a href="#deployment" onclick="scrollToSection('deployment')">部署方案</a>
+                <a href="#references" onclick="scrollToSection('references')">参考资料</a>
+            </div>
+            <div class="nav-toggle" id="navToggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </nav>
+
+        <!-- 主要内容 -->
+        <main class="main-content">
+            <!-- 系统概述 -->
+            <section id="overview" class="section">
+                <h2>1. 系统概述</h2>
+                
+                <div class="content-grid">
+                    <div class="text-content">
+                        <h3>1.1 项目背景</h3>
+                        <p>本平台旨在构建一个从数据爬取到博客内容发布的全流程自动化系统，支持用户自定义爬虫配置、智能内容生成和多渠道发布。系统采用微服务架构，具备高扩展性和高可用性。</p>
+                        
+                        <h3>1.2 核心功能</h3>
+                        <ul>
+                            <li><strong>用户管理</strong>：多租户账号体系，权限控制</li>
+                            <li><strong>爬虫配置</strong>：可视化URL池管理，自定义爬取规则</li>
+                            <li><strong>任务调度</strong>：基于Airflow的工作流编排</li>
+                            <li><strong>内容生成</strong>：AI驱动的博客内容创作</li>
+                            <li><strong>存储管理</strong>：分布式文件存储和元数据管理</li>
+                            <li><strong>监控运维</strong>：实时监控和告警机制</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="image-content">
+                        <img src="images_generated/系统架构图.png" alt="系统架构图" class="architecture-image">
+                        <p class="image-caption">图1-1: 系统整体架构图</p>
+                    </div>
+                </div>
+
+                <h3>1.3 设计理念</h3>
+                <div class="design-principles">
+                    <div class="principle-card">
+                        <h4>微服务架构</h4>
+                        <p>服务解耦，独立部署，便于扩展和维护</p>
+                    </div>
+                    <div class="principle-card">
+                        <h4>事件驱动</h4>
+                        <p>异步处理，提高系统响应性和吞吐量</p>
+                    </div>
+                    <div class="principle-card">
+                        <h4>容器化部署</h4>
+                        <p>Docker容器化，支持云原生部署</p>
+                    </div>
+                    <div class="principle-card">
+                        <h4>数据驱动</h4>
+                        <p>完整的数据链路，支持数据分析和决策</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 技术选型 -->
+            <section id="tech-stack" class="section">
+                <h2>2. 技术栈选型</h2>
+                
+                <div class="tech-stack-grid">
+                    <div class="tech-category">
+                        <h3>前端技术栈</h3>
+                        <div class="tech-items">
+                            <div class="tech-item">
+                                <strong>React 18</strong>
+                                <p>现代化前端框架，组件化开发</p>
+                            </div>
+                            <div class="tech-item">
+                                <strong>TypeScript</strong>
+                                <p>类型安全，提高代码质量</p>
+                            </div>
+                            <div class="tech-item">
+                                <strong>Ant Design</strong>
+                                <p>企业级UI组件库</p>
+                            </div>
+                            <div class="tech-item">
+                                <strong>Redux Toolkit</strong>
+                                <p>状态管理解决方案</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tech-category">
+                        <h3>后端技术栈</h3>
+                        <div class="tech-items">
+                            <div class="tech-item">
+                                <strong>Python 3.11</strong>
+                                <p>主要开发语言，生态丰富</p>
+                            </div>
+                            <div class="tech-item">
+                                <strong>FastAPI</strong>
+                                <p>高性能Web框架，自动API文档</p>
+                            </div>
+                            <div class="tech-item">
+                                <strong>SQLAlchemy</strong>
+                                <p>ORM框架，数据库操作</p>
+                            </div>
+                            <div class="tech-item">
+                                <strong>Celery</strong>
+                                <p>分布式任务队列</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tech-category">
+                        <h3>数据存储</h3>
+                        <div class="tech-items">
+                            <div class="tech-item">
+                                <strong>PostgreSQL 15</strong>
+                                <p>主数据库，ACID事务支持</p>
+                            </div>
+                            <div class="tech-item">
+                                <strong>Redis 7</strong>
+                                <p>缓存和会话存储</p>
+                            </div>
+                            <div class="tech-item">
+                                <strong>MinIO</strong>
+                                <p>对象存储，文件管理</p>
+                            </div>
+                            <div class="tech-item">
+                                <strong>Elasticsearch</strong>
+                                <p>日志搜索和分析</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tech-category">
+                        <h3>基础设施</h3>
+                        <div class="tech-items">
+                            <div class="tech-item">
+                                <strong>Docker</strong>
+                                <p>容器化部署</p>
+                            </div>
+                            <div class="tech-item">
+                                <strong>Kubernetes</strong>
+                                <p>容器编排和管理</p>
+                            </div>
+                            <div class="tech-item">
+                                <strong>Apache Airflow</strong>
+                                <p>工作流调度引擎</p>
+                            </div>
+                            <div class="tech-item">
+                                <strong>RabbitMQ</strong>
+                                <p>消息队列中间件</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3>2.1 技术选型理由</h3>
+                <div class="selection-reasons">
+                    <div class="reason-item">
+                        <h4>Python生态优势</h4>
+                        <p>丰富的爬虫库（Scrapy、BeautifulSoup）和AI库（OpenAI、LangChain），快速开发</p>
+                    </div>
+                    <div class="reason-item">
+                        <h4>PostgreSQL可靠性</h4>
+                        <p>成熟的关系型数据库，支持JSON字段，满足复杂查询需求</p>
+                    </div>
+                    <div class="reason-item">
+                        <h4>Airflow工作流</h4>
+                        <p>可视化DAG管理，支持复杂任务依赖和错误重试</p>
+                    </div>
+                    <div class="reason-item">
+                        <h4>容器化部署</h4>
+                        <p>环境一致性，便于扩展和运维管理</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 架构设计 -->
+            <section id="architecture" class="section">
+                <h2>3. 微服务架构设计</h2>
+                
+                <h3>3.1 架构分层</h3>
+                <div class="architecture-layers">
+                    <div class="layer">
+                        <h4>用户界面层</h4>
+                        <p>Web前端和移动端应用，提供用户交互界面</p>
+                    </div>
+                    <div class="layer">
+                        <h4>API网关层</h4>
+                        <p>统一入口，负责路由、认证、限流和监控</p>
+                    </div>
+                    <div class="layer">
+                        <h4>业务服务层</h4>
+                        <p>核心业务逻辑，包含6个微服务</p>
+                    </div>
+                    <div class="layer">
+                        <h4>数据存储层</h4>
+                        <p>数据持久化和缓存服务</p>
+                    </div>
+                </div>
+
+                <h3>3.2 核心微服务</h3>
+                <div class="services-grid">
+                    <div class="service-card">
+                        <h4>用户管理服务</h4>
+                        <p><strong>职责</strong>：用户认证、授权、权限管理</p>
+                        <p><strong>技术</strong>：FastAPI + JWT + OAuth2</p>
+                        <p><strong>数据</strong>：用户信息、角色权限</p>
+                    </div>
+                    
+                    <div class="service-card">
+                        <h4>任务调度服务</h4>
+                        <p><strong>职责</strong>：工作流编排、任务调度</p>
+                        <p><strong>技术</strong>：Apache Airflow</p>
+                        <p><strong>数据</strong>：DAG定义、任务状态</p>
+                    </div>
+                    
+                    <div class="service-card">
+                        <h4>爬虫服务</h4>
+                        <p><strong>职责</strong>：网页爬取、数据提取</p>
+                        <p><strong>技术</strong>：Scrapy + Selenium</p>
+                        <p><strong>数据</strong>：爬取配置、原始数据</p>
+                    </div>
+                    
+                    <div class="service-card">
+                        <h4>存储服务</h4>
+                        <p><strong>职责</strong>：文件管理、元数据存储</p>
+                        <p><strong>技术</strong>：MinIO + PostgreSQL</p>
+                        <p><strong>数据</strong>：文件索引、元数据</p>
+                    </div>
+                    
+                    <div class="service-card">
+                        <h4>内容生成服务</h4>
+                        <p><strong>职责</strong>：AI内容创作、模板渲染</p>
+                        <p><strong>技术</strong>：OpenAI API + Jinja2</p>
+                        <p><strong>数据</strong>：生成配置、内容模板</p>
+                    </div>
+                    
+                    <div class="service-card">
+                        <h4>监控服务</h4>
+                        <p><strong>职责</strong>：系统监控、日志收集</p>
+                        <p><strong>技术</strong>：Prometheus + Grafana</p>
+                        <p><strong>数据</strong>：监控指标、日志数据</p>
+                    </div>
+                </div>
+
+                <h3>3.3 服务间通信</h3>
+                <div class="communication-patterns">
+                    <div class="pattern">
+                        <h4>同步通信</h4>
+                        <p>HTTP/REST API，用于实时查询和操作</p>
+                    </div>
+                    <div class="pattern">
+                        <h4>异步通信</h4>
+                        <p>RabbitMQ消息队列，用于事件驱动和解耦</p>
+                    </div>
+                    <div class="pattern">
+                        <h4>数据共享</h4>
+                        <p>共享数据库和缓存，减少服务间依赖</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 数据库设计 -->
+            <section id="database" class="section">
+                <h2>4. 数据库设计</h2>
+                
+                <h3>4.1 数据库架构</h3>
+                <div class="database-architecture">
+                    <div class="db-component">
+                        <h4>PostgreSQL主库</h4>
+                        <p>存储业务核心数据，支持ACID事务</p>
+                    </div>
+                    <div class="db-component">
+                        <h4>Redis缓存</h4>
+                        <p>会话存储、热点数据缓存</p>
+                    </div>
+                    <div class="db-component">
+                        <h4>MinIO对象存储</h4>
+                        <p>文件存储，支持大文件和多媒体</p>
+                    </div>
+                    <div class="db-component">
+                        <h4>Elasticsearch</h4>
+                        <p>全文搜索、日志分析</p>
+                    </div>
+                </div>
+
+                <h3>4.2 核心数据表设计</h3>
+                <div class="table-design">
+                    <div class="table-group">
+                        <h4>用户管理表</h4>
+                        <div class="table-schema">
+                            <strong>users</strong> - 用户基本信息<br>
+                            <code>id, username, email, password_hash, role, created_at, updated_at</code>
+                        </div>
+                        <div class="table-schema">
+                            <strong>user_profiles</strong> - 用户详细信息<br>
+                            <code>user_id, display_name, avatar, settings, preferences</code>
+                        </div>
+                    </div>
+
+                    <div class="table-group">
+                        <h4>任务管理表</h4>
+                        <div class="table-schema">
+                            <strong>tasks</strong> - 任务基本信息<br>
+                            <code>id, user_id, name, type, status, config, created_at, updated_at</code>
+                        </div>
+                        <div class="table-schema">
+                            <strong>task_executions</strong> - 任务执行记录<br>
+                            <code>id, task_id, dag_run_id, status, start_time, end_time, logs</code>
+                        </div>
+                    </div>
+
+                    <div class="table-group">
+                        <h4>爬虫配置表</h4>
+                        <div class="table-schema">
+                            <strong>crawler_configs</strong> - 爬虫配置<br>
+                            <code>id, user_id, name, urls, rules, headers, schedule</code>
+                        </div>
+                        <div class="table-schema">
+                            <strong>crawl_results</strong> - 爬取结果<br>
+                            <code>id, config_id, url, status, data, file_paths, created_at</code>
+                        </div>
+                    </div>
+
+                    <div class="table-group">
+                        <h4>内容管理表</h4>
+                        <div class="table-schema">
+                            <strong>content_templates</strong> - 内容模板<br>
+                            <code>id, user_id, name, template, variables, created_at</code>
+                        </div>
+                        <div class="table-schema">
+                            <strong>generated_content</strong> - 生成内容<br>
+                            <code>id, task_id, template_id, content, metadata, status</code>
+                        </div>
+                    </div>
+                </div>
+
+                <h3>4.3 数据分片策略</h3>
+                <div class="sharding-strategy">
+                    <div class="strategy-item">
+                        <h4>按用户分片</h4>
+                        <p>用户相关数据按user_id进行水平分片</p>
+                    </div>
+                    <div class="strategy-item">
+                        <h4>按时间分片</h4>
+                        <p>日志和历史数据按时间维度分表</p>
+                    </div>
+                    <div class="strategy-item">
+                        <h4>读写分离</h4>
+                        <p>主从复制，读操作分发到从库</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Airflow DAG设计 -->
+            <section id="airflow" class="section">
+                <h2>5. Airflow DAG设计</h2>
+                
+                <h3>5.1 工作流类型</h3>
+                <div class="workflow-types">
+                    <div class="workflow-card">
+                        <h4>爬虫工作流</h4>
+                        <p><strong>触发</strong>：定时或手动</p>
+                        <p><strong>步骤</strong>：URL验证 → 数据爬取 → 数据清洗 → 存储</p>
+                        <p><strong>重试</strong>：失败自动重试3次</p>
+                    </div>
+                    
+                    <div class="workflow-card">
+                        <h4>内容生成工作流</h4>
+                        <p><strong>触发</strong>：爬虫完成后</p>
+                        <p><strong>步骤</strong>：数据分析 → 模板选择 → AI生成 → 质量检查</p>
+                        <p><strong>重试</strong>：AI调用失败重试2次</p>
+                    </div>
+                    
+                    <div class="workflow-card">
+                        <h4>发布工作流</h4>
+                        <p><strong>触发</strong>：内容生成完成</p>
+                        <p><strong>步骤</strong>：格式转换 → 平台适配 → 发布 → 状态更新</p>
+                        <p><strong>重试</strong>：发布失败重试1次</p>
+                    </div>
+                </div>
+
+                <h3>5.2 DAG配置示例</h3>
+                <div class="dag-example">
+                    <h4>爬虫到博客生成完整流程</h4>
+                    <div class="dag-code">
+                        <pre><code>from airflow import DAG
+from airflow.operators.python import PythonOperator
+from datetime import datetime, timedelta
+
+default_args = {
+    'owner': 'platform',
+    'depends_on_past': False,
+    'start_date': datetime(2024, 1, 1),
+    'email_on_failure': True,
+    'email_on_retry': False,
+    'retries': 2,
+    'retry_delay': timedelta(minutes=5)
+}
+
+dag = DAG(
+    'crawler_to_blog_pipeline',
+    default_args=default_args,
+    description='爬虫到博客生成完整流程',
+    schedule_interval='@daily',
+    catchup=False
+)
+
+# 任务定义
+validate_urls = PythonOperator(
+    task_id='validate_urls',
+    python_callable=validate_crawler_urls,
+    dag=dag
+)
+
+crawl_data = PythonOperator(
+    task_id='crawl_data',
+    python_callable=execute_crawler,
+    dag=dag
+)
+
+process_data = PythonOperator(
+    task_id='process_data',
+    python_callable=clean_and_process,
+    dag=dag
+)
+
+generate_content = PythonOperator(
+    task_id='generate_content',
+    python_callable=ai_content_generation,
+    dag=dag
+)
+
+publish_blog = PythonOperator(
+    task_id='publish_blog',
+    python_callable=publish_to_platforms,
+    dag=dag
+)
+
+# 任务依赖
+validate_urls >> crawl_data >> process_data >> generate_content >> publish_blog</code></pre>
+                    </div>
+                </div>
+
+                <h3>5.3 监控和告警</h3>
+                <div class="monitoring-alerts">
+                    <div class="alert-type">
+                        <h4>任务失败告警</h4>
+                        <p>任务执行失败时发送邮件和Slack通知</p>
+                    </div>
+                    <div class="alert-type">
+                        <h4>性能监控</h4>
+                        <p>监控任务执行时间，超时自动告警</p>
+                    </div>
+                    <div class="alert-type">
+                        <h4>资源监控</h4>
+                        <p>监控CPU、内存使用率，防止资源耗尽</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- API文档 -->
+            <section id="api-docs" class="section">
+                <h2>6. 后端API文档</h2>
+                <p>详细的API接口文档将在下一部分提供，包含所有微服务的REST API规范。</p>
+                
+                <div class="api-overview">
+                    <div class="api-category">
+                        <h3>用户管理API</h3>
+                        <p>用户注册、登录、权限管理等接口</p>
+                    </div>
+                    <div class="api-category">
+                        <h3>任务管理API</h3>
+                        <p>任务创建、查询、控制等接口</p>
+                    </div>
+                    <div class="api-category">
+                        <h3>爬虫配置API</h3>
+                        <p>爬虫规则配置、URL池管理等接口</p>
+                    </div>
+                    <div class="api-category">
+                        <h3>内容生成API</h3>
+                        <p>AI内容生成、模板管理等接口</p>
+                    </div>
+                    <div class="api-category">
+                        <h3>监控API</h3>
+                        <p>系统状态、性能指标等接口</p>
+                    </div>
+                    <div class="api-category">
+                        <h3>文件管理API</h3>
+                        <p>文件上传、下载、管理等接口</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 部署方案 -->
+            <section id="deployment" class="section">
+                <h2>7. 部署和扩展方案</h2>
+                
+                <h3>7.1 容器化部署</h3>
+                <div class="deployment-strategy">
+                    <div class="deployment-item">
+                        <h4>Docker镜像</h4>
+                        <p>每个微服务独立打包，支持版本管理</p>
+                    </div>
+                    <div class="deployment-item">
+                        <h4>Kubernetes编排</h4>
+                        <p>自动扩缩容、服务发现、负载均衡</p>
+                    </div>
+                    <div class="deployment-item">
+                        <h4>Helm包管理</h4>
+                        <p>简化部署配置，支持环境差异化</p>
+                    </div>
+                </div>
+
+                <h3>7.2 扩展性设计</h3>
+                <div class="scalability-features">
+                    <div class="feature">
+                        <h4>水平扩展</h4>
+                        <p>无状态服务设计，支持多实例部署</p>
+                    </div>
+                    <div class="feature">
+                        <h4>数据库分片</h4>
+                        <p>支持读写分离和数据分片</p>
+                    </div>
+                    <div class="feature">
+                        <h4>缓存策略</h4>
+                        <p>多级缓存，减少数据库压力</p>
+                    </div>
+                    <div class="feature">
+                        <h4>异步处理</h4>
+                        <p>消息队列解耦，提高并发能力</p>
+                    </div>
+                </div>
+
+                <h3>7.3 性能优化</h3>
+                <div class="performance-chart-container">
+                    <canvas id="performanceChart"></canvas>
+                    <p class="chart-caption">图7-1: 系统性能指标对比</p>
+                </div>
+
+                <h3>7.4 安全考虑</h3>
+                <div class="security-measures">
+                    <div class="security-item">
+                        <h4>认证授权</h4>
+                        <p>JWT Token + OAuth2.0，支持多种认证方式</p>
+                    </div>
+                    <div class="security-item">
+                        <h4>数据加密</h4>
+                        <p>传输加密（HTTPS）+ 存储加密</p>
+                    </div>
+                    <div class="security-item">
+                        <h4>访问控制</h4>
+                        <p>API限流、IP白名单、权限控制</p>
+                    </div>
+                    <div class="security-item">
+                        <h4>安全审计</h4>
+                        <p>操作日志记录、安全事件监控</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 参考资料 -->
+            <section id="references" class="section">
+                <h2>参考资料</h2>
+                <div class="references-list">
+                    <div class="reference-item">
+                        <span class="ref-number">[1]</span>
+                        <span class="ref-content">Apache Airflow官方文档 - <a href="https://airflow.apache.org/docs/" target="_blank">https://airflow.apache.org/docs/</a></span>
+                    </div>
+                    <div class="reference-item">
+                        <span class="ref-number">[2]</span>
+                        <span class="ref-content">FastAPI框架文档 - <a href="https://fastapi.tiangolo.com/" target="_blank">https://fastapi.tiangolo.com/</a></span>
+                    </div>
+                    <div class="reference-item">
+                        <span class="ref-number">[3]</span>
+                        <span class="ref-content">PostgreSQL数据库文档 - <a href="https://www.postgresql.org/docs/" target="_blank">https://www.postgresql.org/docs/</a></span>
+                    </div>
+                    <div class="reference-item">
+                        <span class="ref-number">[4]</span>
+                        <span class="ref-content">Kubernetes容器编排 - <a href="https://kubernetes.io/docs/" target="_blank">https://kubernetes.io/docs/</a></span>
+                    </div>
+                    <div class="reference-item">
+                        <span class="ref-number">[5]</span>
+                        <span class="ref-content">微服务架构设计模式 - Martin Fowler</span>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="架构设计脚本.js"></script>
+</body>
+</html>

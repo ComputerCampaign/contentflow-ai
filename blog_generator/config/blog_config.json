@@ -1,0 +1,34 @@
+{
+    "blog": {
+        "enabled": true,
+        "output_dir": "blogs",
+        "drafts_dir": "blogs/drafts",
+        "published_dir": "blogs/published",
+        "template_file": "blog_generator/config/templates/blog_template.md",
+        "templates_dir": "blog_generator/config/templates",
+        "default_author": "AI Assistant",
+        "default_language": "zh-CN",
+        "auto_publish": false,
+        "use_crawler_image_storage": true,
+        "image_processing": {
+            "enabled": true,
+            "max_width": 800,
+            "quality": 85
+        }
+    },
+    "ai": {
+        "provider": "openai",
+        "model": "gpt-3.5-turbo",
+        "api_key": "",
+        "base_url": "",
+        "temperature": 0.7,
+        "max_tokens": 2000
+    },
+    "content": {
+        "min_length": 500,
+        "max_length": 3000,
+        "include_images": true,
+        "include_metadata": true,
+        "seo_optimization": true
+    }
+}

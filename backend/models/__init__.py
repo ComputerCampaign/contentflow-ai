@@ -1,13 +1,22 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
 """
-数据模型模块
+数据模型包
 """
 
-from .base import db
-from .user import User
-from .user_group import UserGroup
-from .user_xpath_rule import UserXPathRule
+from backend.models.user import User
+from backend.models.task import Task, TaskExecution
+from backend.models.crawler import CrawlerConfig, CrawlerResult
+from backend.models.content import ContentTemplate, GeneratedContent
+from backend.models.file import FileRecord
 
-__all__ = ['db', 'User', 'UserGroup', 'UserXPathRule']
+__all__ = [
+    'User',
+    'Task',
+    'TaskExecution', 
+    'CrawlerConfig',
+    'CrawlerResult',
+    'ContentTemplate',
+    'GeneratedContent',
+    'FileRecord'
+]

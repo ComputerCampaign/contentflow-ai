@@ -1,261 +1,667 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
 """
-爬虫任务管理相关API接口
+爬虫配置API
 """
 
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify, current_app
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from backend.extensions import db, limiter
+from backend.models.user import User
+from backend.models.crawler import CrawlerConfig, CrawlerResult
 from datetime import datetime
-import os
-import json
+from sqlalchemy import or_
+import re
+import requests
+from urllib.parse import urlparse
 
-import os
-import sys
-# 添加项目根目录到Python路径，解决相对导入问题
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from backend.models import User, UserXPathRule, db
-from backend.auth.permissions import login_required, group_required
-from backend.crawler_utils.crawler_core import CrawlerCore
-from backend.crawler_utils.xpath_manager import XPathManager
-from backend.config.config import Config
 
 crawler_bp = Blueprint('crawler', __name__)
 
-@crawler_bp.route('/tasks', methods=['POST'])
-@login_required
-def create_task():
-    """
-    创建新的爬虫任务
-    
-    请求体:
-    {
-        "url": "要爬取的URL",
-        "task_name": "任务名称", (可选，默认自动生成)
-        "use_selenium": true/false, (可选，默认false)
-        "use_xpath": true/false, (可选，默认false)
-        "xpath_rule_id": "XPath规则ID", (可选，当use_xpath为true时必须提供)
-        "is_user_rule": true/false, (可选，默认false，表示是否使用用户自定义规则)
-        "blog_template": "博客模板名称" (可选)
-    }
-    """
-    data = request.get_json()
-    
-    if 'url' not in data:
-        return jsonify({"error": "缺少必要字段: url"}), 400
-    
-    # 获取配置
-    config = Config()
-    
-    # 初始化爬虫核心
-    crawler = CrawlerCore(
-        output_dir=config.get('crawler.output_dir'),
-        data_dir=config.get('crawler.data_dir'),
-        timeout=config.get('crawler.timeout'),
-        retry=config.get('crawler.retry'),
-        use_selenium=data.get('use_selenium', False),
-        use_xpath=data.get('use_xpath', False),
-        max_concurrent=config.get('crawler.max_concurrent')
-    )
-    
-    # 处理XPath规则
-    xpath_rule = None
-    if data.get('use_xpath', False):
-        if 'xpath_rule_id' not in data:
-            return jsonify({"error": "使用XPath时必须提供xpath_rule_id"}), 400
-        
-        # 检查是否使用用户自定义规则
-        if data.get('is_user_rule', False):
-            rule = UserXPathRule.query.get(data['xpath_rule_id'])
-            if not rule or rule.user_id != g.current_user.id:
-                return jsonify({"error": "XPath规则不存在或无权访问"}), 404
-            
-            # 用户自定义规则直接使用规则内容
-            xpath_rule = {
-                "id": str(rule.id),
-                "name": rule.rule_name,
-                "domain": rule.domain,
-                "xpath": rule.xpath
-            }
-        else:
-            # 使用系统预设规则
-            xpath_manager = XPathManager()
-            system_rule = xpath_manager.get_rule(data['xpath_rule_id'])
-            if not system_rule:
-                return jsonify({"error": "系统XPath规则不存在"}), 404
-            xpath_rule = system_rule
-    
-    # 检查博客模板权限
-    if 'blog_template' in data and data['blog_template']:
-        if not g.current_user.group:
-            return jsonify({"error": "用户未分配用户组，无法使用博客模板"}), 403
-        
-        allowed_templates = g.current_user.group.allowed_templates
-        if data['blog_template'] not in allowed_templates:
-            return jsonify({"error": f"无权使用博客模板: {data['blog_template']}"}), 403
-    
-    # 执行爬取任务
+
+def get_current_user():
+    """获取当前用户"""
+    user_id = get_jwt_identity()
+    return User.query.get(user_id)
+
+
+def validate_url(url):
+    """验证URL格式"""
     try:
-        task_id = data.get('task_name', None) or f"task_{datetime.now().strftime('%Y%m%d%H%M%S')}_{g.current_user.id}"
-        result = crawler.crawl(
-            url=data['url'],
-            task_id=task_id,
-            xpath_rule=xpath_rule
+        result = urlparse(url)
+        return all([result.scheme, result.netloc])
+    except Exception:
+        return False
+
+
+def validate_crawler_config(config_data):
+    """验证爬虫配置"""
+    required_fields = ['name', 'target_urls']
+    
+    for field in required_fields:
+        if field not in config_data:
+            return False, f"缺少必需字段: {field}"
+    
+    # 验证名称
+    name = config_data.get('name', '').strip()
+    if not name or len(name) < 2:
+        return False, "配置名称至少需要2个字符"
+    
+    # 验证目标URL
+    target_urls = config_data.get('target_urls', [])
+    if not isinstance(target_urls, list) or not target_urls:
+        return False, "至少需要一个目标URL"
+    
+    for url in target_urls:
+        if not validate_url(url):
+            return False, f"无效的URL: {url}"
+    
+    # 验证爬取规则
+    crawl_rules = config_data.get('crawl_rules', {})
+    if crawl_rules:
+        if not isinstance(crawl_rules, dict):
+            return False, "爬取规则必须是JSON对象"
+        
+        # 验证CSS选择器
+        selectors = crawl_rules.get('selectors', {})
+        if selectors and not isinstance(selectors, dict):
+            return False, "CSS选择器配置必须是JSON对象"
+    
+    return True, "配置验证通过"
+
+
+@crawler_bp.route('/configs', methods=['POST'])
+@jwt_required()
+@limiter.limit("10 per minute")
+def create_crawler_config():
+    """创建爬虫配置"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 401
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'message': '请求数据不能为空'
+            }), 400
+        
+        # 验证配置
+        is_valid, message = validate_crawler_config(data)
+        if not is_valid:
+            return jsonify({
+                'success': False,
+                'message': message
+            }), 400
+        
+        # 检查配置名称是否已存在
+        existing_config = CrawlerConfig.query.filter_by(
+            name=data['name'], user_id=current_user.id
+        ).first()
+        if existing_config:
+            return jsonify({
+                'success': False,
+                'message': '配置名称已存在'
+            }), 409
+        
+        # 创建爬虫配置
+        config = CrawlerConfig(
+            name=data['name'],
+            target_urls=data['target_urls'],
+            user_id=current_user.id,
+            description=data.get('description', ''),
+            crawl_rules=data.get('crawl_rules', {}),
+            request_config=data.get('request_config', {}),
+            schedule_config=data.get('schedule_config', {}),
+            output_config=data.get('output_config', {}),
+            tags=data.get('tags', [])
         )
         
-        # 记录任务信息到用户任务历史
-        task_info = {
-            "task_id": task_id,
-            "url": data['url'],
-            "created_at": datetime.now().isoformat(),
-            "user_id": g.current_user.id,
-            "status": "success" if result else "failed",
-            "use_selenium": data.get('use_selenium', False),
-            "use_xpath": data.get('use_xpath', False),
-            "xpath_rule_id": data.get('xpath_rule_id'),
-            "is_user_rule": data.get('is_user_rule', False),
-            "blog_template": data.get('blog_template')
-        }
-        
-        # 保存任务信息
-        tasks_dir = os.path.join(config.get('crawler.data_dir'), 'user_tasks')
-        os.makedirs(tasks_dir, exist_ok=True)
-        
-        with open(os.path.join(tasks_dir, f"{task_id}.json"), 'w', encoding='utf-8') as f:
-            json.dump(task_info, f, ensure_ascii=False, indent=2)
+        db.session.add(config)
+        db.session.commit()
         
         return jsonify({
-            "task_id": task_id,
-            "message": "爬取任务创建成功",
-            "status": "success" if result else "failed"
-        })
-    
+            'success': True,
+            'message': '爬虫配置创建成功',
+            'data': {
+                'config': config.to_dict()
+            }
+        }), 201
+        
     except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"创建爬虫配置失败: {str(e)}")
         return jsonify({
-            "error": f"爬取任务执行失败: {str(e)}"
+            'success': False,
+            'message': '创建爬虫配置失败，请稍后重试'
         }), 500
 
-@crawler_bp.route('/tasks', methods=['GET'])
-@login_required
-def get_user_tasks():
-    """
-    获取当前用户的爬虫任务列表
-    """
-    config = Config()
-    tasks_dir = os.path.join(config.get('crawler.data_dir'), 'user_tasks')
-    
-    if not os.path.exists(tasks_dir):
-        return jsonify({"tasks": []})
-    
-    tasks = []
-    for filename in os.listdir(tasks_dir):
-        if filename.endswith('.json'):
-            try:
-                with open(os.path.join(tasks_dir, filename), 'r', encoding='utf-8') as f:
-                    task_info = json.load(f)
-                    
-                    # 只返回当前用户的任务
-                    if task_info.get('user_id') == g.current_user.id:
-                        tasks.append({
-                            "task_id": task_info.get('task_id'),
-                            "url": task_info.get('url'),
-                            "created_at": task_info.get('created_at'),
-                            "status": task_info.get('status'),
-                            "use_xpath": task_info.get('use_xpath'),
-                            "blog_template": task_info.get('blog_template')
-                        })
-            except Exception:
-                # 忽略无法解析的任务文件
-                continue
-    
-    # 按创建时间倒序排序
-    tasks.sort(key=lambda x: x.get('created_at', ''), reverse=True)
-    
-    return jsonify({"tasks": tasks})
 
-@crawler_bp.route('/tasks/<task_id>', methods=['GET'])
-@login_required
-def get_task_detail(task_id):
-    """
-    获取指定爬虫任务的详细信息
-    """
-    config = Config()
-    task_file = os.path.join(config.get('crawler.data_dir'), 'user_tasks', f"{task_id}.json")
-    
-    if not os.path.exists(task_file):
-        return jsonify({"error": "任务不存在"}), 404
-    
+@crawler_bp.route('/configs', methods=['GET'])
+@jwt_required()
+def get_crawler_configs():
+    """获取爬虫配置列表"""
     try:
-        with open(task_file, 'r', encoding='utf-8') as f:
-            task_info = json.load(f)
-            
-            # 验证任务所有权
-            if task_info.get('user_id') != g.current_user.id:
-                # 管理员可以查看所有任务
-                if not g.current_user.group or g.current_user.group.name != 'admin':
-                    return jsonify({"error": "无权访问此任务"}), 403
-            
-            # 获取任务输出文件信息
-            task_output_dir = os.path.join(config.get('crawler.output_dir'), task_id)
-            output_files = []
-            
-            if os.path.exists(task_output_dir):
-                for root, _, files in os.walk(task_output_dir):
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        rel_path = os.path.relpath(file_path, task_output_dir)
-                        output_files.append({
-                            "name": file,
-                            "path": rel_path,
-                            "size": os.path.getsize(file_path),
-                            "created_at": datetime.fromtimestamp(os.path.getctime(file_path)).isoformat()
-                        })
-            
-            # 返回任务详情和输出文件信息
+        current_user = get_current_user()
+        if not current_user:
             return jsonify({
-                **task_info,
-                "output_files": output_files
-            })
-    
+                'success': False,
+                'message': '用户不存在'
+            }), 401
+        
+        # 获取查询参数
+        page = request.args.get('page', 1, type=int)
+        per_page = min(request.args.get('per_page', 20, type=int), 100)
+        status = request.args.get('status')
+        search = request.args.get('search', '').strip()
+        
+        # 构建查询
+        query = CrawlerConfig.query.filter_by(user_id=current_user.id)
+        
+        # 状态过滤
+        if status:
+            query = query.filter(CrawlerConfig.status == status)
+        
+        # 搜索过滤
+        if search:
+            query = query.filter(
+                or_(
+                    CrawlerConfig.name.contains(search),
+                    CrawlerConfig.description.contains(search)
+                )
+            )
+        
+        # 排序和分页
+        query = query.order_by(CrawlerConfig.created_at.desc())
+        pagination = query.paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
+        configs = [config.to_dict() for config in pagination.items]
+        
+        return jsonify({
+            'success': True,
+            'message': '获取爬虫配置列表成功',
+            'data': {
+                'configs': configs,
+                'pagination': {
+                    'page': page,
+                    'per_page': per_page,
+                    'total': pagination.total,
+                    'pages': pagination.pages,
+                    'has_prev': pagination.has_prev,
+                    'has_next': pagination.has_next
+                }
+            }
+        }), 200
+        
     except Exception as e:
-        return jsonify({"error": f"获取任务详情失败: {str(e)}"}), 500
+        current_app.logger.error(f"获取爬虫配置列表失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '获取爬虫配置列表失败'
+        }), 500
 
-@crawler_bp.route('/templates', methods=['GET'])
-@login_required
-def get_available_templates():
-    """
-    获取当前用户可用的博客模板列表
-    """
-    if not g.current_user.group:
-        return jsonify({"templates": []})
-    
-    allowed_templates = g.current_user.group.allowed_templates
-    
-    # 获取模板详细信息
-    config = Config()
-    templates_dir = config.get('blogs.templates_dir')
-    
-    templates = []
-    for template_name in allowed_templates:
-        template_path = os.path.join(templates_dir, template_name)
-        if os.path.exists(template_path):
-            # 尝试读取模板的元数据（如果有）
-            meta_file = os.path.join(template_path, 'meta.json')
-            meta = {}
-            
-            if os.path.exists(meta_file):
-                try:
-                    with open(meta_file, 'r', encoding='utf-8') as f:
-                        meta = json.load(f)
-                except Exception:
-                    pass
-            
-            templates.append({
-                "name": template_name,
-                "description": meta.get('description', ''),
-                "author": meta.get('author', ''),
-                "version": meta.get('version', '1.0'),
-                "preview": meta.get('preview', '')
-            })
-    
-    return jsonify({"templates": templates})
+
+@crawler_bp.route('/configs/<config_id>', methods=['GET'])
+@jwt_required()
+def get_crawler_config(config_id):
+    """获取爬虫配置详情"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 401
+        
+        config = CrawlerConfig.query.filter_by(
+            id=config_id, user_id=current_user.id
+        ).first()
+        if not config:
+            return jsonify({
+                'success': False,
+                'message': '爬虫配置不存在'
+            }), 404
+        
+        # 获取最近的爬取结果
+        recent_results = CrawlerResult.query.filter_by(config_id=config_id)\
+            .order_by(CrawlerResult.created_at.desc()).limit(5).all()
+        
+        return jsonify({
+            'success': True,
+            'message': '获取爬虫配置详情成功',
+            'data': {
+                'config': config.to_dict(include_stats=True),
+                'recent_results': [result.to_dict() for result in recent_results]
+            }
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"获取爬虫配置详情失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '获取爬虫配置详情失败'
+        }), 500
+
+
+@crawler_bp.route('/configs/<config_id>', methods=['PUT'])
+@jwt_required()
+def update_crawler_config(config_id):
+    """更新爬虫配置"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 401
+        
+        config = CrawlerConfig.query.filter_by(
+            id=config_id, user_id=current_user.id
+        ).first()
+        if not config:
+            return jsonify({
+                'success': False,
+                'message': '爬虫配置不存在'
+            }), 404
+        
+        # 检查配置状态
+        if config.status == 'running':
+            return jsonify({
+                'success': False,
+                'message': '运行中的配置无法修改'
+            }), 400
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'message': '请求数据不能为空'
+            }), 400
+        
+        # 验证配置（如果提供了完整配置）
+        if 'name' in data or 'target_urls' in data:
+            # 构建完整配置用于验证
+            full_config = {
+                'name': data.get('name', config.name),
+                'target_urls': data.get('target_urls', config.target_urls)
+            }
+            is_valid, message = validate_crawler_config(full_config)
+            if not is_valid:
+                return jsonify({
+                    'success': False,
+                    'message': message
+                }), 400
+        
+        # 检查名称冲突
+        if 'name' in data and data['name'] != config.name:
+            existing_config = CrawlerConfig.query.filter_by(
+                name=data['name'], user_id=current_user.id
+            ).first()
+            if existing_config:
+                return jsonify({
+                    'success': False,
+                    'message': '配置名称已存在'
+                }), 409
+        
+        # 可更新的字段
+        updatable_fields = [
+            'name', 'description', 'target_urls', 'crawl_rules',
+            'request_config', 'schedule_config', 'output_config', 'tags'
+        ]
+        
+        for field in updatable_fields:
+            if field in data:
+                setattr(config, field, data[field])
+        
+        config.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '爬虫配置更新成功',
+            'data': {
+                'config': config.to_dict()
+            }
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"更新爬虫配置失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '更新爬虫配置失败'
+        }), 500
+
+
+@crawler_bp.route('/configs/<config_id>', methods=['DELETE'])
+@jwt_required()
+def delete_crawler_config(config_id):
+    """删除爬虫配置"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 401
+        
+        config = CrawlerConfig.query.filter_by(
+            id=config_id, user_id=current_user.id
+        ).first()
+        if not config:
+            return jsonify({
+                'success': False,
+                'message': '爬虫配置不存在'
+            }), 404
+        
+        # 检查配置状态
+        if config.status == 'running':
+            return jsonify({
+                'success': False,
+                'message': '运行中的配置无法删除'
+            }), 400
+        
+        # 删除相关的爬取结果
+        CrawlerResult.query.filter_by(config_id=config_id).delete()
+        
+        # 删除配置
+        db.session.delete(config)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '爬虫配置删除成功'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"删除爬虫配置失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '删除爬虫配置失败'
+        }), 500
+
+
+@crawler_bp.route('/configs/<config_id>/test', methods=['POST'])
+@jwt_required()
+@limiter.limit("5 per minute")
+def test_crawler_config(config_id):
+    """测试爬虫配置"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 401
+        
+        config = CrawlerConfig.query.filter_by(
+            id=config_id, user_id=current_user.id
+        ).first()
+        if not config:
+            return jsonify({
+                'success': False,
+                'message': '爬虫配置不存在'
+            }), 404
+        
+        data = request.get_json() or {}
+        test_url = data.get('test_url')
+        max_pages = data.get('max_pages', 1)
+        
+        # 确定测试URL
+        if test_url:
+            if not validate_url(test_url):
+                return jsonify({
+                    'success': False,
+                    'message': '测试URL格式无效'
+                }), 400
+            test_urls = [test_url]
+        else:
+            test_urls = config.target_urls[:1]  # 只测试第一个URL
+        
+        # 执行测试爬取
+        test_results = []
+        for url in test_urls:
+            try:
+                # 获取请求配置
+                request_config = config.request_config or {}
+                headers = request_config.get('headers', {})
+                timeout = request_config.get('timeout', 30)
+                
+                # 发送请求
+                response = requests.get(url, headers=headers, timeout=timeout)
+                response.raise_for_status()
+                
+                # 基本信息
+                result = {
+                    'url': url,
+                    'status_code': response.status_code,
+                    'content_length': len(response.content),
+                    'content_type': response.headers.get('content-type', ''),
+                    'encoding': response.encoding,
+                    'success': True,
+                    'error': None
+                }
+                
+                # 如果有爬取规则，尝试提取数据
+                crawl_rules = config.crawl_rules or {}
+                if crawl_rules.get('selectors'):
+                    try:
+                        from bs4 import BeautifulSoup
+                        soup = BeautifulSoup(response.content, 'html.parser')
+                        
+                        extracted_data = {}
+                        selectors = crawl_rules['selectors']
+                        
+                        for field, selector in selectors.items():
+                            elements = soup.select(selector)
+                            if elements:
+                                extracted_data[field] = [elem.get_text().strip() for elem in elements[:5]]  # 最多5个
+                            else:
+                                extracted_data[field] = []
+                        
+                        result['extracted_data'] = extracted_data
+                        result['extraction_success'] = True
+                        
+                    except Exception as e:
+                        result['extracted_data'] = {}
+                        result['extraction_success'] = False
+                        result['extraction_error'] = str(e)
+                
+                test_results.append(result)
+                
+            except Exception as e:
+                test_results.append({
+                    'url': url,
+                    'success': False,
+                    'error': str(e),
+                    'status_code': None,
+                    'content_length': 0
+                })
+        
+        # 更新配置的测试时间
+        config.last_test_time = datetime.utcnow()
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '爬虫配置测试完成',
+            'data': {
+                'config_id': config_id,
+                'test_time': config.last_test_time.isoformat(),
+                'test_results': test_results,
+                'summary': {
+                    'total_urls': len(test_results),
+                    'successful_urls': len([r for r in test_results if r.get('success')]),
+                    'failed_urls': len([r for r in test_results if not r.get('success')])
+                }
+            }
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"测试爬虫配置失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '测试爬虫配置失败'
+        }), 500
+
+
+@crawler_bp.route('/configs/<config_id>/results', methods=['GET'])
+@jwt_required()
+def get_crawler_results(config_id):
+    """获取爬虫结果"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 401
+        
+        config = CrawlerConfig.query.filter_by(
+            id=config_id, user_id=current_user.id
+        ).first()
+        if not config:
+            return jsonify({
+                'success': False,
+                'message': '爬虫配置不存在'
+            }), 404
+        
+        # 获取查询参数
+        page = request.args.get('page', 1, type=int)
+        per_page = min(request.args.get('per_page', 20, type=int), 100)
+        status = request.args.get('status')
+        
+        # 构建查询
+        query = CrawlerResult.query.filter_by(config_id=config_id)
+        
+        if status:
+            query = query.filter(CrawlerResult.status == status)
+        
+        # 排序和分页
+        query = query.order_by(CrawlerResult.created_at.desc())
+        pagination = query.paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
+        results = [result.to_dict() for result in pagination.items]
+        
+        return jsonify({
+            'success': True,
+            'message': '获取爬虫结果成功',
+            'data': {
+                'results': results,
+                'pagination': {
+                    'page': page,
+                    'per_page': per_page,
+                    'total': pagination.total,
+                    'pages': pagination.pages,
+                    'has_prev': pagination.has_prev,
+                    'has_next': pagination.has_next
+                }
+            }
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"获取爬虫结果失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '获取爬虫结果失败'
+        }), 500
+
+
+@crawler_bp.route('/results/<result_id>', methods=['GET'])
+@jwt_required()
+def get_crawler_result(result_id):
+    """获取单个爬虫结果详情"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 401
+        
+        result = CrawlerResult.query.join(CrawlerConfig).filter(
+            CrawlerResult.id == result_id,
+            CrawlerConfig.user_id == current_user.id
+        ).first()
+        
+        if not result:
+            return jsonify({
+                'success': False,
+                'message': '爬虫结果不存在'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'message': '获取爬虫结果详情成功',
+            'data': {
+                'result': result.to_dict(include_content=True)
+            }
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"获取爬虫结果详情失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '获取爬虫结果详情失败'
+        }), 500
+
+
+@crawler_bp.route('/stats', methods=['GET'])
+@jwt_required()
+def get_crawler_stats():
+    """获取爬虫统计信息"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 401
+        
+        # 配置统计
+        config_stats = {
+            'total': CrawlerConfig.query.filter_by(user_id=current_user.id).count(),
+            'active': CrawlerConfig.query.filter_by(user_id=current_user.id, status='active').count(),
+            'inactive': CrawlerConfig.query.filter_by(user_id=current_user.id, status='inactive').count(),
+            'running': CrawlerConfig.query.filter_by(user_id=current_user.id, status='running').count()
+        }
+        
+        # 结果统计
+        result_stats = {
+            'total': CrawlerResult.query.join(CrawlerConfig).filter(
+                CrawlerConfig.user_id == current_user.id
+            ).count(),
+            'success': CrawlerResult.query.join(CrawlerConfig).filter(
+                CrawlerConfig.user_id == current_user.id,
+                CrawlerResult.status == 'success'
+            ).count(),
+            'failed': CrawlerResult.query.join(CrawlerConfig).filter(
+                CrawlerConfig.user_id == current_user.id,
+                CrawlerResult.status == 'failed'
+            ).count()
+        }
+        
+        return jsonify({
+            'success': True,
+            'message': '获取统计信息成功',
+            'data': {
+                'config_stats': config_stats,
+                'result_stats': result_stats
+            }
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"获取统计信息失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '获取统计信息失败'
+        }), 500
