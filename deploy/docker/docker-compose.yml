@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  crawler_mysql:
+    image: docker.m.daocloud.io/library/mysql:8.0.39
+    container_name: crawler_mysql
+    env_file:
+      - ../envs/.env
+    ports:
+      - "8306:3306"  # 外部访问端口（可选）
+    volumes:
+      - ../../data/db/mysql:/var/lib/mysql  # 数据持久化
+      - ./mysql-init:/docker-entrypoint-initdb.d  # MySQL 初始化脚本
+    networks:
+      - crawler_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+networks:
+  crawler_network:
+    driver: bridge
