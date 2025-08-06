@@ -639,6 +639,7 @@ with TaskGroup("data_collection", dag=dag) as data_collection_group:
         task_id='crawl_sites',
         python_callable=crawl_target_sites,
         params=CRAWLER_CONFIG,
+        dag=dag,
         doc_md="爬取配置的目标网站数据"
     )
     
@@ -646,6 +647,7 @@ with TaskGroup("data_collection", dag=dag) as data_collection_group:
     process_task = PythonOperator(
         task_id='process_data',
         python_callable=process_crawled_data,
+        dag=dag,
         doc_md="处理爬取的数据，包括去重、清洗、标准化等"
     )
     
@@ -666,6 +668,7 @@ with TaskGroup("data_management", dag=dag) as data_management_group:
     backup_task = PythonOperator(
         task_id='backup_data',
         python_callable=backup_processed_data,
+        dag=dag,
         doc_md="备份处理后的数据和生成的内容"
     )
     
@@ -674,6 +677,7 @@ with TaskGroup("data_management", dag=dag) as data_management_group:
         task_id='cleanup_files',
         python_callable=cleanup_temp_files,
         trigger_rule='all_done',  # 无论上游任务成功或失败都执行
+        dag=dag,
         doc_md="清理临时文件和过期数据"
     )
     
@@ -699,7 +703,7 @@ system_maintenance = BashOperator(
     
     # 检查日志文件大小
     echo "=== 日志文件大小 ==="
-    find /opt/airflow/logs -name "*.log" -type f -exec ls -lh {} \; | head -10
+    find /opt/airflow/logs -name "*.log" -type f -exec ls -lh {} + | head -10
     
     echo "系统维护检查完成"
     ''',

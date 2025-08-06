@@ -136,13 +136,25 @@ build_images() {
     
     cd "$PROJECT_ROOT"
     
+    # 显示构建信息
+    log_info "开始构建 crawler-airflow:latest 镜像..."
+    
     if [ "$no_cache" = "true" ]; then
-        docker-compose -f "$DOCKER_COMPOSE_FILE" build --platform linux/amd64 --no-cache airflow_webserver
+        log_info "使用 --no-cache 选项重新构建镜像"
+        docker-compose -f "$DOCKER_COMPOSE_FILE" build --no-cache airflow_webserver
     else
-        docker-compose -f "$DOCKER_COMPOSE_FILE" build --platform linux/amd64 airflow_webserver
+        docker-compose -f "$DOCKER_COMPOSE_FILE" build airflow_webserver
     fi
     
-    log_info "镜像构建完成"
+    # 验证镜像是否构建成功
+    if docker images | grep -q "crawler-airflow.*latest"; then
+        log_info "镜像构建完成: crawler-airflow:latest"
+        # 显示镜像信息
+        docker images | grep "crawler-airflow" | head -1
+    else
+        log_error "镜像构建失败！"
+        exit 1
+    fi
 }
 
 # 启动服务
@@ -154,7 +166,8 @@ start_services() {
     cd "$PROJECT_ROOT"
     
     if [ "$detach" = "true" ]; then
-        docker-compose -f "$DOCKER_COMPOSE_FILE" up -d
+        # 静默启动，减少输出信息
+        docker-compose -f "$DOCKER_COMPOSE_FILE" up -d --quiet-pull 2>/dev/null
     else
         docker-compose -f "$DOCKER_COMPOSE_FILE" up
     fi

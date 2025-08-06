@@ -293,9 +293,9 @@ start_task >> system_check
 from airflow.utils.task_group import TaskGroup
 
 with TaskGroup("data_pipeline", dag=dag) as data_pipeline:
-    extract = DummyOperator(task_id="extract")
-    transform = DummyOperator(task_id="transform")
-    load = DummyOperator(task_id="load")
+    extract = DummyOperator(task_id="extract", dag=dag)
+    transform = DummyOperator(task_id="transform", dag=dag)
+    load = DummyOperator(task_id="load", dag=dag)
     
     extract >> transform >> load
 

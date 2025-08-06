@@ -1,4 +1,8 @@
-FROM airflow:2.9.3
+# 基于本地的镜像
+# docker pull swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/apache/airflow:2.9.3
+# docker tag swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/apache/airflow:2.9.3 airflow:2.9.3
+# docker build --platform linux/amd64 -t crawler-airflow .
+FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/apache/airflow:2.9.3
 
 # 使用airflow用户
 USER airflow

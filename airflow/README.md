@@ -53,11 +53,12 @@ airflow/
 ```bash
 # 复制环境变量文件
 cp deploy/envs/.env.example deploy/envs/.env
-cp airflow/config/.env.example airflow/config/.env
 
 # 编辑配置文件（可选）
 vim deploy/envs/.env
 ```
+
+**注意**: 所有环境变量配置已统一到 `deploy/envs/.env` 文件中，无需单独配置airflow目录下的环境文件。
 
 ### 3. 启动服务
 
@@ -171,6 +172,53 @@ task1 = PythonOperator(
 )
 ```
 
+### DAG文件热更新机制
+
+本平台采用**卷挂载(Volume Mount)**方式部署DAG文件，实现了以下优势：
+
+#### 技术原理
+- **实时同步**: 本地 `airflow/dags/` 目录通过Docker卷挂载到容器的 `/opt/airflow/dags/`
+- **自动检测**: Airflow自动监控DAG目录变化，无需重启服务
+- **热更新**: DAG文件修改后立即生效，支持开发调试
+
+#### 配置说明
+```yaml
+# docker-compose.yml 中的卷挂载配置
+volumes:
+  - ../../airflow/dags:/opt/airflow/dags     # DAG文件同步
+  - ../../airflow/logs:/opt/airflow/logs     # 日志文件同步
+  - ../../airflow/plugins:/opt/airflow/plugins # 插件文件同步
+```
+
+#### 开发优势
+1. **快速迭代**: 修改DAG文件后无需重建Docker镜像
+2. **调试便利**: 实时查看DAG变更效果
+3. **数据持久**: 容器重启后DAG和日志数据保持不变
+4. **版本控制**: DAG文件直接在宿主机上管理
+
+#### 常见DAG问题修复
+
+**TaskGroup任务依赖错误**:
+```python
+# 错误示例 - 缺少dag参数
+with TaskGroup('data_pipeline', dag=dag) as data_pipeline:
+    extract = DummyOperator(task_id='extract')  # ❌ 缺少dag=dag
+    
+# 正确示例 - 添加dag参数
+with TaskGroup('data_pipeline', dag=dag) as data_pipeline:
+    extract = DummyOperator(task_id='extract', dag=dag)  # ✅ 正确
+```
+
+**Bash命令转义问题**:
+```python
+# 错误示例 - 无效转义序列
+command = "find /path -name \*.log"  # ❌ 无效转义
+
+# 正确示例 - 使用原始字符串
+command = r"find /path -name *.log"  # ✅ 原始字符串
+command = "find /path -name *.log"   # ✅ 或直接使用
+```
+
 ### 最佳实践
 
 1. **任务幂等性**: 确保任务可以安全重复执行
@@ -178,6 +226,7 @@ task1 = PythonOperator(
 3. **资源管理**: 合理设置任务的资源限制
 4. **日志记录**: 添加详细的日志信息
 5. **测试验证**: 在部署前充分测试DAG
+6. **DAG参数**: TaskGroup内部任务必须显式指定 `dag=dag` 参数
 
 ## 配置说明
 
@@ -190,6 +239,18 @@ task1 = PythonOperator(
 - **安全配置**: 认证和加密设置
 - **性能配置**: 并发和资源限制
 - **日志配置**: 日志级别和格式
+
+### 执行器架构说明
+
+当前使用 **LocalExecutor** 执行器，架构特点：
+
+- **无需Worker节点**: 任务直接在Scheduler容器内执行
+- **本地进程执行**: 通过本地进程池运行DAG任务
+- **简化部署**: 只需Webserver和Scheduler两个服务
+- **适用场景**: 单机部署，中小规模任务处理
+- **并发控制**: 通过 `parallelism = 32` 控制最大并发任务数
+
+> **注意**: 如需分布式执行，可切换到CeleryExecutor并添加Worker服务
 
 ### 环境变量
 

@@ -64,8 +64,10 @@ check_system_requirements() {
     fi
     
     # 检查磁盘空间
-    available_space=$(df -h "$PROJECT_ROOT" | awk 'NR==2 {print $4}' | sed 's/G//')
-    if [ "${available_space%.*}" -lt 5 ]; then
+    available_space=$(df -h "$PROJECT_ROOT" | awk 'NR==2 {print $4}')
+    # 提取数字部分进行比较
+    space_num=$(echo "$available_space" | sed 's/[^0-9.]//g')
+    if [ -n "$space_num" ] && [ "${space_num%.*}" -lt 5 ] 2>/dev/null; then
         log_warn "可用磁盘空间不足5GB，可能影响运行"
     else
         log_info "可用磁盘空间: ${available_space} ✓"
@@ -154,11 +156,16 @@ check_port_availability() {
         echo "  - 8080: Airflow Web UI"
         echo "  - 8306: MySQL数据库"
         
-        read -p "是否继续部署？(y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            log_info "部署已取消"
-            exit 0
+        if [ "$FORCE_REBUILD" != "true" ]; then
+            read -p "是否继续部署？(y/N): " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                log_info "部署已取消"
+                save_cancellation_log "${occupied_ports[*]}"
+                exit 0
+            fi
+        else
+            log_warn "强制模式下继续部署"
         fi
     else
         log_info "端口检查通过 ✓"
@@ -204,9 +211,23 @@ confirm_deployment() {
     fi
 }
 
+# 检查镜像是否存在
+check_image_exists() {
+    local image_name="crawler-airflow:latest"
+    if docker images --format "table {{.Repository}}:{{.Tag}}" | grep -q "^$image_name$"; then
+        return 0  # 镜像存在
+    else
+        return 1  # 镜像不存在
+    fi
+}
+
 # 执行部署
 perform_deployment() {
-    log_info "开始部署Airflow平台..."
+    if [ "$QUIET_MODE" = "true" ]; then
+        echo "🚀 正在部署Airflow平台..."
+    else
+        log_info "开始部署Airflow平台..."
+    fi
     
     # 检查管理脚本
     if [ ! -f "$AIRFLOW_MANAGER" ]; then
@@ -215,24 +236,127 @@ perform_deployment() {
     fi
     
     # 初始化环境
-    log_info "初始化环境..."
-    "$AIRFLOW_MANAGER" init
+    if [ "$QUIET_MODE" = "false" ]; then
+        log_info "初始化环境..."
+    fi
+    "$AIRFLOW_MANAGER" init >/dev/null 2>&1
     
-    # 构建镜像
-    log_info "构建Docker镜像..."
-    "$AIRFLOW_MANAGER" build
+    # 智能构建镜像
+    if [ "$FORCE_REBUILD" = "true" ]; then
+        if [ "$QUIET_MODE" = "true" ]; then
+            echo "🔨 重新构建镜像..."
+            if ! "$AIRFLOW_MANAGER" build --no-cache >/dev/null 2>&1; then
+                echo "❌ 镜像构建失败！请检查错误信息:"
+                "$AIRFLOW_MANAGER" build --no-cache
+                exit 1
+            fi
+        else
+            log_info "强制重新构建镜像..."
+            if ! "$AIRFLOW_MANAGER" build --no-cache; then
+                log_error "镜像构建失败！"
+                exit 1
+            fi
+        fi
+    elif check_image_exists; then
+        if [ "$QUIET_MODE" = "true" ]; then
+            echo "✅ 使用现有镜像"
+        else
+            log_info "检测到已存在的Airflow镜像，跳过构建步骤"
+            log_warn "如需重新构建镜像，请使用 --rebuild 选项或手动执行: $AIRFLOW_MANAGER build"
+        fi
+    else
+        if [ "$QUIET_MODE" = "true" ]; then
+            echo "🔨 构建Airflow镜像..."
+            if ! "$AIRFLOW_MANAGER" build >/dev/null 2>&1; then
+                echo "❌ 镜像构建失败！请检查错误信息:"
+                "$AIRFLOW_MANAGER" build
+                exit 1
+            fi
+        else
+            log_info "未检测到Airflow镜像，开始构建..."
+            if ! "$AIRFLOW_MANAGER" build; then
+                log_error "镜像构建失败！"
+                exit 1
+            fi
+        fi
+    fi
     
     # 启动服务
-    log_info "启动服务..."
-    "$AIRFLOW_MANAGER" start -d
+    if [ "$QUIET_MODE" = "true" ]; then
+        echo "🚀 启动服务..."
+    else
+        log_info "启动服务..."
+    fi
+    "$AIRFLOW_MANAGER" start -d >/dev/null 2>&1
     
     # 等待服务启动
-    log_info "等待服务启动..."
-    sleep 30
+    if [ "$QUIET_MODE" = "true" ]; then
+        echo "⏳ 等待服务启动..."
+        sleep 30
+        echo "✅ 服务启动完成"
+    else
+        log_info "等待服务启动..."
+        for i in {1..30}; do
+            printf "."
+            sleep 1
+        done
+        echo
+    fi
     
     # 检查服务状态
-    log_info "检查服务状态..."
-    "$AIRFLOW_MANAGER" status
+    if [ "$QUIET_MODE" = "false" ]; then
+        log_info "检查服务状态..."
+        "$AIRFLOW_MANAGER" status
+    fi
+}
+
+# 保存部署日志
+save_deployment_log() {
+    local log_dir="$PROJECT_ROOT/logs"
+    local log_file="$log_dir/airflow-deployment.log"
+    
+    # 确保日志目录存在
+    mkdir -p "$log_dir"
+    
+    # 生成部署日志内容
+    cat > "$log_file" << EOF
+=== Airflow 部署日志 ===
+部署时间: $(date '+%Y-%m-%d %H:%M:%S')
+部署用户: $(whoami)
+项目路径: $PROJECT_ROOT
+
+=== 系统信息 ===
+操作系统: $OSTYPE
+内存信息: $(if [[ "$OSTYPE" == "darwin"* ]]; then sysctl -n hw.memsize | awk '{print int($1/1024/1024/1024)"GB"}'; else free -h | awk '/^Mem:/{print $2}'; fi)
+磁盘空间: $(df -h "$PROJECT_ROOT" | awk 'NR==2 {print $4}')
+Docker版本: $(docker --version)
+Docker Compose版本: $(docker-compose --version)
+
+=== 部署配置 ===
+强制重建: $FORCE_REBUILD
+静默模式: $QUIET_MODE
+
+=== 服务信息 ===
+Airflow Web UI: http://localhost:8080
+MySQL数据库: localhost:8306
+默认用户名: admin
+默认密码: admin123
+
+=== 数据目录 ===
+MySQL数据: $PROJECT_ROOT/data/db/mysql
+Airflow日志: $PROJECT_ROOT/airflow/logs
+DAG文件: $PROJECT_ROOT/airflow/dags
+
+=== 管理命令 ===
+查看状态: ./airflow/scripts/airflow-manager.sh status
+查看日志: ./airflow/scripts/airflow-manager.sh logs
+停止服务: ./airflow/scripts/airflow-manager.sh stop
+重启服务: ./airflow/scripts/airflow-manager.sh restart
+
+=== 部署完成 ===
+部署状态: 成功
+完成时间: $(date '+%Y-%m-%d %H:%M:%S')
+EOF
 }
 
 # 显示部署结果
@@ -271,6 +395,9 @@ $(blue "=== 下一步 ===")
 
 EOF
     
+    # 保存部署日志
+    save_deployment_log
+    
     log_info "部署日志已保存到: $PROJECT_ROOT/logs/airflow-deployment.log"
 }
 
@@ -287,7 +414,103 @@ handle_error() {
     echo "4. 查看详细日志: ./airflow/scripts/airflow-manager.sh logs"
     echo "5. 重新运行部署脚本"
     
+    # 保存错误日志
+    save_error_log "$exit_code"
+    
     exit $exit_code
+}
+
+# 保存取消部署日志
+save_cancellation_log() {
+    local occupied_ports=$1
+    local log_dir="$PROJECT_ROOT/logs"
+    local log_file="$log_dir/airflow-deployment.log"
+    
+    # 确保日志目录存在
+    mkdir -p "$log_dir"
+    
+    # 生成取消部署日志内容
+    cat > "$log_file" << EOF
+=== Airflow 部署日志 ===
+部署时间: $(date '+%Y-%m-%d %H:%M:%S')
+部署用户: $(whoami)
+项目路径: $PROJECT_ROOT
+
+=== 系统信息 ===
+操作系统: $OSTYPE
+内存信息: $(if [[ "$OSTYPE" == "darwin"* ]]; then sysctl -n hw.memsize | awk '{print int($1/1024/1024/1024)"GB"}'; else free -h | awk '/^Mem:/{print $2}'; fi)
+磁盘空间: $(df -h "$PROJECT_ROOT" | awk 'NR==2 {print $4}')
+Docker版本: $(docker --version 2>/dev/null || echo "未安装")
+Docker Compose版本: $(docker-compose --version 2>/dev/null || echo "未安装")
+
+=== 部署配置 ===
+强制重建: ${FORCE_REBUILD:-false}
+静默模式: ${QUIET_MODE:-false}
+
+=== 取消原因 ===
+取消时间: $(date '+%Y-%m-%d %H:%M:%S')
+取消原因: 端口冲突
+占用端口: $occupied_ports
+
+=== 解决建议 ===
+1. 停止占用端口的服务:
+   - 端口8080: 可能是其他Web服务
+   - 端口8306: 可能是MySQL或其他数据库服务
+2. 使用以下命令查看端口占用:
+   lsof -i :8080
+   lsof -i :8306
+3. 停止相关服务后重新运行部署脚本
+4. 或者使用 --force 参数强制部署
+
+=== 部署结果 ===
+部署状态: 已取消
+完成时间: $(date '+%Y-%m-%d %H:%M:%S')
+EOF
+}
+
+# 保存错误日志
+save_error_log() {
+    local exit_code=$1
+    local log_dir="$PROJECT_ROOT/logs"
+    local log_file="$log_dir/airflow-deployment.log"
+    
+    # 确保日志目录存在
+    mkdir -p "$log_dir"
+    
+    # 生成错误日志内容
+    cat > "$log_file" << EOF
+=== Airflow 部署日志 ===
+部署时间: $(date '+%Y-%m-%d %H:%M:%S')
+部署用户: $(whoami)
+项目路径: $PROJECT_ROOT
+
+=== 系统信息 ===
+操作系统: $OSTYPE
+内存信息: $(if [[ "$OSTYPE" == "darwin"* ]]; then sysctl -n hw.memsize | awk '{print int($1/1024/1024/1024)"GB"}'; else free -h | awk '/^Mem:/{print $2}'; fi)
+磁盘空间: $(df -h "$PROJECT_ROOT" | awk 'NR==2 {print $4}')
+Docker版本: $(docker --version 2>/dev/null || echo "未安装")
+Docker Compose版本: $(docker-compose --version 2>/dev/null || echo "未安装")
+
+=== 部署配置 ===
+强制重建: ${FORCE_REBUILD:-false}
+静默模式: ${QUIET_MODE:-false}
+
+=== 错误信息 ===
+错误时间: $(date '+%Y-%m-%d %H:%M:%S')
+退出码: $exit_code
+错误描述: 部署过程中发生错误
+
+=== 故障排除建议 ===
+1. 检查Docker服务是否正常运行
+2. 确保端口8080和8306未被占用
+3. 检查系统资源是否充足
+4. 查看详细日志: ./airflow/scripts/airflow-manager.sh logs
+5. 重新运行部署脚本
+
+=== 部署结果 ===
+部署状态: 失败
+完成时间: $(date '+%Y-%m-%d %H:%M:%S')
+EOF
 }
 
 # 主函数
@@ -329,26 +552,46 @@ Airflow快速启动脚本
 选项:
   -h, --help    显示帮助信息
   --force       跳过确认直接部署
+  --rebuild     强制重新构建镜像
+  --quiet       静默模式（减少输出信息）
   --verbose     显示详细输出
 
 示例:
   $0              # 交互式部署
   $0 --force      # 自动部署
+  $0 --rebuild    # 强制重建镜像
+  $0 --quiet      # 静默模式部署
   $0 --verbose    # 详细输出部署
 
 EOF
     exit 0
 fi
 
-# 处理参数
-if [ "$1" = "--force" ]; then
-    # 跳过确认
-    confirm_deployment() { :; }
-fi
+# 全局变量
+FORCE_REBUILD=false
+QUIET_MODE=false
 
-if [ "$1" = "--verbose" ] || [ "$2" = "--verbose" ]; then
-    set -x
-fi
+# 处理参数
+for arg in "$@"; do
+    case $arg in
+        --force)
+            # 跳过确认
+            confirm_deployment() { :; }
+            ;;
+        --rebuild)
+            FORCE_REBUILD=true
+            ;;
+        --quiet)
+            QUIET_MODE=true
+            # 重定义日志函数为静默模式
+            log_info() { :; }
+            log_warn() { :; }
+            ;;
+        --verbose)
+            set -x
+            ;;
+    esac
+done
 
 # 执行主函数
 main "$@"
