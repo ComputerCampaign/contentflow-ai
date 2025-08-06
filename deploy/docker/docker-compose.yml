@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # MySQL数据库服务
   crawler_mysql:
     image: docker.m.daocloud.io/library/mysql:8.0.39
     container_name: crawler_mysql
@@ -19,6 +20,66 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+
+  # Airflow Webserver服务
+  airflow_webserver:
+    image: crawler-airflow:latest
+    container_name: airflow_webserver
+    env_file:
+      - ../envs/.env
+      - ../../airflow/config/.env
+    environment:
+      - AIRFLOW_SERVICE_TYPE=webserver
+      - AIRFLOW_INIT_DB=true
+      - AIRFLOW_CREATE_ADMIN=true
+    ports:
+      - "8080:8080"  # Airflow Web UI
+    volumes:
+      - ../../airflow/dags:/opt/airflow/dags
+      - ../../airflow/logs:/opt/airflow/logs
+      - ../../airflow/plugins:/opt/airflow/plugins
+      - ../../data:/opt/airflow/data  # 共享数据目录
+    networks:
+      - crawler_network
+    depends_on:
+      crawler_mysql:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Airflow Scheduler服务
+  airflow_scheduler:
+    image: crawler-airflow:latest
+    container_name: airflow_scheduler
+    env_file:
+      - ../envs/.env
+      - ../../airflow/config/.env
+    environment:
+      - AIRFLOW_SERVICE_TYPE=scheduler
+      - AIRFLOW_INIT_DB=false
+      - AIRFLOW_CREATE_ADMIN=false
+    volumes:
+      - ../../airflow/dags:/opt/airflow/dags
+      - ../../airflow/logs:/opt/airflow/logs
+      - ../../airflow/plugins:/opt/airflow/plugins
+      - ../../data:/opt/airflow/data  # 共享数据目录
+    networks:
+      - crawler_network
+    depends_on:
+      airflow_webserver:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname $(hostname)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
 networks:
   crawler_network:
