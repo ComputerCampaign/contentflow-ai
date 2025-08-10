@@ -99,5 +99,8 @@ frontend/.env.*.local
 # 保留.gitkeep文件
 !db/.gitkeep
 
+# Airflow日志目录
+airflow/logs/
+
 # 前端构建输出
 /static/

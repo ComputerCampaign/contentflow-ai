@@ -168,10 +168,10 @@ def login():
             }), 401
         
         # 检查账户状态
-        if user.status != 'active':
+        if not user.is_active:
             return jsonify({
                 'success': False,
-                'message': f'账户状态异常: {user.status}'
+                'message': '账户已被禁用'
             }), 403
         
         # 更新最后登录时间
@@ -179,8 +179,12 @@ def login():
         db.session.commit()
         
         # 生成JWT令牌
-        access_token = user.generate_token()
-        refresh_token = create_refresh_token(identity=user.id)
+        access_token, refresh_token = user.generate_tokens()
+        
+        # 获取过期时间（转换为秒）
+        expires_in = current_app.config.get('JWT_ACCESS_TOKEN_EXPIRES', 3600)
+        if hasattr(expires_in, 'total_seconds'):
+            expires_in = int(expires_in.total_seconds())
         
         return jsonify({
             'success': True,
@@ -189,7 +193,7 @@ def login():
                 'access_token': access_token,
                 'refresh_token': refresh_token,
                 'token_type': 'Bearer',
-                'expires_in': current_app.config.get('JWT_ACCESS_TOKEN_EXPIRES', 3600),
+                'expires_in': expires_in,
                 'user': user.to_dict()
             }
         }), 200
@@ -279,7 +283,7 @@ def get_profile():
             'success': True,
             'message': '获取用户资料成功',
             'data': {
-                'user': user.to_dict(include_stats=True)
+                'user': user.to_dict(include_sensitive=True)
             }
         }), 200
         

@@ -13,6 +13,8 @@ class Config:
     
     # 基础配置
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
+    HOST = os.environ.get('HOST') or '127.0.0.1'
+    PORT = int(os.environ.get('PORT') or 5000)
     
     # 数据库配置
     MYSQL_HOST = os.environ.get('MYSQL_HOST') or 'localhost'

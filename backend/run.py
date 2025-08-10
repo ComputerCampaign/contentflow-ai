@@ -6,6 +6,10 @@
 
 import os
 import sys
+# 首先加载环境变量
+from dotenv import load_dotenv
+load_dotenv()
+
 from app import create_app
 from backend.extensions import db
 
@@ -38,9 +42,9 @@ def main():
                 admin = User(
                     username='admin',
                     email='admin@example.com',
+                    password='admin123',
                     role='admin'
                 )
-                admin.set_password('admin123')
                 admin.is_active = True
                 
                 db.session.add(admin)
