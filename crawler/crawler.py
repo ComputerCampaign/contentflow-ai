@@ -56,18 +56,18 @@ class Crawler:
         logger.info(f"邮件通知: {'已启用' if notifier.enabled else '未启用'}")
         logger.info("博客生成：请在爬虫完成后使用generate_blog_from_crawler.py脚本")
     
-    def crawl(self, url, rule_id=None, task_id=None):
+    def crawl(self, url, rule_ids=None, task_id=None):
         """爬取指定URL的图片和标题
         
         Args:
             url (str): 要爬取的URL
-            rule_id (str, optional): XPath规则ID，用于指定使用哪个XPath规则
+            rule_ids (list, optional): XPath规则ID列表，用于指定使用哪些XPath规则
             task_id (str, optional): 任务ID，如果不提供则自动生成
             
         Returns:
             tuple: (是否成功, 任务ID, 任务目录)
         """
-        result = self.crawler_core.crawl_url(url, task_id)
+        result = self.crawler_core.crawl_url(url, task_id, rule_ids=rule_ids)
         if result.get('success'):
             return True, result.get('task_name'), result.get('task_dir')
         else:
@@ -96,7 +96,7 @@ def main():
     parser.add_argument("--proxy", help="Selenium使用的代理服务器地址，格式为http://host:port或socks5://host:port")
     parser.add_argument("--page-load-wait", type=int, help="Selenium页面加载等待时间，单位为秒")
     parser.add_argument("--user-agent", help="Selenium使用的用户代理字符串")
-    parser.add_argument("--rule-id", help="XPath规则ID，用于指定使用哪个XPath规则（例如：reddit_media, twitter_media, general_article）")
+    parser.add_argument("--rule-ids", help="XPath规则ID列表，用逗号分隔，用于指定使用哪些XPath规则（例如：reddit_media,reddit_comments）")
     parser.add_argument("--enable-xpath", type=lambda x: x.lower() == 'true', help="启用XPath选择器，使用XPath规则解析页面，值为true或false（默认值取决于config.json中xpath_config.enabled的值）")
     parser.add_argument("--list-rules", action="store_true", help="列出所有可用的XPath规则")
     
@@ -158,8 +158,14 @@ def main():
     )
     
     try:
-        # 开始爬取，传入规则ID和任务ID
-        success, task_id, task_dir = crawler.crawl(args.url, args.rule_id, args.task_id)
+        # 解析规则ID列表
+        rule_ids = None
+        if args.rule_ids:
+            rule_ids = [rule_id.strip() for rule_id in args.rule_ids.split(',') if rule_id.strip()]
+            logger.info(f"指定的XPath规则ID: {rule_ids}")
+        
+        # 开始爬取，传入规则ID列表和任务ID
+        success, task_id, task_dir = crawler.crawl(args.url, rule_ids, args.task_id)
         if not success:
             sys.exit(1)
         logger.info(f"爬取完成，任务ID: {task_id}, 任务目录: {task_dir}")

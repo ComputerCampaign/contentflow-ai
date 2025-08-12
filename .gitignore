@@ -56,6 +56,8 @@ data/*/*
 !data/*/.gitkeep
 !data/README.md
 !data/db/MySQL数据目录说明文档.md
+crawler_data/*
+!crawler_data/README.md
 
 # 输出目录内容，但保留.gitkeep文件
 output/*

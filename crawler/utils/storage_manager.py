@@ -132,9 +132,11 @@ class StorageManager:
         Returns:
             元数据文件保存路径
         """
-        # 生成元数据文件名
+        # 生成元数据文件名，保存到metadata子目录中
+        metadata_dir = os.path.join(task_dir, 'metadata')
+        os.makedirs(metadata_dir, exist_ok=True)  # 确保metadata目录存在
         filename = 'metadata.json'
-        file_path = os.path.join(task_dir, filename)
+        file_path = os.path.join(metadata_dir, filename)
         
         # 保存元数据
         try:
@@ -155,8 +157,10 @@ class StorageManager:
         Returns:
             元数据字典
         """
+        # 从metadata子目录中读取元数据文件
+        metadata_dir = os.path.join(task_dir, 'metadata')
         filename = 'metadata.json'
-        file_path = os.path.join(task_dir, filename)
+        file_path = os.path.join(metadata_dir, filename)
         
         try:
             if os.path.exists(file_path):

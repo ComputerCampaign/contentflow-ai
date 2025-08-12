@@ -20,6 +20,46 @@
             "description": "通用网站文章内容区域",
             "domain_patterns": [],
             "xpath": "//article | //div[contains(@class, 'article')] | //div[contains(@class, 'content')]"
+        },
+        {
+            "id": "reddit_comments",
+            "name": "Reddit评论",
+            "description": "Reddit网站评论区域 - 基于最新HTML结构优化",
+            "domain_patterns": ["reddit.com", "www.reddit.com"],
+            "xpath": "//shreddit-comment[@author and @thingid]",
+            "comment_xpath": {
+                "text": ".//div[contains(@class, 'md') and contains(@class, 'text-14-scalable')]//p/text() | .//div[contains(@id, '-post-rtjson-content')]//p/text()",
+                "author": "@author",
+                "score": "@score",
+                "timestamp": ".//time/@datetime",
+                "comment_id": "@thingid",
+                "depth": "@depth",
+                "permalink": "@permalink"
+            }
+        },
+        {
+            "id": "twitter_comments",
+            "name": "Twitter评论",
+            "description": "Twitter/X网站评论区域",
+            "domain_patterns": ["twitter.com", "x.com", "www.twitter.com", "www.x.com"],
+            "xpath": "//div[contains(@data-testid, 'tweet')] | //article[contains(@data-testid, 'tweet')]",
+            "comment_xpath": {
+                "text": ".//div[contains(@data-testid, 'tweetText')]/span",
+                "author": ".//div[contains(@data-testid, 'User-Name')]//span",
+                "timestamp": ".//time/@datetime",
+                "interactions": ".//div[contains(@data-testid, 'like')] | .//div[contains(@data-testid, 'retweet')]"
+            }
+        },
+        {
+            "id": "general_comments",
+            "name": "通用评论",
+            "description": "通用网站评论区域",
+            "domain_patterns": [],
+            "xpath": "//div[contains(@class, 'comment')] | //div[contains(@id, 'comment')] | //div[contains(@class, 'reply')]",
+            "comment_xpath": {
+                "text": ".//text()[normalize-space()]",
+                "author": ".//span[contains(@class, 'author')] | .//a[contains(@class, 'user')] | .//div[contains(@class, 'name')]"
+            }
         }
     ]
 }

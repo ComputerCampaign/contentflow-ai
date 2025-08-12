@@ -77,7 +77,13 @@ class SeleniumRenderer:
             selenium_config = self.config.get('selenium', {})
         
         # 根据配置决定是否使用无头模式
-        headless = selenium_config.get('headless', self.headless)
+        # 优先使用动态设置的selenium_headless属性，然后是配置文件，最后是初始化参数
+        headless = getattr(self.config, 'selenium_headless', None)
+        if headless is None:
+            headless = selenium_config.get('headless', self.headless)
+        
+        logger.info(f"Selenium无头模式设置: {headless}")
+        
         if headless:
             chrome_options.add_argument('--headless')
             if selenium_config.get('disable_gpu', True):

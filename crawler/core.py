@@ -55,13 +55,18 @@ class CrawlerCore:
         
         logger.info(f"爬虫初始化完成 - 输出目录: {self.output_dir}, 数据目录: {self.data_dir}")
         logger.info(f"配置 - 超时: {self.timeout}s, 重试: {self.retry}次, Selenium: {self.use_selenium}, XPath: {self.enable_xpath}")
+        if self.xpath_manager:
+            logger.info(f"XPath管理器初始化成功，启用状态: {self.xpath_manager.enabled}")
+        else:
+            logger.warning("XPath管理器未初始化")
     
-    def crawl_url(self, url: str, task_name: Optional[str] = None) -> Dict[str, Any]:
+    def crawl_url(self, url: str, task_name: Optional[str] = None, rule_ids: Optional[List[str]] = None) -> Dict[str, Any]:
         """爬取单个URL
         
         Args:
             url: 要爬取的URL
             task_name: 任务名称，用于创建存储目录
+            rule_ids: XPath规则ID列表，用于指定使用哪些XPath规则
             
         Returns:
             爬取结果字典
@@ -80,26 +85,48 @@ class CrawlerCore:
             if not html_content:
                 return {'success': False, 'error': 'Failed to fetch HTML content'}
             
+            # 保存页面源码
+            html_file_path = self.storage_manager.save_page_html(task_dir, url, html_content)
+            if html_file_path:
+                logger.info(f"页面源码已保存: {html_file_path}")
+            
             # 解析网页
             parse_result = self.html_parser.parse_html(html_content, url)
             
             # 应用XPath规则（如果启用）
             if self.xpath_manager:
-                xpath_result = self.xpath_manager.apply_rules(html_content, url)
+                logger.info(f"开始应用XPath规则，rule_ids: {rule_ids}")
+                if rule_ids:
+                    # 使用指定的多个规则
+                    logger.info(f"使用指定的多个规则: {rule_ids}")
+                    xpath_result = self.xpath_manager.apply_multiple_rules(html_content, url, rule_ids)
+                else:
+                    # 使用默认的单规则或URL匹配
+                    logger.info("使用默认的单规则或URL匹配")
+                    xpath_result = self.xpath_manager.apply_rules(html_content, url)
+                
+                logger.info(f"XPath处理结果: {xpath_result is not None}")
                 if xpath_result:
+                    logger.info(f"XPath提取到 {len(xpath_result.get('images', []))} 张图片")
                     # 合并XPath结果
                     parse_result.update(xpath_result)
+                else:
+                    logger.warning("XPath规则未返回任何结果")
+            else:
+                logger.warning("XPath管理器未启用，跳过XPath规则应用")
             
             # 下载图片
             if parse_result.get('images'):
                 downloader = BatchDownloader(
-                    max_workers=self.max_workers,
+                    storage_manager=self.storage_manager,
                     timeout=self.timeout,
-                    retry=self.retry
+                    retry=self.retry,
+                    max_workers=self.max_workers
                 )
                 
                 download_result = downloader.download_images(
                     parse_result['images'],
+                    url,
                     task_dir
                 )
                 
@@ -111,14 +138,17 @@ class CrawlerCore:
                 'title': parse_result.get('title', ''),
                 'description': parse_result.get('description', ''),
                 'images': parse_result.get('images', []),
+                'comments': parse_result.get('comments', []),
+                'comments_count': parse_result.get('comments_count', 0),
                 'download_result': parse_result.get('download_result', {}),
                 'crawl_time': time.time(),
-                'task_name': task_name
+                'task_name': task_name,
+                'xpath_rule_used': parse_result.get('xpath_rule_used', None)
             }
             
             self.storage_manager.save_metadata(metadata, task_dir)
             
-            logger.info(f"爬取完成 - 任务: {task_name}, 图片数量: {len(parse_result.get('images', []))}")
+            logger.info(f"爬取完成 - 任务: {task_name}, 图片数量: {len(parse_result.get('images', []))}, 评论数量: {len(parse_result.get('comments', []))}")
             
             return {
                 'success': True,
@@ -191,7 +221,11 @@ class CrawlerCore:
                 if self.use_selenium and self.selenium_renderer:
                     # 使用Selenium渲染
                     logger.debug(f"使用Selenium获取内容: {url} (尝试 {attempt + 1})")
-                    return self.selenium_renderer.render_page(url)
+                    success, html_content = self.selenium_renderer.render_page(url)
+                    if success:
+                        return html_content
+                    else:
+                        raise Exception(f"Selenium渲染失败: {html_content}")
                 else:
                     # 使用requests获取
                     logger.debug(f"使用requests获取内容: {url} (尝试 {attempt + 1})")
@@ -249,6 +283,9 @@ class CrawlerCore:
             
             tasks = []
             for item in os.listdir(self.data_dir):
+                # 确保item是字符串类型
+                if not isinstance(item, str):
+                    continue
                 item_path = os.path.join(self.data_dir, item)
                 if os.path.isdir(item_path) and item.startswith('task_'):
                     tasks.append(item)
