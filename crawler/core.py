@@ -90,30 +90,41 @@ class CrawlerCore:
             if html_file_path:
                 logger.info(f"页面源码已保存: {html_file_path}")
             
-            # 解析网页
-            parse_result = self.html_parser.parse_html(html_content, url)
+            # 初始化解析结果
+            parse_result = {
+                'title': '',
+                'description': '',
+                'images': [],
+                'texts': [],
+                'links': [],
+                'elements': [],
+                'comments': [],
+                'comments_count': 0
+            }
             
             # 应用XPath规则（如果启用）
-            if self.xpath_manager:
+            if self.xpath_manager and self.xpath_manager.is_enabled():
                 logger.info(f"开始应用XPath规则，rule_ids: {rule_ids}")
-                if rule_ids:
-                    # 使用指定的多个规则
-                    logger.info(f"使用指定的多个规则: {rule_ids}")
-                    xpath_result = self.xpath_manager.apply_multiple_rules(html_content, url, rule_ids)
-                else:
-                    # 使用默认的单规则或URL匹配
-                    logger.info("使用默认的单规则或URL匹配")
-                    xpath_result = self.xpath_manager.apply_rules(html_content, url)
                 
-                logger.info(f"XPath处理结果: {xpath_result is not None}")
-                if xpath_result:
-                    logger.info(f"XPath提取到 {len(xpath_result.get('images', []))} 张图片")
-                    # 合并XPath结果
-                    parse_result.update(xpath_result)
+                # 获取要应用的规则列表
+                rules_to_apply = self.xpath_manager.get_rules_for_url(url, rule_ids)
+                
+                if rules_to_apply:
+                    logger.info(f"找到 {len(rules_to_apply)} 个XPath规则")
+                    
+                    # 应用每个规则并合并结果
+                    xpath_result = self._apply_xpath_rules(html_content, rules_to_apply, url)
+                    
+                    if xpath_result:
+                        logger.info(f"XPath提取到 {len(xpath_result.get('images', []))} 张图片, {len(xpath_result.get('texts', []))} 个文本, {len(xpath_result.get('links', []))} 个链接")
+                        # 合并XPath结果
+                        self._merge_xpath_results(parse_result, xpath_result)
+                    else:
+                        logger.warning("XPath规则未返回任何结果")
                 else:
-                    logger.warning("XPath规则未返回任何结果")
+                    logger.warning("未找到可应用的XPath规则")
             else:
-                logger.warning("XPath管理器未启用，跳过XPath规则应用")
+                logger.warning("XPath管理器未启用或无可用规则，跳过XPath规则应用")
             
             # 下载图片
             if parse_result.get('images'):
@@ -138,12 +149,15 @@ class CrawlerCore:
                 'title': parse_result.get('title', ''),
                 'description': parse_result.get('description', ''),
                 'images': parse_result.get('images', []),
+                'texts': parse_result.get('texts', []),
+                'links': parse_result.get('links', []),
+                'elements': parse_result.get('elements', []),
                 'comments': parse_result.get('comments', []),
                 'comments_count': parse_result.get('comments_count', 0),
                 'download_result': parse_result.get('download_result', {}),
                 'crawl_time': time.time(),
                 'task_name': task_name,
-                'xpath_rule_used': parse_result.get('xpath_rule_used', None)
+                'xpath_rules_used': parse_result.get('xpath_rules_used', [])
             }
             
             self.storage_manager.save_metadata(metadata, task_dir)
@@ -206,6 +220,141 @@ class CrawlerCore:
             'success_count': success_count,
             'results': results
         }
+    
+    def _apply_xpath_rules(self, html_content, rules, url):
+        """应用XPath规则列表并合并结果
+        
+        Args:
+            html_content (str): HTML内容
+            rules (list): XPath规则列表
+            url (str): 页面URL
+            
+        Returns:
+            dict: 合并后的解析结果
+        """
+        combined_result = {
+            'images': [],
+            'texts': [],
+            'links': [],
+            'elements': [],
+            'comments': [],
+            'xpath_rules_used': []
+        }
+        
+        for rule in rules:
+            try:
+                logger.info(f"应用XPath规则: {rule.get('name', 'Unknown')} ({rule.get('id', 'unknown')})")
+                
+                # 使用html_parser的新方法处理规则
+                rule_result = self.html_parser.extract_by_xpath_rule(html_content, rule, url)
+                
+                if rule_result:
+                    # 获取元数据
+                    meta = rule_result.get('_meta', {})
+                    rule_id = meta.get('rule_id') or rule.get('id', 'unknown')
+                    rule_type = meta.get('rule_type', 'general')
+                    field_name = meta.get('field_name', 'unknown')
+                    
+                    # 获取实际数据（排除_meta）
+                    data_key = field_name
+                    extracted_data = rule_result.get(data_key, [])
+                    
+                    # 根据规则类型合并数据
+                    if rule_type == 'image' and isinstance(extracted_data, list):
+                        self._merge_unique_images(combined_result['images'], extracted_data)
+                    elif rule_type == 'text' and isinstance(extracted_data, list):
+                        combined_result['texts'].extend(extracted_data)
+                    elif rule_type == 'link' and isinstance(extracted_data, list):
+                        self._merge_unique_links(combined_result['links'], extracted_data)
+                    elif rule_type == 'general' and isinstance(extracted_data, dict):
+                        # 通用类型返回的是包含所有类型的字典
+                        self._merge_unique_images(combined_result['images'], extracted_data.get('images', []))
+                        combined_result['texts'].extend(extracted_data.get('texts', []))
+                        self._merge_unique_links(combined_result['links'], extracted_data.get('links', []))
+                        combined_result['elements'].extend(extracted_data.get('elements', []))
+                    else:
+                        # 其他情况，将数据添加到elements中
+                        if isinstance(extracted_data, list):
+                            combined_result['elements'].extend(extracted_data)
+                        else:
+                            combined_result['elements'].append(extracted_data)
+                    
+                    # 记录使用的规则
+                    if rule_id not in combined_result['xpath_rules_used']:
+                        combined_result['xpath_rules_used'].append(rule_id)
+                
+            except Exception as e:
+                logger.error(f"应用XPath规则失败: {rule.get('id', 'unknown')}, 错误: {str(e)}")
+                continue
+        
+        # 将文本结果转换为评论格式以保持兼容性
+        for text_item in combined_result['texts']:
+            if text_item.get('text'):
+                combined_result['comments'].append({
+                    'text': text_item['text'],
+                    'author': 'Unknown',
+                    'timestamp': None,
+                    'xpath_rule': 'text_extraction'
+                })
+        
+        combined_result['comments_count'] = len(combined_result['comments'])
+        
+        return combined_result if any(combined_result[key] for key in ['images', 'texts', 'links', 'elements']) else None
+    
+    def _merge_xpath_results(self, parse_result, xpath_result):
+        """将XPath结果合并到解析结果中
+        
+        Args:
+            parse_result (dict): 原始解析结果
+            xpath_result (dict): XPath解析结果
+        """
+        # 合并图片（去重）
+        self._merge_unique_images(parse_result['images'], xpath_result.get('images', []))
+        
+        # 合并文本
+        parse_result['texts'].extend(xpath_result.get('texts', []))
+        
+        # 合并链接（去重）
+        self._merge_unique_links(parse_result['links'], xpath_result.get('links', []))
+        
+        # 合并通用元素
+        parse_result['elements'].extend(xpath_result.get('elements', []))
+        
+        # 合并评论
+        parse_result['comments'].extend(xpath_result.get('comments', []))
+        
+        # 更新评论数量
+        parse_result['comments_count'] = len(parse_result['comments'])
+        
+        # 记录使用的XPath规则
+        if xpath_result.get('xpath_rules_used'):
+            parse_result['xpath_rules_used'] = xpath_result['xpath_rules_used']
+    
+    def _merge_unique_images(self, existing_images, new_images):
+        """合并图片列表，避免重复
+        
+        Args:
+            existing_images (list): 现有图片列表
+            new_images (list): 新图片列表
+        """
+        existing_urls = {img['url'] for img in existing_images}
+        for img in new_images:
+            if img['url'] not in existing_urls:
+                existing_images.append(img)
+                existing_urls.add(img['url'])
+    
+    def _merge_unique_links(self, existing_links, new_links):
+        """合并链接列表，避免重复
+        
+        Args:
+            existing_links (list): 现有链接列表
+            new_links (list): 新链接列表
+        """
+        existing_urls = {link['url'] for link in existing_links}
+        for link in new_links:
+            if link['url'] not in existing_urls:
+                existing_links.append(link)
+                existing_urls.add(link['url'])
     
     def _fetch_html(self, url: str) -> Optional[str]:
         """获取网页HTML内容

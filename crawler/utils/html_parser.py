@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from lxml import etree
+import re
 
 # 导入日志配置
 from crawler.logger import setup_logger
@@ -12,378 +12,295 @@ from crawler.logger import setup_logger
 logger = setup_logger(__name__, file_path=__file__)
 
 class HtmlParser:
-    """HTML解析器，负责从网页中提取图片和标题信息"""
+    """HTML解析器，基于XPath规则提取内容"""
     
     def __init__(self):
         """初始化解析器"""
         pass
     
-    def parse_with_xpath(self, html_content, xpath_selector=None, base_url=None):
-        """使用XPath解析HTML内容，提取图片和标题
+    def extract_images_by_xpath(self, html_content, xpath_rule, base_url=None):
+        """使用XPath规则提取图片
         
         Args:
             html_content (str): HTML内容
-            xpath_selector (str, optional): XPath选择器，用于限定爬取区域
+            xpath_rule (str): XPath选择器
             base_url (str, optional): 基础URL，用于处理相对路径
             
         Returns:
-            dict: 包含标题和图片URL的字典
+            list: 图片数据列表
         """
         try:
-            # 使用lxml解析HTML
             parser = etree.HTMLParser()
             tree = etree.fromstring(html_content, parser)
             
-            # 提取页面标题
-            title_elements = tree.xpath('//title/text()')
-            title = title_elements[0].strip() if title_elements else "未知标题"
-            logger.info(f"页面标题: {title}")
+            # 应用XPath选择器
+            elements = tree.xpath(xpath_rule)
+            logger.info(f"XPath规则匹配到 {len(elements)} 个元素")
             
             images = []
             
-            # 如果提供了XPath选择器，使用XPath提取图片
-            if xpath_selector:
-                logger.info(f"使用XPath选择器: {xpath_selector}")
-                
-                # 检查选择器是否直接选择img标签
-                if self._is_xpath_selecting_img_directly(xpath_selector):
-                    # 直接选择img标签
-                    img_elements = tree.xpath(xpath_selector)
-                    logger.info(f"XPath直接选择img标签，找到 {len(img_elements)} 个图片")
+            for element in elements:
+                # 如果元素本身是img标签
+                if element.tag == 'img':
+                    img_data = self._extract_image_from_element(element, base_url)
+                    if img_data:
+                        images.append(img_data)
                 else:
-                    # 在容器元素内查找img标签
-                    container_elements = tree.xpath(xpath_selector)
-                    img_elements = []
-                    for container in container_elements:
-                        img_elements.extend(container.xpath('.//img'))
-                    logger.info(f"在容器内查找img标签，找到 {len(img_elements)} 个图片")
-                
-                # 提取图片信息
-                for img in img_elements:
-                    img_data = self._extract_image_data(img, base_url, tree)
-                    if img_data:
-                        images.append(img_data)
-            else:
-                # 如果没有提供XPath选择器，则在整个页面中查找图片
-                img_elements = tree.xpath('//img')
-                logger.info(f"在整个页面查找图片，找到 {len(img_elements)} 个图片标签")
-                
-                for img in img_elements:
-                    img_data = self._extract_image_data(img, base_url, tree)
-                    if img_data:
-                        images.append(img_data)
+                    # 在元素内查找img标签
+                    img_elements = element.xpath('.//img')
+                    for img in img_elements:
+                        img_data = self._extract_image_from_element(img, base_url)
+                        if img_data:
+                            images.append(img_data)
             
-            # 提取可能的文章标题（h1, h2等）
-            headings = []
-            for i in range(1, 4):  # h1, h2, h3
-                for h_text in tree.xpath(f'//h{i}/text()'):
-                    headings.append({
-                        'level': i,
-                        'text': h_text.strip()
-                    })
-            
-            return {
-                'page_title': title,
-                'page_url': base_url,
-                'images': images,
-                'headings': headings
-            }
+            logger.info(f"提取到 {len(images)} 张图片")
+            return images
             
         except Exception as e:
-            logger.error(f"XPath解析失败: {str(e)}")
-            return {
-                'page_title': "解析失败",
-                'page_url': base_url,
-                'images': [],
-                'headings': []
-            }
+            logger.error(f"XPath图片提取失败: {str(e)}")
+            return []
     
-    def _is_xpath_selecting_img_directly(self, xpath):
-        """检查XPath是否直接选择img标签"""
-        if not isinstance(xpath, str):
-            return False
+    def extract_text_by_xpath(self, html_content, xpath_rule):
+        """使用XPath规则提取文本内容
         
-        xpath_lower = xpath.lower().strip()
-        # 检查是否直接选择img标签
-        return (
-            xpath_lower.startswith('//img') or 
-            xpath_lower.endswith('/img') or 
-            xpath_lower.endswith('img') or
-            '/img[' in xpath_lower or
-            '//img[' in xpath_lower
-        )
+        Args:
+            html_content (str): HTML内容
+            xpath_rule (str): XPath选择器
+            
+        Returns:
+            list: 文本内容列表
+        """
+        try:
+            parser = etree.HTMLParser()
+            tree = etree.fromstring(html_content, parser)
+            
+            # 应用XPath选择器
+            elements = tree.xpath(xpath_rule)
+            logger.info(f"XPath规则匹配到 {len(elements)} 个元素")
+            
+            texts = []
+            
+            for element in elements:
+                text_content = self._extract_text_from_element(element)
+                if text_content:
+                    texts.append({
+                        'text': text_content,
+                        'tag': element.tag if hasattr(element, 'tag') else 'text',
+                        'attributes': dict(element.attrib) if hasattr(element, 'attrib') else {}
+                    })
+            
+            logger.info(f"提取到 {len(texts)} 个文本内容")
+            return texts
+            
+        except Exception as e:
+            logger.error(f"XPath文本提取失败: {str(e)}")
+            return []
     
-    def _extract_image_data(self, img_element, base_url, tree):
+    def extract_links_by_xpath(self, html_content, xpath_rule, base_url=None):
+        """使用XPath规则提取链接
+        
+        Args:
+            html_content (str): HTML内容
+            xpath_rule (str): XPath选择器
+            base_url (str, optional): 基础URL，用于处理相对路径
+            
+        Returns:
+            list: 链接数据列表
+        """
+        try:
+            parser = etree.HTMLParser()
+            tree = etree.fromstring(html_content, parser)
+            
+            # 应用XPath选择器
+            elements = tree.xpath(xpath_rule)
+            logger.info(f"XPath规则匹配到 {len(elements)} 个元素")
+            
+            links = []
+            
+            for element in elements:
+                # 如果元素本身是a标签
+                if element.tag == 'a':
+                    link_data = self._extract_link_from_element(element, base_url)
+                    if link_data:
+                        links.append(link_data)
+                else:
+                    # 在元素内查找a标签
+                    link_elements = element.xpath('.//a')
+                    for link in link_elements:
+                        link_data = self._extract_link_from_element(link, base_url)
+                        if link_data:
+                            links.append(link_data)
+            
+            logger.info(f"提取到 {len(links)} 个链接")
+            return links
+            
+        except Exception as e:
+            logger.error(f"XPath链接提取失败: {str(e)}")
+            return []
+    
+    def extract_elements_by_xpath(self, html_content, xpath_rule):
+        """使用XPath规则提取通用元素
+        
+        Args:
+            html_content (str): HTML内容
+            xpath_rule (str): XPath选择器
+            
+        Returns:
+            list: 元素数据列表
+        """
+        try:
+            parser = etree.HTMLParser()
+            tree = etree.fromstring(html_content, parser)
+            
+            # 应用XPath选择器
+            elements = tree.xpath(xpath_rule)
+            logger.info(f"XPath规则匹配到 {len(elements)} 个元素")
+            
+            results = []
+            
+            for element in elements:
+                element_data = {
+                    'tag': element.tag if hasattr(element, 'tag') else 'text',
+                    'text': self._extract_text_from_element(element),
+                    'attributes': dict(element.attrib) if hasattr(element, 'attrib') else {},
+                }
+                
+                # 如果是文本节点
+                if isinstance(element, str):
+                    element_data = {
+                        'tag': 'text',
+                        'text': element.strip(),
+                        'attributes': {}
+                    }
+                
+                results.append(element_data)
+            
+            logger.info(f"提取到 {len(results)} 个元素")
+            return results
+            
+        except Exception as e:
+            logger.error(f"XPath元素提取失败: {str(e)}")
+            return []
+    
+    def extract_by_xpath_rule(self, html_content, rule, base_url=None):
+        """使用完整的XPath规则配置提取内容
+        
+        Args:
+            html_content (str): HTML内容
+            rule (dict): XPath规则配置，包含xpath、rule_type、field_name等字段
+            base_url (str, optional): 基础URL
+            
+        Returns:
+            dict: 提取结果，使用field_name作为键名
+        """
+        if not rule or 'xpath' not in rule:
+            logger.warning("无效的XPath规则")
+            return {}
+        
+        rule_id = rule.get('id', 'unknown')
+        rule_type = rule.get('rule_type', 'general')  # 兼容旧的type字段
+        field_name = rule.get('field_name')  # 获取字段名
+        xpath_selector = rule['xpath']
+        
+        # 如果没有指定field_name，使用默认命名规则
+        if not field_name:
+            if rule_type == 'image':
+                field_name = 'images'
+            elif rule_type == 'text':
+                field_name = 'texts'
+            elif rule_type == 'link':
+                field_name = 'links'
+            else:
+                field_name = 'elements'
+        
+        logger.info(f"应用XPath规则: {rule.get('name', 'Unknown')} ({rule_id}), 类型: {rule_type}, 字段名: {field_name}")
+        
+        # 根据规则类型选择提取方法
+        if rule_type == 'image':
+            extracted_data = self.extract_images_by_xpath(html_content, xpath_selector, base_url)
+        elif rule_type == 'text':
+            extracted_data = self.extract_text_by_xpath(html_content, xpath_selector)
+        elif rule_type == 'link':
+            extracted_data = self.extract_links_by_xpath(html_content, xpath_selector, base_url)
+        else:
+            # 通用提取，返回所有类型的数据
+            extracted_data = {
+                'images': self.extract_images_by_xpath(html_content, xpath_selector, base_url),
+                'texts': self.extract_text_by_xpath(html_content, xpath_selector),
+                'links': self.extract_links_by_xpath(html_content, xpath_selector, base_url),
+                'elements': self.extract_elements_by_xpath(html_content, xpath_selector)
+            }
+        
+        # 使用field_name作为键名返回结果
+        result = {
+            field_name: extracted_data,
+            '_meta': {
+                'rule_id': rule_id,
+                'rule_type': rule_type,
+                'field_name': field_name
+            }
+        }
+        
+        return result
+    
+    def _extract_image_from_element(self, img_element, base_url):
         """从img元素中提取图片数据"""
         try:
             img_url = img_element.get('src')
             if not img_url:
                 return None
-                
+            
             # 处理相对URL
             if base_url and not img_url.startswith(('http://', 'https://')):
                 img_url = urljoin(base_url, img_url)
             
-            # 提取alt文本作为图片标题
-            img_alt = img_element.get('alt', '').strip()
-            
-            # 提取图片所在的父元素的文本
-            parent_text = ''
-            try:
-                parent_elements = tree.xpath(f"//img[@src='{img_element.get('src')}']/parent::*/text()")
-                if parent_elements:
-                    parent_text = ' '.join([text.strip() for text in parent_elements])
-                    if len(parent_text) > 200:
-                        parent_text = parent_text[:197] + '...'
-            except Exception as e:
-                logger.debug(f"提取父元素文本失败: {str(e)}")
-            
             return {
                 'url': img_url,
-                'alt': img_alt,
-                'parent_text': parent_text
+                'alt': img_element.get('alt', '').strip(),
+                'title': img_element.get('title', '').strip(),
+                'width': img_element.get('width', ''),
+                'height': img_element.get('height', ''),
+                'class': img_element.get('class', ''),
+                'id': img_element.get('id', '')
             }
         except Exception as e:
             logger.debug(f"提取图片数据失败: {str(e)}")
             return None
     
-    def parse_comments(self, html_content, base_url=None):
-        """解析HTML内容，提取评论数据
-        
-        Args:
-            html_content (str): HTML内容
-            base_url (str, optional): 基础URL，用于处理相对路径
-            
-        Returns:
-            list: 评论数据列表
-        """
-        soup = BeautifulSoup(html_content, 'lxml')
-        comments = []
-        
-        # 通用评论选择器模式
-        comment_selectors = [
-            # 通用评论区域
-            {'selector': '[class*="comment"]', 'type': 'class'},
-            {'selector': '[id*="comment"]', 'type': 'id'},
-            {'selector': '.comment, .comments', 'type': 'class'},
-            # 社交媒体评论
-            {'selector': '[data-testid*="tweet"]', 'type': 'attribute'},  # Twitter
-            {'selector': '[class*="reply"]', 'type': 'class'},
-            {'selector': '[class*="discussion"]', 'type': 'class'},
-            # Reddit评论
-            {'selector': '[class*="Comment"]', 'type': 'class'},
-            {'selector': '[data-testid="comment"]', 'type': 'attribute'},
-        ]
-        
-        for selector_info in comment_selectors:
-            try:
-                elements = soup.select(selector_info['selector'])
-                for element in elements:
-                    comment_data = self._extract_comment_data(element, base_url)
-                    if comment_data and comment_data not in comments:
-                        comments.append(comment_data)
-            except Exception as e:
-                logger.debug(f"评论选择器 {selector_info['selector']} 解析失败: {str(e)}")
-                continue
-        
-        logger.info(f"提取到 {len(comments)} 条评论")
-        return comments
-    
-    def _extract_comment_data(self, element, base_url=None):
-        """从评论元素中提取数据
-        
-        Args:
-            element: BeautifulSoup元素
-            base_url: 基础URL
-            
-        Returns:
-            dict: 评论数据
-        """
+    def _extract_link_from_element(self, link_element, base_url):
+        """从a元素中提取链接数据"""
         try:
-            # 提取评论文本
-            text_content = element.get_text(strip=True)
-            if not text_content or len(text_content) < 5:  # 过滤太短的内容
+            href = link_element.get('href')
+            if not href:
                 return None
             
-            # 提取作者信息
-            author = self._extract_author(element)
-            
-            # 提取时间信息
-            timestamp = self._extract_timestamp(element)
-            
-            # 提取点赞数等互动数据
-            interactions = self._extract_interactions(element)
-            
-            # 提取回复数据
-            replies = self._extract_replies(element, base_url)
+            # 处理相对URL
+            if base_url and not href.startswith(('http://', 'https://')):
+                href = urljoin(base_url, href)
             
             return {
-                'text': text_content[:500],  # 限制长度
-                'author': author,
-                'timestamp': timestamp,
-                'interactions': interactions,
-                'replies_count': len(replies),
-                'replies': replies[:5] if replies else [],  # 最多保存5条回复
-                'element_class': element.get('class', []),
-                'element_id': element.get('id', '')
+                'url': href,
+                'text': self._extract_text_from_element(link_element),
+                'title': link_element.get('title', '').strip(),
+                'target': link_element.get('target', ''),
+                'class': link_element.get('class', ''),
+                'id': link_element.get('id', '')
             }
         except Exception as e:
-            logger.debug(f"提取评论数据失败: {str(e)}")
+            logger.debug(f"提取链接数据失败: {str(e)}")
             return None
     
-    def _extract_author(self, element):
-        """提取评论作者信息"""
-        author_selectors = [
-            '[class*="author"]',
-            '[class*="user"]',
-            '[class*="name"]',
-            'a[href*="/user/"]',
-            'a[href*="/u/"]',
-            '.username',
-            '.user-name'
-        ]
-        
-        for selector in author_selectors:
-            try:
-                author_elem = element.select_one(selector)
-                if author_elem:
-                    return author_elem.get_text(strip=True)
-            except:
-                continue
-        return "匿名用户"
-    
-    def _extract_timestamp(self, element):
-        """提取评论时间戳"""
-        time_selectors = [
-            'time',
-            '[class*="time"]',
-            '[class*="date"]',
-            '[datetime]',
-            '.timestamp'
-        ]
-        
-        for selector in time_selectors:
-            try:
-                time_elem = element.select_one(selector)
-                if time_elem:
-                    # 尝试获取datetime属性或文本内容
-                    return time_elem.get('datetime') or time_elem.get_text(strip=True)
-            except:
-                continue
-        return None
-    
-    def _extract_interactions(self, element):
-        """提取互动数据（点赞、回复等）"""
-        interactions = {}
-        
-        # 点赞数
-        like_selectors = [
-            '[class*="like"]',
-            '[class*="upvote"]',
-            '[class*="heart"]',
-            '[aria-label*="like"]'
-        ]
-        
-        for selector in like_selectors:
-            try:
-                like_elem = element.select_one(selector)
-                if like_elem:
-                    like_text = like_elem.get_text(strip=True)
-                    # 尝试提取数字
-                    import re
-                    numbers = re.findall(r'\d+', like_text)
-                    if numbers:
-                        interactions['likes'] = int(numbers[0])
-                        break
-            except:
-                continue
-        
-        return interactions
-    
-    def _extract_replies(self, element, base_url=None):
-        """提取回复数据"""
-        replies = []
-        
-        # 查找嵌套的回复元素
-        reply_selectors = [
-            '[class*="reply"]',
-            '[class*="child"]',
-            '.nested-comment'
-        ]
-        
-        for selector in reply_selectors:
-            try:
-                reply_elements = element.select(selector)
-                for reply_elem in reply_elements[:5]:  # 最多5条回复
-                    reply_data = self._extract_comment_data(reply_elem, base_url)
-                    if reply_data:
-                        replies.append(reply_data)
-            except:
-                continue
-        
-        return replies
-
-    def parse_html(self, html_content, base_url=None):
-        """解析HTML内容，提取图片、标题和评论
-        
-        Args:
-            html_content (str): HTML内容
-            base_url (str, optional): 基础URL，用于处理相对路径
-            
-        Returns:
-            dict: 包含标题、图片URL和评论的字典
-        """
-        soup = BeautifulSoup(html_content, 'lxml')
-        
-        # 提取页面标题
-        title = soup.title.text.strip() if soup.title else "未知标题"
-        logger.info(f"页面标题: {title}")
-        
-        # 提取所有图片
-        img_tags = soup.find_all('img')
-        logger.info(f"找到 {len(img_tags)} 个图片标签")
-        
-        # 提取图片URL和alt文本
-        images = []
-        for img in img_tags:
-            img_url = img.get('src')
-            if not img_url:
-                continue
-                
-            # 处理相对URL
-            if base_url and not img_url.startswith(('http://', 'https://')):
-                img_url = urljoin(base_url, img_url)
-            
-            # 提取alt文本作为图片标题
-            img_alt = img.get('alt', '').strip()
-            
-            # 提取图片所在的父元素的文本
-            parent_text = ''
-            parent = img.parent
-            if parent:
-                parent_text = parent.get_text(strip=True)
-                if len(parent_text) > 200:
-                    parent_text = parent_text[:197] + '...'
-            
-            images.append({
-                'url': img_url,
-                'alt': img_alt,
-                'parent_text': parent_text
-            })
-        
-        # 提取评论数据
-        comments = self.parse_comments(html_content, base_url)
-        
-        # 提取页面描述
-        description = ''
-        meta_desc = soup.find('meta', attrs={'name': 'description'})
-        if meta_desc:
-            description = meta_desc.get('content', '').strip()
-        
-        return {
-            'title': title,
-            'description': description,
-            'images': images,
-            'comments': comments,
-            'comments_count': len(comments)
-        }
+    def _extract_text_from_element(self, element):
+        """从元素中提取文本内容"""
+        try:
+            if isinstance(element, str):
+                return element.strip()
+            elif hasattr(element, 'text_content'):
+                return element.text_content().strip()
+            elif hasattr(element, 'text'):
+                return element.text.strip() if element.text else ''
+            else:
+                return str(element).strip()
+        except Exception as e:
+            logger.debug(f"提取文本内容失败: {str(e)}")
+            return ''

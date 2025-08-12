@@ -5,21 +5,9 @@
             "name": "Reddit媒体图片",
             "description": "Reddit网站媒体图片区域",
             "domain_patterns": ["reddit.com", "www.reddit.com"],
-            "xpath": "//img[contains(@class, 'media-lightbox-img')]"
-        },
-        {
-            "id": "twitter_media",
-            "name": "Twitter媒体图片",
-            "description": "Twitter网站媒体图片区域",
-            "domain_patterns": ["twitter.com", "x.com", "www.twitter.com", "www.x.com"],
-            "xpath": "//div[contains(@data-testid, 'tweetPhoto')]"
-        },
-        {
-            "id": "general_article",
-            "name": "通用文章内容",
-            "description": "通用网站文章内容区域",
-            "domain_patterns": [],
-            "xpath": "//article | //div[contains(@class, 'article')] | //div[contains(@class, 'content')]"
+            "xpath": "//img[contains(@class, 'media-lightbox-img')]",
+            "rule_type": "image",
+            "field_name": "reddit_media_images"
         },
         {
             "id": "reddit_comments",
@@ -27,6 +15,8 @@
             "description": "Reddit网站评论区域 - 基于最新HTML结构优化",
             "domain_patterns": ["reddit.com", "www.reddit.com"],
             "xpath": "//shreddit-comment[@author and @thingid]",
+            "rule_type": "text",
+            "field_name": "reddit_comments",
             "comment_xpath": {
                 "text": ".//div[contains(@class, 'md') and contains(@class, 'text-14-scalable')]//p/text() | .//div[contains(@id, '-post-rtjson-content')]//p/text()",
                 "author": "@author",
@@ -38,28 +28,22 @@
             }
         },
         {
-            "id": "twitter_comments",
-            "name": "Twitter评论",
-            "description": "Twitter/X网站评论区域",
-            "domain_patterns": ["twitter.com", "x.com", "www.twitter.com", "www.x.com"],
-            "xpath": "//div[contains(@data-testid, 'tweet')] | //article[contains(@data-testid, 'tweet')]",
-            "comment_xpath": {
-                "text": ".//div[contains(@data-testid, 'tweetText')]/span",
-                "author": ".//div[contains(@data-testid, 'User-Name')]//span",
-                "timestamp": ".//time/@datetime",
-                "interactions": ".//div[contains(@data-testid, 'like')] | .//div[contains(@data-testid, 'retweet')]"
-            }
+            "id": "reddit_post_title",
+            "name": "Reddit帖子标题提取",
+            "description": "提取Reddit帖子的标题信息",
+            "domain_patterns": ["reddit.com", "www.reddit.com"],
+            "xpath": "//h1[@id='post-title-t3_1mgqbmr']/text()",
+            "rule_type": "text",
+            "field_name": "title"
         },
         {
-            "id": "general_comments",
-            "name": "通用评论",
-            "description": "通用网站评论区域",
-            "domain_patterns": [],
-            "xpath": "//div[contains(@class, 'comment')] | //div[contains(@id, 'comment')] | //div[contains(@class, 'reply')]",
-            "comment_xpath": {
-                "text": ".//text()[normalize-space()]",
-                "author": ".//span[contains(@class, 'author')] | .//a[contains(@class, 'user')] | .//div[contains(@class, 'name')]"
-            }
+            "id": "reddit_post_description",
+            "name": "Reddit帖子描述提取",
+            "description": "提取Reddit帖子的描述信息",
+            "domain_patterns": ["reddit.com", "www.reddit.com"],
+            "xpath": "//div[@id='t3_1mgqbmr-post-rtjson-content']//p[1]/text()",
+            "rule_type": "text",
+            "field_name": "description"
         }
     ]
 }

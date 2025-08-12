@@ -3,14 +3,12 @@
 
 """
 XPath规则管理器，用于加载和管理XPath规则
-重构版本：代码清晰，功能分离，便于扩展
+重构版本：只负责规则管理，不包含解析逻辑
 """
 
 import os
 import json
-import re
 from urllib.parse import urlparse
-from lxml import etree
 
 from crawler.config import crawler_config
 from crawler.logger import setup_logger
@@ -105,247 +103,43 @@ class XPathManager:
         
         return None
     
-    def extract_images_from_html(self, html_content, rule):
-        """从HTML内容中提取图片信息"""
-        images = []
+    def get_default_rule(self):
+        """获取默认规则"""
+        if not self.enabled or not self.rules:
+            return None
         
-        try:
-            parser = etree.HTMLParser()
-            tree = etree.fromstring(html_content, parser)
-            
-            # 应用XPath选择器
-            elements = tree.xpath(rule['xpath'])
-            
-            if not elements:
-                logger.warning(f"图片提取：XPath规则未匹配到任何元素: {rule['xpath']}")
-                return images
-            
-            xpath_selects_img_directly = self._is_xpath_selecting_img_directly(rule['xpath'])
-            
-            if xpath_selects_img_directly:
-                # XPath直接选择img标签
-                img_elements = [elem for elem in elements if elem.tag == 'img']
-                logger.info(f"图片提取：XPath直接选择了 {len(img_elements)} 个img标签")
-            else:
-                # XPath选择容器元素，在其中查找img标签
-                img_elements = []
-                for element in elements:
-                    inner_imgs = element.xpath('.//img')
-                    img_elements.extend(inner_imgs)
-                logger.info(f"图片提取：在容器元素中找到 {len(img_elements)} 个img标签")
-            
-            for img in img_elements:
-                img_url = img.get('src')
-                if img_url:
-                    images.append({
-                        'url': img_url,
-                        'alt': img.get('alt', ''),
-                        'xpath_rule': rule['id']
-                    })
-            
-            logger.info(f"图片提取：从规则 {rule['id']} 提取到 {len(images)} 张图片")
-            
-        except Exception as e:
-            logger.error(f"图片提取失败: {str(e)}")
-        
-        return images
+        return self.get_rule_by_id(self.default_rule_id)
     
-    def extract_comments_from_html(self, html_content, rule):
-        """从HTML内容中提取评论信息"""
-        if 'comment_xpath' not in rule:
+    def is_enabled(self):
+        """检查XPath管理器是否启用"""
+        return self.enabled and bool(self.rules)
+    
+    def get_rules_for_url(self, url, rule_ids=None):
+        """根据URL和规则ID列表获取要应用的规则"""
+        if not self.enabled or not self.rules:
             return []
         
-        comments = []
-        comment_xpath_config = rule.get('comment_xpath', {})
-        
-        try:
-            parser = etree.HTMLParser()
-            tree = etree.fromstring(html_content, parser)
-            
-            # 应用XPath选择器
-            comment_elements = tree.xpath(rule['xpath'])
-            
-            if not comment_elements:
-                logger.warning(f"评论提取：XPath规则未匹配到任何元素: {rule['xpath']}")
-                return comments
-            
-            for element in comment_elements:
-                comment_data = self._extract_single_comment(element, comment_xpath_config, rule['id'])
-                if comment_data:
-                    comments.append(comment_data)
-            
-            logger.info(f"评论提取：从规则 {rule['id']} 提取到 {len(comments)} 条评论")
-                    
-        except Exception as e:
-            logger.error(f"评论提取失败: {str(e)}")
-        
-        return comments
-    
-    def apply_multiple_rules(self, html_content, url, rule_ids=None):
-        """应用多个XPath规则解析HTML内容"""
-        if not self.enabled or not self.rules:
-            return None
-        
-        rules_to_apply = self._get_rules_to_apply(url, rule_ids)
-        if not rules_to_apply:
-            logger.warning("未找到可应用的XPath规则")
-            return None
-        
-        logger.info(f"应用 {len(rules_to_apply)} 个XPath规则")
-        
-        combined_result = {
-            'xpath_rules_used': [],
-            'images': [],
-            'comments': []
-        }
-        
-        for rule in rules_to_apply:
-            logger.info(f"应用XPath规则: {rule['name']} ({rule['id']})")
-            logger.debug(f"当前应用的规则内容: {json.dumps(rule, ensure_ascii=False, indent=2)}")
-            
-            combined_result['xpath_rules_used'].append(rule['id'])
-            
-            # 独立进行图片提取
-            images = self.extract_images_from_html(html_content, rule)
-            self._merge_unique_images(combined_result['images'], images)
-            
-            # 独立进行评论提取
-            comments = self.extract_comments_from_html(html_content, rule)
-            combined_result['comments'].extend(comments)
-        
-        combined_result['comments_count'] = len(combined_result['comments'])
-        
-        logger.info(f"多规则XPath提取到 {len(combined_result['images'])} 张图片, {len(combined_result['comments'])} 条评论")
-        
-        return combined_result
-    
-    def apply_rules(self, html_content, url):
-        """应用XPath规则解析HTML内容"""
-        if not self.enabled or not self.rules:
-            return None
-        
-        matched_rule = self.match_rule_by_url(url)
-        if not matched_rule:
-            matched_rule = self.get_rule_by_id(self.default_rule_id)
-        
-        if not matched_rule:
-            logger.warning("未找到匹配的XPath规则")
-            return None
-        
-        logger.info(f"使用XPath规则: {matched_rule['name']} ({matched_rule['id']})")
-        logger.debug(f"当前使用的规则内容: {json.dumps(matched_rule, ensure_ascii=False, indent=2)}")
-        
-        # 独立进行图片提取
-        images = self.extract_images_from_html(html_content, matched_rule)
-        
-        # 独立进行评论提取
-        comments = self.extract_comments_from_html(html_content, matched_rule)
-        
-        logger.info(f"XPath规则提取到 {len(images)} 张图片, {len(comments)} 条评论")
-        
-        return {
-            'xpath_rule_used': matched_rule['id'],
-            'images': images,
-            'comments': comments,
-            'comments_count': len(comments)
-        }
-    
-    def _is_xpath_selecting_img_directly(self, xpath):
-        """检查XPath是否直接选择img标签"""
-        return (xpath.strip().endswith('img') or 
-                '/img[' in xpath or 
-                '//img[' in xpath)
-    
-    def _get_rules_to_apply(self, url, rule_ids):
-        """获取要应用的规则列表"""
         if rule_ids:
+            # 使用指定的规则ID列表
             return self.get_rules_by_ids(rule_ids)
         
+        # 尝试根据URL匹配规则
         matched_rule = self.match_rule_by_url(url)
         if matched_rule:
             return [matched_rule]
         
-        default_rule = self.get_rule_by_id(self.default_rule_id)
+        # 使用默认规则
+        default_rule = self.get_default_rule()
         return [default_rule] if default_rule else []
     
-    def _merge_unique_images(self, existing_images, new_images):
-        """合并图片列表，避免重复"""
-        existing_urls = {img['url'] for img in existing_images}
-        for img in new_images:
-            if img['url'] not in existing_urls:
-                existing_images.append(img)
-                existing_urls.add(img['url'])
-    
-    def _log_matched_elements(self, elements):
-        """记录匹配到的元素信息"""
-        for i, element in enumerate(elements[:3]):  # 只记录前3个元素
-            logger.info(f"匹配元素 {i+1}: 标签={element.tag}, 属性={dict(element.attrib)}")
-            if element.tag == 'img':
-                logger.info(f"  - src: {element.get('src')}")
-                logger.info(f"  - alt: {element.get('alt')}")
-                logger.info(f"  - class: {element.get('class')}")
-    
-    def _extract_single_comment(self, element, comment_xpath_config, rule_id):
-        """从单个元素中提取评论数据"""
-        comment_data = {}
-        
-        # 提取评论文本
-        if 'text' in comment_xpath_config:
-            text_elements = element.xpath(comment_xpath_config['text'])
-            if text_elements:
-                text_content = self._extract_text_content(text_elements[0])
-                if text_content:
-                    comment_data['text'] = text_content
-        
-        # 提取作者信息
-        if 'author' in comment_xpath_config:
-            author_elements = element.xpath(comment_xpath_config['author'])
-            if author_elements:
-                author_content = self._extract_text_content(author_elements[0])
-                if author_content:
-                    comment_data['author'] = author_content
-        
-        # 提取时间戳
-        if 'timestamp' in comment_xpath_config:
-            time_elements = element.xpath(comment_xpath_config['timestamp'])
-            if time_elements:
-                comment_data['timestamp'] = str(time_elements[0]).strip()
-        
-        # 提取评分/点赞数
-        if 'score' in comment_xpath_config:
-            score_elements = element.xpath(comment_xpath_config['score'])
-            if score_elements:
-                score = self._extract_score(score_elements[0])
-                if score is not None:
-                    comment_data['score'] = score
-        
-        # 提取互动数据
-        if 'interactions' in comment_xpath_config:
-            interaction_elements = element.xpath(comment_xpath_config['interactions'])
-            comment_data['interactions'] = len(interaction_elements)
-        
-        # 验证并返回评论数据
-        if comment_data.get('text') and len(comment_data['text']) > 5:
-            comment_data['xpath_rule'] = rule_id
-            comment_data['text'] = comment_data['text'][:500]  # 限制长度
-            return comment_data
-        
-        return None
-    
-    def _extract_text_content(self, element):
-        """提取元素的文本内容"""
-        if isinstance(element, str):
-            return element.strip()
-        elif hasattr(element, 'text_content'):
-            return element.text_content().strip()
-        else:
-            return str(element).strip()
-    
-    def _extract_score(self, element):
-        """提取评分数字"""
-        try:
-            score_text = str(element).strip()
-            numbers = re.findall(r'\d+', score_text)
-            return int(numbers[0]) if numbers else None
-        except:
+    def get_rule_xpath(self, rule):
+        """获取规则的XPath选择器"""
+        if not rule or 'xpath' not in rule:
             return None
+        return rule['xpath']
+    
+    def get_rule_comment_config(self, rule):
+        """获取规则的评论配置"""
+        if not rule:
+            return None
+        return rule.get('comment_xpath', {})

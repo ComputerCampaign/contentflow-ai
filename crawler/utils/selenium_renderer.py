@@ -112,7 +112,9 @@ class SeleniumRenderer:
             chrome_options.add_argument(f'--proxy-server={proxy}')
         
         # 初始化WebDriver
+        logger.info("正在检查 Chrome Driver...")
         service = Service(ChromeDriverManager().install())
+        logger.info("Chrome Driver 准备完成")
         driver = webdriver.Chrome(service=service, options=chrome_options)
         
         # 设置页面加载超时
