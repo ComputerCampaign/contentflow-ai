@@ -233,6 +233,8 @@ class CrawlerCore:
             dict: 合并后的解析结果
         """
         combined_result = {
+            'title': '',
+            'description': '',
             'images': [],
             'texts': [],
             'links': [],
@@ -259,10 +261,27 @@ class CrawlerCore:
                     data_key = field_name
                     extracted_data = rule_result.get(data_key, [])
                     
-                    # 根据规则类型合并数据
-                    if rule_type == 'image' and isinstance(extracted_data, list):
+                    # 特殊处理title和description字段
+                    if field_name == 'title' and extracted_data:
+                        # 提取第一个文本作为标题
+                        if isinstance(extracted_data, list) and extracted_data:
+                            combined_result['title'] = extracted_data[0].get('text', '') if isinstance(extracted_data[0], dict) else str(extracted_data[0])
+                        elif isinstance(extracted_data, str):
+                            combined_result['title'] = extracted_data
+                    elif field_name == 'description' and extracted_data:
+                        # 提取第一个文本作为描述
+                        if isinstance(extracted_data, list) and extracted_data:
+                            combined_result['description'] = extracted_data[0].get('text', '') if isinstance(extracted_data[0], dict) else str(extracted_data[0])
+                        elif isinstance(extracted_data, str):
+                            combined_result['description'] = extracted_data
+                    elif field_name == 'reddit_comments' and isinstance(extracted_data, dict):
+                        # 处理评论数据，简化输出格式
+                        comments_data = extracted_data.get('comments', [])
+                        simplified_comments = self._simplify_comments(comments_data)
+                        combined_result['comments'].extend(simplified_comments)
+                    elif rule_type == 'image' and isinstance(extracted_data, list):
                         self._merge_unique_images(combined_result['images'], extracted_data)
-                    elif rule_type == 'text' and isinstance(extracted_data, list):
+                    elif rule_type == 'text' and isinstance(extracted_data, list) and field_name not in ['title', 'description']:
                         combined_result['texts'].extend(extracted_data)
                     elif rule_type == 'link' and isinstance(extracted_data, list):
                         self._merge_unique_links(combined_result['links'], extracted_data)
@@ -287,19 +306,30 @@ class CrawlerCore:
                 logger.error(f"应用XPath规则失败: {rule.get('id', 'unknown')}, 错误: {str(e)}")
                 continue
         
-        # 将文本结果转换为评论格式以保持兼容性
-        for text_item in combined_result['texts']:
-            if text_item.get('text'):
-                combined_result['comments'].append({
-                    'text': text_item['text'],
-                    'author': 'Unknown',
-                    'timestamp': None,
-                    'xpath_rule': 'text_extraction'
-                })
-        
         combined_result['comments_count'] = len(combined_result['comments'])
         
-        return combined_result if any(combined_result[key] for key in ['images', 'texts', 'links', 'elements']) else None
+        return combined_result if any(combined_result[key] for key in ['title', 'description', 'images', 'texts', 'links', 'elements', 'comments']) else None
+    
+    def _simplify_comments(self, comments_data):
+        """简化评论数据，只保留text和children字段
+        
+        Args:
+            comments_data (list): 原始评论数据列表
+            
+        Returns:
+            list: 简化后的评论数据列表
+        """
+        simplified = []
+        
+        for comment in comments_data:
+            if isinstance(comment, dict):
+                simplified_comment = {
+                    'text': comment.get('text', ''),
+                    'children': self._simplify_comments(comment.get('children', []))
+                }
+                simplified.append(simplified_comment)
+        
+        return simplified
     
     def _merge_xpath_results(self, parse_result, xpath_result):
         """将XPath结果合并到解析结果中
@@ -308,6 +338,12 @@ class CrawlerCore:
             parse_result (dict): 原始解析结果
             xpath_result (dict): XPath解析结果
         """
+        # 合并title和description
+        if xpath_result.get('title'):
+            parse_result['title'] = xpath_result['title']
+        if xpath_result.get('description'):
+            parse_result['description'] = xpath_result['description']
+        
         # 合并图片（去重）
         self._merge_unique_images(parse_result['images'], xpath_result.get('images', []))
         
