@@ -12,12 +12,6 @@
         "output_dir": "output",
         "logs_dir": "logs"
     },
-    "github": {
-        "token": "",
-        "repo": "",
-        "branch": "main",
-        "path": "images"
-    },
     "selenium": {
         "headless": true,
         "disable_gpu": true,

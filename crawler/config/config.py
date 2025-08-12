@@ -8,6 +8,7 @@
 import os
 import json
 from typing import Dict, Any, Optional
+from dotenv import load_dotenv
 
 class CrawlerConfig:
     """
@@ -33,6 +34,9 @@ class CrawlerConfig:
         Returns:
             配置字典
         """
+        # 加载.env文件中的环境变量
+        env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.env')
+        load_dotenv(env_path)
         default_config = {
             "crawler": {
                 "timeout": 30,
@@ -47,12 +51,7 @@ class CrawlerConfig:
                 "output_dir": "output",
                 "logs_dir": "logs"
             },
-            "github": {
-                "token": "",
-                "repo": "",
-                "branch": "main",
-                "path": "images"
-            },
+
             "selenium": {
                 "headless": True,
                 "disable_gpu": True,
@@ -92,6 +91,9 @@ class CrawlerConfig:
             except Exception as e:
                 print(f"Warning: Failed to load config file {self.config_file}: {e}")
         
+        # 从环境变量加载配置，覆盖空值
+        self._load_env_config(default_config)
+        
         return default_config
     
     def _merge_config(self, default: Dict[str, Any], override: Dict[str, Any]):
@@ -107,6 +109,26 @@ class CrawlerConfig:
                 self._merge_config(default[key], value)
             else:
                 default[key] = value
+    
+    def _load_env_config(self, config: Dict[str, Any]):
+        """
+        从环境变量加载配置，覆盖空值
+        
+        Args:
+            config: 配置字典
+        """
+        # 加载GitHub token
+        github_token = os.getenv('CRAWLER_GITHUB_TOKEN')
+        if github_token:
+            # 覆盖image_storage.github.token配置
+            if 'image_storage' in config and 'github' in config['image_storage']:
+                if not config['image_storage']['github'].get('token'):
+                    config['image_storage']['github']['token'] = github_token
+                    print(f"Info: GitHub token loaded from environment variable (token: {github_token[:8]}...)")
+                else:
+                    print(f"Info: GitHub token already set in config file, skipping environment variable")
+        else:
+            print("Warning: CRAWLER_GITHUB_TOKEN environment variable not found")
     
     def get(self, key: str, default: Any = None) -> Any:
         """
@@ -166,10 +188,7 @@ class CrawlerConfig:
         """存储配置"""
         return self._config.get('storage', {})
     
-    @property
-    def github(self) -> Dict[str, Any]:
-        """GitHub配置"""
-        return self._config.get('github', {})
+
     
     @property
     def selenium(self) -> Dict[str, Any]:

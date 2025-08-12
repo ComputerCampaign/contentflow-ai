@@ -98,15 +98,31 @@ class BatchDownloader:
                         
                         # 下载成功后立即上传到GitHub图床
                         if hasattr(self.storage_manager, 'upload_to_github') and callable(getattr(self.storage_manager, 'upload_to_github')):
+                            logger.info(f"开始上传图片到GitHub图床: {task['save_path']}")
+                            logger.debug(f"图片信息: URL={task['img_url']}, 本地路径={task['save_path']}, 索引={task['index']}")
+                            
                             try:
                                 github_url = self.storage_manager.upload_to_github(task['save_path'])
                                 if github_url:
-                                    logger.info(f"图片已上传到GitHub: {github_url}")
+                                    logger.info(f"批量下载器: 图片已成功上传到GitHub图床")
+                                    logger.info(f"  - 本地路径: {task['save_path']}")
+                                    logger.info(f"  - GitHub URL: {github_url}")
                                     task['img_data']['github_url'] = github_url
                                 else:
-                                    logger.error(f"上传图片到GitHub失败: {task['save_path']}")
+                                    logger.error(f"批量下载器: GitHub图床上传失败")
+                                    logger.error(f"  - 本地路径: {task['save_path']}")
+                                    logger.error(f"  - 原始URL: {task['img_url']}")
+                                    logger.error(f"  - 可能原因: GitHub配置问题、网络问题或文件问题")
                             except Exception as e:
-                                logger.error(f"上传图片到GitHub时发生错误: {str(e)}")
+                                logger.error(f"批量下载器: 上传图片到GitHub时发生异常")
+                                logger.error(f"  - 本地路径: {task['save_path']}")
+                                logger.error(f"  - 异常信息: {str(e)}")
+                                logger.error(f"  - 异常类型: {type(e).__name__}")
+                                import traceback
+                                logger.debug(f"  - 异常堆栈: {traceback.format_exc()}")
+                        else:
+                            logger.warning(f"批量下载器: StorageManager没有upload_to_github方法，跳过GitHub上传")
+                            logger.debug(f"  - 本地路径: {task['save_path']}")
                         
                         successful_downloads.append(task['img_data'])
                     else:

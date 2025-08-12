@@ -258,26 +258,66 @@ class StorageManager:
         Returns:
             GitHub图片URL，上传失败则返回空字符串
         """
+        logger.info(f"StorageManager: 开始处理GitHub图床上传请求")
+        logger.debug(f"  - 图片路径: {image_path}")
+        
+        # 检查文件是否存在
+        if not os.path.exists(image_path):
+            logger.error(f"StorageManager: 图片文件不存在，无法上传")
+            logger.error(f"  - 路径: {image_path}")
+            return ""
+        
+        # 获取文件信息
+        try:
+            file_size = os.path.getsize(image_path)
+            logger.debug(f"StorageManager: 图片文件信息 - 大小: {file_size} bytes ({file_size/1024:.2f} KB)")
+        except Exception as e:
+            logger.warning(f"StorageManager: 无法获取文件大小: {str(e)}")
+        
         try:
             # 导入GitHub图床上传器
+            logger.debug("StorageManager: 导入GitHub图床上传器")
             from crawler.utils.github_image_uploader import GitHubImageUploader
             
             # 创建GitHub图床上传器实例
+            logger.debug("StorageManager: 创建GitHub图床上传器实例")
             github_uploader = GitHubImageUploader()
             
             # 检查是否配置正确
+            logger.debug("StorageManager: 检查GitHub图床配置")
             if not github_uploader.is_configured():
-                logger.warning("GitHub图床未正确配置，无法上传图片")
+                logger.error("StorageManager: GitHub图床未正确配置，无法上传图片")
+                logger.error("  - 请检查以下配置项:")
+                logger.error(f"    * enabled: {getattr(github_uploader, 'enabled', 'N/A')}")
+                logger.error(f"    * token: {'已设置' if getattr(github_uploader, 'token', '') else '未设置'}")
+                logger.error(f"    * repo_owner: {getattr(github_uploader, 'repo_owner', 'N/A')}")
+                logger.error(f"    * repo_name: {getattr(github_uploader, 'repo_name', 'N/A')}")
                 return ""
+            
+            logger.info("StorageManager: GitHub图床配置检查通过，开始上传")
             
             # 上传图片
             github_url = github_uploader.upload_image(image_path)
             if github_url:
-                logger.info(f"图片已上传到GitHub: {github_url}")
+                logger.info(f"StorageManager: 图片已成功上传到GitHub图床")
+                logger.info(f"  - 本地路径: {image_path}")
+                logger.info(f"  - GitHub URL: {github_url}")
                 return github_url
             else:
-                logger.warning("上传图片到GitHub失败")
+                logger.error("StorageManager: GitHub图床上传失败")
+                logger.error(f"  - 本地路径: {image_path}")
+                logger.error("  - 可能原因: 网络问题、权限问题或GitHub服务异常")
+                logger.error("  - 建议: 检查网络连接、GitHub token权限和仓库访问权限")
                 return ""
+        except ImportError as e:
+            logger.error(f"StorageManager: 导入GitHub图床上传器失败: {str(e)}")
+            logger.error("  - 请检查crawler.utils.github_image_uploader模块是否存在")
+            return ""
         except Exception as e:
-            logger.error(f"上传图片到GitHub时发生错误: {str(e)}")
+            logger.error(f"StorageManager: 上传图片到GitHub时发生未知错误")
+            logger.error(f"  - 本地路径: {image_path}")
+            logger.error(f"  - 错误信息: {str(e)}")
+            logger.error(f"  - 错误类型: {type(e).__name__}")
+            import traceback
+            logger.debug(f"  - 错误堆栈: {traceback.format_exc()}")
             return ""
