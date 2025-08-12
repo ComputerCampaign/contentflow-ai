@@ -1,0 +1,21 @@
+{
+  "models": {
+    "doubao": {
+      "name": "豆包模型",
+      "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+      "model": "doubao-seed-1-6-250615",
+      "api_key_env": "ARK_API_KEY",
+      "timeout": 60,
+      "max_retries": 3,
+      "generation_config": {
+        "max_tokens": 2000,
+        "temperature": 0.7,
+        "top_p": 0.9,
+        "frequency_penalty": 0.0,
+        "presence_penalty": 0.0
+      }
+    }
+  },
+  "default_model": "doubao",
+  "_note": "模型替换说明：当更换模型时，请确保同时更新对应的API_KEY环境变量。例如，如果使用OpenAI模型，需要设置OPENAI_API_KEY环境变量。"
+}

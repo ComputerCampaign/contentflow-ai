@@ -1,0 +1,10 @@
+{
+  "prompts": {
+    "article_generation": {
+      "system": "你是一个专业的内容创作者，擅长根据给定的素材生成高质量的文章。",
+      "user_template": "请根据以下内容生成一篇文章：\n\n标题：{title}\n\n内容描述：{description}\n\n图片信息：{images}\n\n评论信息：{comments}\n\n请生成一篇结构清晰、内容丰富的文章。"
+    }
+  },
+  "default_prompt": "article_generation",
+  "_note": "提示词模板配置文件，用于管理AI内容生成的提示词模板。可以根据需要添加新的提示词类型。"
+}

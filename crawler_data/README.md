@@ -9,25 +9,24 @@
 ```
 crawler_data/
 ├── README.md                    # 本说明文件
-├── tasks/                       # 爬虫任务数据
-│   ├── task_name_YYYYMMDD_HHMMSS/
-│   │   ├── metadata.json        # 页面元数据
-│   │   ├── page.html           # 原始HTML内容
-│   │   ├── images/             # 下载的图片
-│   │   └── logs/               # 任务日志
-│   └── ...
-├── cache/                       # 缓存文件
-│   ├── html_cache/             # HTML缓存
-│   └── image_cache/            # 图片缓存
-└── temp/                        # 临时文件
-    ├── downloads/              # 临时下载
-    └── processing/             # 处理中的文件
+├── task_id/                     # 爬虫任务数据（直接以task_id命名）
+│   ├── metadata/               # 元数据目录
+│   │   └── metadata.json       # 页面元数据
+│   ├── page.html              # 原始HTML内容
+│   └── images/                # 下载的图片
+│       └── task_id_1.png      # 图片文件
+├── cache/                      # 缓存文件
+│   ├── html_cache/            # HTML缓存
+│   └── image_cache/           # 图片缓存
+└── temp/                       # 临时文件
+    ├── downloads/             # 临时下载
+    └── processing/            # 处理中的文件
 ```
 
 ## 数据类型
 
-### 1. 任务数据 (tasks/)
-- **元数据文件**: 包含页面标题、描述、图片信息、评论数据等
+### 1. 任务数据 (task_id/)
+- **元数据文件**: 位于metadata/metadata.json，包含页面标题、描述、图片信息、评论数据等
 - **原始HTML**: 爬取的完整页面内容
 - **图片文件**: 下载的图片资源
 - **日志文件**: 爬取过程的详细日志
