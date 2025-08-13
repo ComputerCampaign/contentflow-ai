@@ -24,22 +24,42 @@ export const authAPI = {
 
   // 获取用户信息
   getUserProfile() {
-    return request.get('/auth/profile')
+    return request.get('/auth/me')
   },
 
   // 更新用户信息
   updateProfile(data) {
-    return request.put('/auth/profile', data)
+    return request.put('/auth/me', data)
   },
 
   // 修改密码
   changePassword(data) {
-    return request.post('/auth/change-password', data)
+    return request.put('/auth/password', data)
   },
 
   // 验证token
   verifyToken() {
     return request.post('/auth/verify-token')
+  },
+
+  // 重置密码请求
+  requestPasswordReset(data) {
+    return request.post('/auth/reset-password', data)
+  },
+
+  // 确认密码重置
+  confirmPasswordReset(data) {
+    return request.post('/auth/reset-password/confirm', data)
+  },
+
+  // 验证邮箱
+  verifyEmail(data) {
+    return request.post('/auth/verify-email', data)
+  },
+
+  // 重新发送验证邮件
+  resendVerificationEmail() {
+    return request.post('/auth/resend-verification')
   }
 }
 

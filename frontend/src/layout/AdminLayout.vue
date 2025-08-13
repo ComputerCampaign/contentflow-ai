@@ -170,9 +170,7 @@ const menuItems = [
   { name: 'Dashboard', path: '/dashboard', title: '仪表板', icon: 'tachometer-alt' },
   { name: 'Tasks', path: '/tasks', title: '任务管理', icon: 'tasks' },
   { name: 'Crawler', path: '/crawler', title: '爬虫配置', icon: 'spider' },
-  { name: 'Content', path: '/content', title: '内容生成', icon: 'edit' },
-  { name: 'Blog', path: '/blog', title: '博客预览', icon: 'blog' },
-  { name: 'Files', path: '/files', title: '文件管理', icon: 'folder' },
+  { name: 'XPath', path: '/xpath', title: 'XPath配置', icon: 'code' },
   { name: 'Monitoring', path: '/monitoring', title: '系统监控', icon: 'chart-bar' },
   { name: 'Settings', path: '/settings', title: '系统设置', icon: 'cog' }
 ]
@@ -199,7 +197,7 @@ const notifications = ref([
     id: 3,
     type: 'info',
     title: '新功能上线',
-    message: 'AI 内容生成功能已更新',
+    message: '系统功能已更新',
     time: new Date(Date.now() - 7200000),
     read: true
   }

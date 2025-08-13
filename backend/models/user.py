@@ -42,15 +42,7 @@ class User(db.Model):
                           onupdate=datetime.utcnow, nullable=False)
     last_login = db.Column(db.DateTime)
     
-    # 关联关系
-    tasks = db.relationship('Task', backref='user', lazy='dynamic', 
-                           cascade='all, delete-orphan')
-    crawler_configs = db.relationship('CrawlerConfig', backref='user', 
-                                     lazy='dynamic', cascade='all, delete-orphan')
-    content_templates = db.relationship('ContentTemplate', backref='user', 
-                                       lazy='dynamic', cascade='all, delete-orphan')
-    file_records = db.relationship('FileRecord', backref='user', 
-                                  lazy='dynamic', cascade='all, delete-orphan')
+    # 移除关联关系 - 使用简化的数据库设计
     
     def __init__(self, username, email, password, display_name=None, role='user'):
         self.username = username

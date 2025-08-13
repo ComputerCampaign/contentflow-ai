@@ -164,12 +164,12 @@ const handleLogin = async () => {
     
     if (success) {
       ElMessage.success('登录成功，正在跳转...')
-      setTimeout(() => {
-        router.push('/dashboard')
-      }, 1000)
+      // 立即跳转，不需要延迟
+      await router.push('/dashboard')
     }
   } catch (error) {
     console.error('登录失败:', error)
+    // 错误消息已经在userStore.login中处理了
   } finally {
     loading.value = false
   }

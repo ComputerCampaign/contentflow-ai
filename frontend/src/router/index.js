@@ -48,32 +48,17 @@ const routes = [
         }
       },
       {
-        path: '/content',
-        name: 'Content',
-        component: () => import('@/views/Content.vue'),
+        path: '/xpath',
+        name: 'XPath',
+        component: () => import('@/views/XPath.vue'),
         meta: {
-          title: '内容生成',
-          icon: 'Edit'
+          title: 'XPath配置',
+          icon: 'Position'
         }
       },
-      {
-        path: '/blog',
-        name: 'Blog',
-        component: () => import('@/views/Blog.vue'),
-        meta: {
-          title: '博客预览',
-          icon: 'Document'
-        }
-      },
-      {
-        path: '/files',
-        name: 'Files',
-        component: () => import('@/views/Files.vue'),
-        meta: {
-          title: '文件管理',
-          icon: 'Folder'
-        }
-      },
+
+
+
       {
         path: '/monitoring',
         name: 'Monitoring',

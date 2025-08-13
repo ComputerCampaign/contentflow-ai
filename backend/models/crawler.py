@@ -11,7 +11,7 @@ import json
 
 
 class CrawlerConfig(db.Model):
-    """爬虫配置模型"""
+    """爬虫配置模型 - 对应crawler.py的命令行参数"""
     
     __tablename__ = 'crawler_configs'
     
@@ -22,55 +22,66 @@ class CrawlerConfig(db.Model):
     name = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text)
     
-    # 目标配置
-    urls = db.Column(db.JSON, nullable=False)  # 目标URL列表
+    # 对应crawler.py命令行参数的字段（严格按照L85-102）
+    # --url: 要爬取的网页URL（在任务提交时指定，不在配置中存储）
+    # --task-id: 任务ID（在创建任务时动态生成，不在配置中存储）
     
-    # 爬取规则
-    rules = db.Column(db.JSON, nullable=False)  # 爬取规则配置
+    # --output: 输出目录，用于临时文件和日志
+    output = db.Column(db.String(500))  # 对应--output参数
     
-    # 请求配置
-    headers = db.Column(db.JSON)  # 请求头
-    cookies = db.Column(db.JSON)  # Cookie
-    proxy_config = db.Column(db.JSON)  # 代理配置
+    # --data-dir: 数据存储目录，用于保存图片和元数据
+    data_dir = db.Column(db.String(500))  # 对应--data-dir参数
     
-    # 调度配置
-    schedule = db.Column(db.JSON)  # 调度配置
+    # --use-selenium: 使用Selenium和ChromeDriver进行爬取
+    use_selenium = db.Column(db.Boolean, default=False)  # 对应--use-selenium参数
     
-    # 限制配置
-    rate_limit = db.Column(db.Float, default=1.0)  # 请求间隔（秒）
-    max_depth = db.Column(db.Integer, default=1)  # 最大爬取深度
-    max_pages = db.Column(db.Integer, default=100)  # 最大页面数
-    timeout = db.Column(db.Integer, default=30)  # 请求超时（秒）
+    # --timeout: 请求超时时间，单位为秒
+    timeout = db.Column(db.Integer, default=30)  # 对应--timeout参数
     
-    # 状态信息
-    status = db.Column(db.Enum('active', 'inactive', 'testing', name='config_status'), 
-                      default='active', nullable=False)
-    is_public = db.Column(db.Boolean, default=False)  # 是否公开配置
+    # --retry: 失败重试次数
+    retry = db.Column(db.Integer, default=3)  # 对应--retry参数
     
-    # 统计信息
-    total_runs = db.Column(db.Integer, default=0)
-    successful_runs = db.Column(db.Integer, default=0)
-    failed_runs = db.Column(db.Integer, default=0)
-    last_run_at = db.Column(db.DateTime)
+    # --config: 配置文件路径（默认为'config.json'）
+    config = db.Column(db.String(500), default='config.json')  # 对应--config参数
+    
+    # --email-notification: 是否启用邮件通知
+    email_notification = db.Column(db.Boolean, default=False)  # 对应--email-notification参数
+    
+    # Selenium 配置参数
+    # --headless: Selenium是否使用无头模式
+    headless = db.Column(db.Boolean, default=True)  # 对应--headless参数
+    
+    # --proxy: Selenium使用的代理服务器地址
+    proxy = db.Column(db.String(200))  # 对应--proxy参数
+    
+    # --page-load-wait: Selenium页面加载等待时间，单位为秒
+    page_load_wait = db.Column(db.Integer, default=10)  # 对应--page-load-wait参数
+    
+    # --user-agent: Selenium使用的用户代理字符串
+    user_agent = db.Column(db.String(500))  # 对应--user-agent参数
+    
+    # --rule-ids: XPath规则ID列表，用逗号分隔
+    rule_ids = db.Column(db.String(500))  # 对应--rule-ids参数，存储逗号分隔的规则ID
+    
+    # --enable-xpath: 启用XPath选择器
+    enable_xpath = db.Column(db.Boolean, default=False)  # 对应--enable-xpath参数
+    
+    # --list-rules: 列出所有可用的XPath规则（这是一个动作参数，不需要存储）
+    
+    # 时间戳字段保留
     
     # 时间戳
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, 
                           onupdate=datetime.utcnow, nullable=False)
     
-    # 外键
-    user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    # 关联字段（移除外键约束）
+    user_id = db.Column(db.String(36), nullable=False)  # 用户ID
     
-    # 关联关系
-    tasks = db.relationship('Task', backref='crawler_config', lazy='dynamic')
-    results = db.relationship('CrawlerResult', backref='config', lazy='dynamic',
-                             cascade='all, delete-orphan',
-                             order_by='CrawlerResult.created_at.desc()')
+    # 移除关联关系 - 使用简化的数据库设计
     
-    def __init__(self, name, urls, rules, user_id, **kwargs):
+    def __init__(self, name, user_id, **kwargs):
         self.name = name
-        self.urls = urls if isinstance(urls, list) else [urls]
-        self.rules = rules
         self.user_id = user_id
         
         # 设置可选参数
@@ -79,64 +90,60 @@ class CrawlerConfig(db.Model):
                 setattr(self, key, value)
     
     def update_run_stats(self, success=True):
-        """更新运行统计"""
-        self.total_runs += 1
-        if success:
-            self.successful_runs += 1
-        else:
-            self.failed_runs += 1
-        self.last_run_at = datetime.utcnow()
-        db.session.commit()
+        """更新运行统计 - 已移除统计字段"""
+        # 统计字段已从模型中移除
+        pass
     
     def get_success_rate(self):
-        """获取成功率"""
-        if self.total_runs == 0:
-            return 0
-        return round((self.successful_runs / self.total_runs) * 100, 2)
+        """获取成功率 - 已移除统计字段"""
+        # 统计字段已从模型中移除
+        return 0
     
     def validate_config(self):
         """验证配置有效性"""
         errors = []
         
-        # 验证URL
-        if not self.urls or len(self.urls) == 0:
-            errors.append("至少需要一个目标URL")
+        # 验证基本配置
+        if not self.name or len(self.name.strip()) == 0:
+            errors.append("配置名称不能为空")
         
-        # 验证规则
-        required_rules = ['title_selector', 'content_selector']
-        for rule in required_rules:
-            if rule not in self.rules:
-                errors.append(f"缺少必需的规则: {rule}")
+        if self.timeout <= 0:
+            errors.append("超时时间必须大于0")
+            
+        if self.retry < 0:
+            errors.append("重试次数不能小于0")
         
         return errors
     
     def get_latest_results(self, limit=10):
         """获取最新的爬取结果"""
-        return self.results.limit(limit).all()
+        from backend.models.crawler import CrawlerResult
+        return CrawlerResult.query.filter_by(config_id=self.id).order_by(CrawlerResult.created_at.desc()).limit(limit).all()
     
     def to_dict(self, include_results=False):
         """转换为字典"""
         data = {
-            'config_id': self.id,
+            'id': self.id,
             'name': self.name,
             'description': self.description,
-            'urls': self.urls,
-            'rules': self.rules,
-            'headers': self.headers,
-            'cookies': self.cookies,
-            'proxy_config': self.proxy_config,
-            'schedule': self.schedule,
-            'rate_limit': self.rate_limit,
-            'max_depth': self.max_depth,
-            'max_pages': self.max_pages,
+            # 对应crawler.py命令行参数的字段
+            'output': self.output,
+            'data_dir': self.data_dir,
+            'use_selenium': self.use_selenium,
             'timeout': self.timeout,
-            'status': self.status,
-            'is_public': self.is_public,
-            'total_runs': self.total_runs,
-            'success_rate': self.get_success_rate(),
-            'last_run_at': self.last_run_at.isoformat() if self.last_run_at else None,
-            'created_at': self.created_at.isoformat(),
-            'updated_at': self.updated_at.isoformat(),
+            'retry': self.retry,
+            'config': self.config,
+            'email_notification': self.email_notification,
+            # Selenium配置
+            'headless': self.headless,
+            'proxy': self.proxy,
+            'page_load_wait': self.page_load_wait,
+            'user_agent': self.user_agent,
+            # XPath配置
+            'rule_ids': self.rule_ids,
+            'enable_xpath': self.enable_xpath,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'user_id': self.user_id
         }
         
@@ -188,9 +195,9 @@ class CrawlerResult(db.Model):
     # 时间戳
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     
-    # 外键
-    config_id = db.Column(db.String(36), db.ForeignKey('crawler_configs.id'), nullable=False)
-    task_execution_id = db.Column(db.String(36), db.ForeignKey('task_executions.id'))
+    # 关联字段（移除外键约束）
+    config_id = db.Column(db.String(36), nullable=False)  # 爬虫配置ID
+    task_execution_id = db.Column(db.String(36))  # 任务执行ID
     
     def __init__(self, url, config_id, status='success', **kwargs):
         self.url = url

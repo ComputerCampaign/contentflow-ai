@@ -10,8 +10,7 @@ from backend.extensions import db, limiter
 from backend.models.user import User
 from backend.models.task import Task, TaskExecution
 from backend.models.crawler import CrawlerConfig, CrawlerResult
-from backend.models.content import ContentTemplate, GeneratedContent
-from backend.models.file import FileRecord
+
 from datetime import datetime, timedelta
 from sqlalchemy import func, and_
 import psutil
@@ -89,26 +88,26 @@ def get_overview_stats():
         user_stats = {
             'total_tasks': Task.query.filter_by(user_id=current_user.id).count(),
             'running_tasks': Task.query.filter_by(user_id=current_user.id, status='running').count(),
-            'total_configs': CrawlerConfig.query.filter_by(user_id=current_user.id).count(),
-            'total_templates': ContentTemplate.query.filter_by(user_id=current_user.id).count(),
-            'total_files': FileRecord.query.filter_by(user_id=current_user.id, status='available').count()
+            'total_configs': CrawlerConfig.query.filter_by(user_id=current_user.id).count()
         }
         
-        # 最近24小时活动
+        # 最近24小时活动 - 使用简单字段查询
         last_24h = datetime.utcnow() - timedelta(hours=24)
+        
+        # 获取用户的任务ID列表
+        user_task_ids = [task.id for task in Task.query.filter_by(user_id=current_user.id).all()]
+        # 获取用户的配置ID列表
+        user_config_ids = [config.id for config in CrawlerConfig.query.filter_by(user_id=current_user.id).all()]
+        
         recent_activity = {
-            'task_executions': TaskExecution.query.join(Task).filter(
-                Task.user_id == current_user.id,
+            'task_executions': TaskExecution.query.filter(
+                TaskExecution.task_id.in_(user_task_ids),
                 TaskExecution.created_at >= last_24h
-            ).count(),
-            'crawler_results': CrawlerResult.query.join(CrawlerConfig).filter(
-                CrawlerConfig.user_id == current_user.id,
+            ).count() if user_task_ids else 0,
+            'crawler_results': CrawlerResult.query.filter(
+                CrawlerResult.config_id.in_(user_config_ids),
                 CrawlerResult.created_at >= last_24h
-            ).count(),
-            'generated_content': GeneratedContent.query.filter(
-                GeneratedContent.user_id == current_user.id,
-                GeneratedContent.created_at >= last_24h
-            ).count()
+            ).count() if user_config_ids else 0
         }
         
         return jsonify({
@@ -177,9 +176,7 @@ def get_system_stats():
             'active_users': User.query.filter_by(is_active=True).count(),
             'total_tasks': Task.query.count(),
             'running_tasks': Task.query.filter_by(status='running').count(),
-            'total_configs': CrawlerConfig.query.count(),
-            'total_templates': ContentTemplate.query.count(),
-            'total_files': FileRecord.query.filter_by(status='available').count()
+            'total_configs': CrawlerConfig.query.count()
         }
         
         # 性能统计
@@ -236,39 +233,36 @@ def get_performance_stats():
         
         start_date = datetime.utcnow() - timedelta(days=days)
         
-        # 任务执行性能
+        # 获取用户的任务ID列表
+        user_task_ids = [task.id for task in Task.query.filter_by(user_id=current_user.id).all()]
+        
+        # 任务执行性能 - 使用简单字段查询
         task_performance = db.session.query(
             func.date(TaskExecution.created_at).label('date'),
             func.count(TaskExecution.id).label('total'),
             func.sum(func.case([(TaskExecution.status == 'completed', 1)], else_=0)).label('success'),
             func.sum(func.case([(TaskExecution.status == 'failed', 1)], else_=0)).label('failed'),
             func.avg(TaskExecution.duration).label('avg_duration')
-        ).join(Task).filter(
-            Task.user_id == current_user.id,
+        ).filter(
+            TaskExecution.task_id.in_(user_task_ids),
             TaskExecution.created_at >= start_date
-        ).group_by(func.date(TaskExecution.created_at)).all()
+        ).group_by(func.date(TaskExecution.created_at)).all() if user_task_ids else []
         
-        # 爬虫性能
+        # 获取用户的配置ID列表
+        user_config_ids = [config.id for config in CrawlerConfig.query.filter_by(user_id=current_user.id).all()]
+        
+        # 爬虫性能 - 使用简单字段查询
         crawler_performance = db.session.query(
             func.date(CrawlerResult.created_at).label('date'),
             func.count(CrawlerResult.id).label('total'),
             func.sum(func.case([(CrawlerResult.status == 'success', 1)], else_=0)).label('success'),
             func.avg(CrawlerResult.response_time).label('avg_response_time')
-        ).join(CrawlerConfig).filter(
-            CrawlerConfig.user_id == current_user.id,
-            CrawlerResult.created_at >= start_date
-        ).group_by(func.date(CrawlerResult.created_at)).all()
-        
-        # 内容生成性能
-        content_performance = db.session.query(
-            func.date(GeneratedContent.created_at).label('date'),
-            func.count(GeneratedContent.id).label('total'),
-            func.sum(func.case([(GeneratedContent.status == 'completed', 1)], else_=0)).label('success'),
-            func.avg(GeneratedContent.quality_score).label('avg_quality')
         ).filter(
-            GeneratedContent.user_id == current_user.id,
-            GeneratedContent.created_at >= start_date
-        ).group_by(func.date(GeneratedContent.created_at)).all()
+            CrawlerResult.config_id.in_(user_config_ids),
+            CrawlerResult.created_at >= start_date
+        ).group_by(func.date(CrawlerResult.created_at)).all() if user_config_ids else []
+        
+
         
         # 格式化数据
         task_data = [{
@@ -288,21 +282,12 @@ def get_performance_stats():
             'avg_response_time': float(row.avg_response_time) if row.avg_response_time else 0
         } for row in crawler_performance]
         
-        content_data = [{
-            'date': row.date.isoformat(),
-            'total': row.total,
-            'success': row.success or 0,
-            'success_rate': (row.success or 0) / row.total if row.total > 0 else 0,
-            'avg_quality': float(row.avg_quality) if row.avg_quality else 0
-        } for row in content_performance]
-        
         return jsonify({
             'success': True,
             'message': '获取性能统计成功',
             'data': {
                 'task_performance': task_data,
                 'crawler_performance': crawler_data,
-                'content_performance': content_data,
                 'date_range': {
                     'start': start_date.isoformat(),
                     'end': datetime.utcnow().isoformat(),
@@ -396,13 +381,14 @@ def get_alerts():
         alerts = []
         
         # 检查用户相关的告警
-        # 1. 失败的任务执行
+        # 1. 失败的任务执行 - 使用简单字段查询
         last_hour = datetime.utcnow() - timedelta(hours=1)
-        failed_tasks = TaskExecution.query.join(Task).filter(
-            Task.user_id == current_user.id,
+        user_task_ids = [task.id for task in Task.query.filter_by(user_id=current_user.id).all()]
+        failed_tasks = TaskExecution.query.filter(
+            TaskExecution.task_id.in_(user_task_ids),
             TaskExecution.status == 'failed',
             TaskExecution.created_at >= last_hour
-        ).count()
+        ).count() if user_task_ids else 0
         
         if failed_tasks > 0:
             alerts.append({
@@ -471,6 +457,9 @@ def get_metrics():
                 'message': '用户不存在'
             }), 401
         
+        # 获取用户的任务ID列表
+        user_task_ids = [task.id for task in Task.query.filter_by(user_id=current_user.id).all()]
+        
         # 实时指标
         metrics = {
             'timestamp': datetime.utcnow().isoformat(),
@@ -481,10 +470,10 @@ def get_metrics():
                 'pending_tasks': Task.query.filter_by(
                     user_id=current_user.id, status='pending'
                 ).count(),
-                'total_executions_today': TaskExecution.query.join(Task).filter(
-                    Task.user_id == current_user.id,
+                'total_executions_today': TaskExecution.query.filter(
+                    TaskExecution.task_id.in_(user_task_ids),
                     func.date(TaskExecution.created_at) == datetime.utcnow().date()
-                ).count()
+                ).count() if user_task_ids else 0
             }
         }
         

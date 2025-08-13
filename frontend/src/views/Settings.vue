@@ -120,59 +120,7 @@
         </div>
       </el-tab-pane>
 
-      <!-- 内容生成设置 -->
-      <el-tab-pane label="内容生成" name="content">
-        <div class="settings-section">
-          <h3>AI内容生成配置</h3>
-          <el-form :model="contentSettings" label-width="150px">
-            <el-form-item label="AI模型">
-              <el-select v-model="contentSettings.aiModel" style="width: 200px">
-                <el-option label="GPT-3.5" value="gpt-3.5-turbo"></el-option>
-                <el-option label="GPT-4" value="gpt-4"></el-option>
-                <el-option label="Claude" value="claude-3"></el-option>
-              </el-select>
-            </el-form-item>
-            <el-form-item label="API密钥">
-              <el-input
-                v-model="contentSettings.apiKey"
-                type="password"
-                style="width: 400px"
-                placeholder="请输入API密钥"
-                show-password
-              />
-            </el-form-item>
-            <el-form-item label="最大长度">
-              <el-input-number
-                v-model="contentSettings.maxLength"
-                :min="100"
-                :max="4000"
-                :step="100"
-                style="width: 200px"
-              />
-              <span class="setting-desc">生成内容的最大字符数</span>
-            </el-form-item>
-            <el-form-item label="创意度">
-              <el-slider
-                v-model="contentSettings.temperature"
-                :min="0"
-                :max="1"
-                :step="0.1"
-                style="width: 300px"
-                show-input
-              />
-              <span class="setting-desc">控制生成内容的创意程度</span>
-            </el-form-item>
-            <el-form-item label="质量检查">
-              <el-switch v-model="contentSettings.qualityCheck" />
-              <span class="setting-desc">启用内容质量自动检查</span>
-            </el-form-item>
-            <el-form-item label="自动发布">
-              <el-switch v-model="contentSettings.autoPublish" />
-              <span class="setting-desc">生成后自动发布到博客</span>
-            </el-form-item>
-          </el-form>
-        </div>
-      </el-tab-pane>
+
 
       <!-- 通知设置 -->
       <el-tab-pane label="通知设置" name="notification">
@@ -338,15 +286,7 @@ const crawlerSettings = ref({
   proxyUrl: ''
 })
 
-// 内容生成设置
-const contentSettings = ref({
-  aiModel: 'gpt-3.5-turbo',
-  apiKey: '',
-  maxLength: 2000,
-  temperature: 0.7,
-  qualityCheck: true,
-  autoPublish: false
-})
+
 
 // 通知设置
 const notificationSettings = ref({

@@ -13,8 +13,6 @@ from backend.api import register_blueprints
 from backend.models.user import User
 from backend.models.task import Task, TaskExecution
 from backend.models.crawler import CrawlerConfig, CrawlerResult
-from backend.models.content import ContentTemplate, GeneratedContent
-from backend.models.file import FileRecord
 import logging
 from logging.handlers import RotatingFileHandler
 import os
@@ -237,40 +235,18 @@ def register_cli_commands(app):
         db.session.commit()
         print('管理员用户创建成功: admin/admin123')
     
-    @app.cli.command()
-    def cleanup_files():
-        """清理过期文件"""
-        from backend.models.file import FileRecord
-        from datetime import datetime, timedelta
-        
-        # 清理过期文件
-        now = datetime.utcnow()
-        expired_files = FileRecord.query.filter(
-            FileRecord.expires_at < now,
-            FileRecord.auto_delete == True
-        ).all()
-        
-        cleaned_count = 0
-        for file_record in expired_files:
-            try:
-                file_record.hard_delete()
-                cleaned_count += 1
-            except Exception as e:
-                print(f'清理文件失败 {file_record.id}: {str(e)}')
-        
-        print(f'清理完成，共清理{cleaned_count}个过期文件')
+
     
     @app.cli.command()
     def show_stats():
         """显示系统统计信息"""
+        from datetime import datetime
         print('=== 系统统计信息 ===')
         print(f'用户总数: {User.query.count()}')
         print(f'活跃用户: {User.query.filter_by(is_active=True).count()}')
         print(f'任务总数: {Task.query.count()}')
         print(f'运行中任务: {Task.query.filter_by(status="running").count()}')
         print(f'爬虫配置: {CrawlerConfig.query.count()}')
-        print(f'内容模板: {ContentTemplate.query.count()}')
-        print(f'文件记录: {FileRecord.query.filter_by(status="available").count()}')
         
         # 今日活动
         today = datetime.utcnow().date()

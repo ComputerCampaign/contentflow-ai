@@ -21,8 +21,16 @@ class Task(db.Model):
     # 基本信息
     name = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text)
-    type = db.Column(db.Enum('crawler', 'content_generation', 'full_pipeline', 
-                            name='task_type'), nullable=False)
+    type = db.Column(db.Enum('crawler', 'content_generation', 'combined', name='task_type'), nullable=False)
+    
+    # 爬虫任务字段
+    url = db.Column(db.String(2000))  # 目标URL（爬虫任务必需）
+    
+    # 内容生成任务字段
+    source_task_id = db.Column(db.String(36))  # 源任务ID（内容生成任务引用的爬虫任务）
+    crawler_task_id = db.Column(db.String(36))  # 爬虫任务ID（用于传递给ai_content_generator）
+    
+
     
     # 状态管理
     status = db.Column(db.Enum('pending', 'running', 'completed', 'failed', 
@@ -34,34 +42,27 @@ class Task(db.Model):
     config = db.Column(db.JSON)  # 任务配置
     priority = db.Column(db.Integer, default=5)  # 1-10，数字越大优先级越高
     
-    # 调度信息
-    schedule = db.Column(db.String(100))  # Cron表达式
-    next_run = db.Column(db.DateTime)
+    # 调度信息已移除 - 当前版本不支持定时任务
     last_run = db.Column(db.DateTime)
     
-    # 执行统计
+    # 执行统计简化 - 只保留基本统计
     total_executions = db.Column(db.Integer, default=0)
-    successful_executions = db.Column(db.Integer, default=0)
-    failed_executions = db.Column(db.Integer, default=0)
     
-    # 结果信息
-    result_summary = db.Column(db.JSON)  # 执行结果摘要
-    output_files = db.Column(db.JSON)  # 输出文件列表
+    # 结果信息已移除 - 通过TaskExecution记录详细结果
     
     # 时间戳
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, 
                           onupdate=datetime.utcnow, nullable=False)
     
-    # 外键
-    user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
-    crawler_config_id = db.Column(db.String(36), db.ForeignKey('crawler_configs.id'))
-    content_template_id = db.Column(db.String(36), db.ForeignKey('content_templates.id'))
+    # 关联字段（移除外键约束）
+    user_id = db.Column(db.String(36), nullable=False)  # 用户ID
+    crawler_config_id = db.Column(db.String(36))  # 爬虫配置ID
+    xpath_config_id = db.Column(db.String(36))  # XPath配置ID
+    ai_content_config_id = db.Column(db.String(36))  # AI内容生成配置ID
+
     
-    # 关联关系
-    executions = db.relationship('TaskExecution', backref='task', lazy='dynamic',
-                                cascade='all, delete-orphan', 
-                                order_by='TaskExecution.created_at.desc()')
+    # 移除关联关系 - 使用简化的数据库设计
     
     def __init__(self, name, type, user_id, config=None, **kwargs):
         self.name = name
@@ -111,12 +112,8 @@ class Task(db.Model):
         if success:
             self.status = 'completed'
             self.progress = 100
-            self.successful_executions += 1
-            if result:
-                self.result_summary = result
         else:
             self.status = 'failed'
-            self.failed_executions += 1
         
         db.session.commit()
     
@@ -124,11 +121,58 @@ class Task(db.Model):
         """获取成功率"""
         if self.total_executions == 0:
             return 0
-        return round((self.successful_executions / self.total_executions) * 100, 2)
+        # 通过查询TaskExecution计算成功率
+        from backend.models.task import TaskExecution
+        success_count = TaskExecution.query.filter_by(task_id=self.id, status='success').count()
+        return round((success_count / self.total_executions) * 100, 2)
     
     def get_latest_execution(self):
         """获取最新执行记录"""
-        return self.executions.first()
+        from backend.models.task import TaskExecution
+        return TaskExecution.query.filter_by(task_id=self.id).order_by(TaskExecution.created_at.desc()).first()
+    
+    def get_crawler_params(self):
+        """获取完整的爬虫服务参数"""
+        if self.type != 'crawler':
+            return None
+        
+        params = {
+            'url': self.url,
+            'task-id': self.id
+        }
+        
+        # 从crawler_config获取基础参数
+        if self.crawler_config_id:
+            from backend.models.crawler import CrawlerConfig
+            crawler_config = CrawlerConfig.query.get(self.crawler_config_id)
+            if crawler_config:
+                config_dict = crawler_config.to_dict()
+                # 映射配置字段到命令行参数
+                param_mapping = {
+                    'output': 'output',
+                    'data_dir': 'data-dir',
+                    'use_selenium': 'use-selenium',
+                    'timeout': 'timeout',
+                    'retry': 'retry',
+                    'config': 'config',
+                    'email_notification': 'email-notification',
+                    'headless': 'headless',
+                    'proxy': 'proxy',
+                    'page_load_wait': 'page-load-wait',
+                    'user_agent': 'user-agent',
+                    'enable_xpath': 'enable-xpath'
+                }
+                
+                for config_key, param_key in param_mapping.items():
+                    if config_dict.get(config_key) is not None:
+                        params[param_key] = config_dict[config_key]
+        
+        # 从xpath_config获取rule_ids
+        if self.xpath_config_id:
+            # 简化设计：直接使用xpath_config_id作为rule-ids
+            params['rule-ids'] = str(self.xpath_config_id)
+        
+        return params
     
     def to_dict(self, include_executions=False):
         """转换为字典"""
@@ -137,26 +181,29 @@ class Task(db.Model):
             'name': self.name,
             'description': self.description,
             'type': self.type,
+            'url': self.url,
+
             'status': self.status,
             'progress': self.progress,
             'config': self.config,
             'priority': self.priority,
-            'schedule': self.schedule,
-            'next_run': self.next_run.isoformat() if self.next_run else None,
+
             'last_run': self.last_run.isoformat() if self.last_run else None,
             'total_executions': self.total_executions,
             'success_rate': self.get_success_rate(),
-            'result_summary': self.result_summary,
-            'output_files': self.output_files,
+
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat(),
             'user_id': self.user_id,
             'crawler_config_id': self.crawler_config_id,
-            'content_template_id': self.content_template_id
+            'xpath_config_id': self.xpath_config_id,
+
         }
         
         if include_executions:
-            data['executions'] = [exec.to_dict() for exec in self.executions.limit(10)]
+            from backend.models.task import TaskExecution
+            executions = TaskExecution.query.filter_by(task_id=self.id).order_by(TaskExecution.created_at.desc()).limit(10).all()
+            data['executions'] = [exec.to_dict() for exec in executions]
         
         return data
     
@@ -195,8 +242,8 @@ class TaskExecution(db.Model):
     # 时间戳
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     
-    # 外键
-    task_id = db.Column(db.String(36), db.ForeignKey('tasks.id'), nullable=False)
+    # 关联字段（移除外键约束）
+    task_id = db.Column(db.String(36), nullable=False)  # 任务ID
     
     def __init__(self, task_id, status='running', **kwargs):
         self.task_id = task_id

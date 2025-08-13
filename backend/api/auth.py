@@ -79,46 +79,46 @@ def register():
                 'message': '邮箱格式不正确'
             }), 400
         
-        # 验证密码强度
-        is_valid, message = validate_password(password)
-        if not is_valid:
+        # 验证密码强度（文档要求最少6字符）
+        if len(password) < 6:
             return jsonify({
                 'success': False,
-                'message': message
+                'message': '密码长度至少6位',
+                'error_code': 'VALIDATION_ERROR'
             }), 400
         
         # 检查用户名是否已存在
         if User.query.filter_by(username=username).first():
             return jsonify({
                 'success': False,
-                'message': '用户名已存在'
+                'message': '用户名已存在',
+                'error_code': 'USERNAME_EXISTS'
             }), 409
         
         # 检查邮箱是否已存在
         if User.query.filter_by(email=email).first():
             return jsonify({
                 'success': False,
-                'message': '邮箱已被注册'
+                'message': '邮箱已被注册',
+                'error_code': 'EMAIL_EXISTS'
             }), 409
         
         # 创建新用户
         user = User(
             username=username,
             email=email,
-            role=data.get('role', 'user'),
-            profile=data.get('profile', {})
+            password=password,
+            display_name=data.get('display_name', username),
+            role=data.get('role', 'user')
         )
-        user.set_password(password)
         
         db.session.add(user)
         db.session.commit()
         
         return jsonify({
             'success': True,
-            'message': '注册成功',
-            'data': {
-                'user': user.to_dict()
-            }
+            'message': '用户注册成功',
+            'data': user.to_dict()
         }), 201
         
     except Exception as e:
@@ -164,14 +164,16 @@ def login():
         if not user or not user.check_password(password):
             return jsonify({
                 'success': False,
-                'message': '用户名/邮箱或密码错误'
+                'message': '用户名/邮箱或密码错误',
+                'error_code': 'INVALID_CREDENTIALS'
             }), 401
         
         # 检查账户状态
         if not user.is_active:
             return jsonify({
                 'success': False,
-                'message': '账户已被禁用'
+                'message': '账户已被禁用',
+                'error_code': 'ACCOUNT_DISABLED'
             }), 403
         
         # 更新最后登录时间
@@ -182,7 +184,7 @@ def login():
         access_token, refresh_token = user.generate_tokens()
         
         # 获取过期时间（转换为秒）
-        expires_in = current_app.config.get('JWT_ACCESS_TOKEN_EXPIRES', 3600)
+        expires_in = current_app.config.get('JWT_ACCESS_TOKEN_EXPIRES', 86400)
         if hasattr(expires_in, 'total_seconds'):
             expires_in = int(expires_in.total_seconds())
         
@@ -207,7 +209,7 @@ def login():
 
 
 @auth_bp.route('/refresh', methods=['POST'])
-@jwt_required(refresh=True)
+@jwt_required()
 def refresh():
     """刷新访问令牌"""
     try:
@@ -225,11 +227,11 @@ def refresh():
         
         return jsonify({
             'success': True,
-            'message': '令牌刷新成功',
+            'message': 'Token刷新成功',
             'data': {
                 'access_token': new_token,
                 'token_type': 'Bearer',
-                'expires_in': current_app.config.get('JWT_ACCESS_TOKEN_EXPIRES', 3600)
+                'expires_in': 86400
             }
         }), 200
         
@@ -265,9 +267,9 @@ def logout():
         }), 500
 
 
-@auth_bp.route('/profile', methods=['GET'])
+@auth_bp.route('/me', methods=['GET'])
 @jwt_required()
-def get_profile():
+def get_current_user():
     """获取用户资料"""
     try:
         current_user_id = get_jwt_identity()
@@ -281,10 +283,8 @@ def get_profile():
         
         return jsonify({
             'success': True,
-            'message': '获取用户资料成功',
-            'data': {
-                'user': user.to_dict(include_sensitive=True)
-            }
+            'message': '获取用户信息成功',
+            'data': user.to_dict()
         }), 200
         
     except Exception as e:
@@ -295,9 +295,9 @@ def get_profile():
         }), 500
 
 
-@auth_bp.route('/profile', methods=['PUT'])
+@auth_bp.route('/me', methods=['PUT'])
 @jwt_required()
-def update_profile():
+def update_current_user():
     """更新用户资料"""
     try:
         current_user_id = get_jwt_identity()
@@ -317,21 +317,30 @@ def update_profile():
             }), 400
         
         # 可更新的字段
-        updatable_fields = ['profile']
+        if 'display_name' in data:
+            user.display_name = data['display_name']
         
-        for field in updatable_fields:
-            if field in data:
-                setattr(user, field, data[field])
+        if 'email' in data:
+            # 检查邮箱是否已被其他用户使用
+            existing_user = User.query.filter(
+                User.email == data['email'],
+                User.id != user.id
+            ).first()
+            if existing_user:
+                return jsonify({
+                    'success': False,
+                    'message': '邮箱已被其他用户使用',
+                    'error_code': 'EMAIL_EXISTS'
+                }), 409
+            user.email = data['email']
         
         user.updated_at = datetime.utcnow()
         db.session.commit()
         
         return jsonify({
             'success': True,
-            'message': '用户资料更新成功',
-            'data': {
-                'user': user.to_dict()
-            }
+            'message': '用户信息更新成功',
+            'data': user.to_dict()
         }), 200
         
     except Exception as e:
@@ -343,9 +352,8 @@ def update_profile():
         }), 500
 
 
-@auth_bp.route('/change-password', methods=['POST'])
+@auth_bp.route('/password', methods=['PUT'])
 @jwt_required()
-@limiter.limit("3 per minute")
 def change_password():
     """修改密码"""
     try:
@@ -365,28 +373,30 @@ def change_password():
                 'message': '请求数据不能为空'
             }), 400
         
-        old_password = data.get('old_password', '')
+        current_password = data.get('current_password', '')
         new_password = data.get('new_password', '')
         
-        if not all([old_password, new_password]):
+        if not all([current_password, new_password]):
             return jsonify({
                 'success': False,
-                'message': '旧密码和新密码不能为空'
+                'message': '当前密码和新密码不能为空',
+                'error_code': 'VALIDATION_ERROR'
             }), 400
         
-        # 验证旧密码
-        if not user.check_password(old_password):
+        # 验证当前密码
+        if not user.check_password(current_password):
             return jsonify({
                 'success': False,
-                'message': '旧密码错误'
+                'message': '当前密码错误',
+                'error_code': 'INVALID_CURRENT_PASSWORD'
             }), 401
         
-        # 验证新密码强度
-        is_valid, message = validate_password(new_password)
-        if not is_valid:
+        # 验证新密码强度（文档要求最少6字符）
+        if len(new_password) < 6:
             return jsonify({
                 'success': False,
-                'message': message
+                'message': '新密码长度至少6位',
+                'error_code': 'VALIDATION_ERROR'
             }), 400
         
         # 更新密码

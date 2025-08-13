@@ -27,7 +27,14 @@ export const useUserStore = defineStore('user', () => {
     try {
       loading.value = true
       const response = await authAPI.login(loginData)
+      
+      // 后端返回的数据结构：{success: true, data: {access_token, user, ...}}
+      // request.js会将data.data作为response.data返回
       const { access_token, user } = response.data
+      
+      if (!access_token || !user) {
+        throw new Error('登录响应数据格式错误')
+      }
       
       token.value = access_token
       userInfo.value = {
@@ -42,10 +49,11 @@ export const useUserStore = defineStore('user', () => {
       // 保存token到cookie
       Cookies.set('token', access_token, { expires: 7 })
       
-      ElMessage.success('登录成功')
+      // 不在这里显示成功消息，让Login.vue组件处理
       return true
     } catch (error) {
-      ElMessage.error(error.response?.data?.message || '登录失败')
+      console.error('登录失败详情:', error)
+      ElMessage.error(error.response?.data?.message || error.message || '登录失败')
       return false
     } finally {
       loading.value = false

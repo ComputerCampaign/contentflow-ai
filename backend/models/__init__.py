@@ -7,16 +7,7 @@
 from backend.models.user import User
 from backend.models.task import Task, TaskExecution
 from backend.models.crawler import CrawlerConfig, CrawlerResult
-from backend.models.content import ContentTemplate, GeneratedContent
-from backend.models.file import FileRecord
+from backend.models.xpath import XPathConfig
+from backend.models.ai_content import AIContentConfig
 
-__all__ = [
-    'User',
-    'Task',
-    'TaskExecution', 
-    'CrawlerConfig',
-    'CrawlerResult',
-    'ContentTemplate',
-    'GeneratedContent',
-    'FileRecord'
-]
+__all__ = ['User', 'Task', 'TaskExecution', 'CrawlerConfig', 'CrawlerResult', 'XPathConfig', 'AIContentConfig']

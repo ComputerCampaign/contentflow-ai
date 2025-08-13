@@ -49,15 +49,7 @@
         </div>
       </div>
 
-      <!-- 内容生成统计 -->
-      <div class="chart-card">
-        <div class="card-header">
-          <h3>内容生成统计</h3>
-        </div>
-        <div class="chart-container">
-          <canvas ref="contentStatsChart"></canvas>
-        </div>
-      </div>
+
 
       <!-- 系统资源监控 -->
       <div class="chart-card">
@@ -220,14 +212,7 @@ const recentActivities = ref([
     time: new Date(),
     status: 'success'
   },
-  {
-    id: 2,
-    type: 'content',
-    title: 'AI 内容生成',
-    description: '基于采集内容生成了 23 篇原创文章',
-    time: new Date(Date.now() - 1800000),
-    status: 'success'
-  },
+
   {
     id: 3,
     type: 'system',
@@ -254,12 +239,7 @@ const quickActions = ref([
     description: '快速创建新的爬虫任务',
     icon: 'fas fa-plus-circle'
   },
-  {
-    name: 'generate-content',
-    title: '生成内容',
-    description: '使用 AI 生成原创内容',
-    icon: 'fas fa-magic'
-  },
+
   {
     name: 'view-logs',
     title: '查看日志',
@@ -277,7 +257,6 @@ const quickActions = ref([
 // Chart 实例
 const taskTrendChart = ref(null)
 const crawlerStatusChart = ref(null)
-const contentStatsChart = ref(null)
 const resourceChart = ref(null)
 
 let charts = {}
@@ -296,7 +275,6 @@ const getResourceColor = (percentage) => {
 const getActivityIcon = (type) => {
   const icons = {
     task: 'fas fa-tasks',
-    content: 'fas fa-file-alt',
     system: 'fas fa-cog',
     error: 'fas fa-exclamation-triangle'
   }
@@ -326,9 +304,6 @@ const handleQuickAction = (action) => {
   switch (action.name) {
     case 'new-task':
       router.push('/tasks')
-      break
-    case 'generate-content':
-      router.push('/content')
       break
     case 'view-logs':
       router.push('/monitoring')
@@ -412,40 +387,7 @@ const initCharts = async () => {
     })
   }
   
-  // 内容生成统计图
-  if (contentStatsChart.value) {
-    charts.contentStats = new Chart(contentStatsChart.value, {
-      type: 'bar',
-      data: {
-        labels: ['文章', '新闻', '博客', '评论', '摘要'],
-        datasets: [{
-          label: '生成数量',
-          data: [45, 32, 28, 67, 23],
-          backgroundColor: [
-            '#667eea',
-            '#764ba2',
-            '#f093fb',
-            '#f5576c',
-            '#4facfe'
-          ]
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            display: false
-          }
-        },
-        scales: {
-          y: {
-            beginAtZero: true
-          }
-        }
-      }
-    })
-  }
+
   
   // 系统资源监控图
   if (resourceChart.value) {
