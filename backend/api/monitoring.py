@@ -86,8 +86,8 @@ def get_overview_stats():
         
         # 用户统计
         user_stats = {
-            'total_tasks': Task.query.filter_by(user_id=current_user.id).count(),
-            'running_tasks': Task.query.filter_by(user_id=current_user.id, status='running').count(),
+            'total_tasks': Task.query.filter_by(user_id=current_user.id, is_deleted=False).count(),
+            'running_tasks': Task.query.filter_by(user_id=current_user.id, status='running', is_deleted=False).count(),
             'total_configs': CrawlerConfig.query.filter_by(user_id=current_user.id).count()
         }
         
@@ -95,7 +95,7 @@ def get_overview_stats():
         last_24h = datetime.utcnow() - timedelta(hours=24)
         
         # 获取用户的任务ID列表
-        user_task_ids = [task.id for task in Task.query.filter_by(user_id=current_user.id).all()]
+        user_task_ids = [task.id for task in Task.query.filter_by(user_id=current_user.id, is_deleted=False).all()]
         # 获取用户的配置ID列表
         user_config_ids = [config.id for config in CrawlerConfig.query.filter_by(user_id=current_user.id).all()]
         
@@ -234,7 +234,7 @@ def get_performance_stats():
         start_date = datetime.utcnow() - timedelta(days=days)
         
         # 获取用户的任务ID列表
-        user_task_ids = [task.id for task in Task.query.filter_by(user_id=current_user.id).all()]
+        user_task_ids = [task.id for task in Task.query.filter_by(user_id=current_user.id, is_deleted=False).all()]
         
         # 任务执行性能 - 使用简单字段查询
         task_performance = db.session.query(
@@ -383,7 +383,7 @@ def get_alerts():
         # 检查用户相关的告警
         # 1. 失败的任务执行 - 使用简单字段查询
         last_hour = datetime.utcnow() - timedelta(hours=1)
-        user_task_ids = [task.id for task in Task.query.filter_by(user_id=current_user.id).all()]
+        user_task_ids = [task.id for task in Task.query.filter_by(user_id=current_user.id, is_deleted=False).all()]
         failed_tasks = TaskExecution.query.filter(
             TaskExecution.task_id.in_(user_task_ids),
             TaskExecution.status == 'failed',
@@ -402,6 +402,7 @@ def get_alerts():
         long_running_tasks = Task.query.filter(
             Task.user_id == current_user.id,
             Task.status == 'running',
+            Task.is_deleted == False,
             Task.updated_at < datetime.utcnow() - timedelta(hours=2)
         ).count()
         
@@ -458,17 +459,17 @@ def get_metrics():
             }), 401
         
         # 获取用户的任务ID列表
-        user_task_ids = [task.id for task in Task.query.filter_by(user_id=current_user.id).all()]
+        user_task_ids = [task.id for task in Task.query.filter_by(user_id=current_user.id, is_deleted=False).all()]
         
         # 实时指标
         metrics = {
             'timestamp': datetime.utcnow().isoformat(),
             'user_metrics': {
                 'active_tasks': Task.query.filter_by(
-                    user_id=current_user.id, status='running'
+                    user_id=current_user.id, status='running', is_deleted=False
                 ).count(),
                 'pending_tasks': Task.query.filter_by(
-                    user_id=current_user.id, status='pending'
+                    user_id=current_user.id, status='pending', is_deleted=False
                 ).count(),
                 'total_executions_today': TaskExecution.query.filter(
                     TaskExecution.task_id.in_(user_task_ids),

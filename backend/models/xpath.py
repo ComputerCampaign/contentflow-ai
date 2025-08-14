@@ -37,6 +37,7 @@ class XPathConfig(db.Model):
     # 状态信息
     status = db.Column(db.Enum('active', 'inactive', 'testing', name='xpath_status'), 
                       default='active', nullable=False)
+    enabled = db.Column(db.Boolean, default=True)  # 是否启用
     is_public = db.Column(db.Boolean, default=False)  # 是否公开配置
     
     # 统计信息
@@ -48,7 +49,7 @@ class XPathConfig(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, 
                           onupdate=datetime.utcnow, nullable=False)
     
-    # 关联字段（移除外键约束）
+    # 关联信息
     user_id = db.Column(db.String(36), nullable=False)  # 用户ID
     
     def __init__(self, rule_id, name, domain_patterns, xpath, rule_type, field_name, user_id, **kwargs):
@@ -120,6 +121,7 @@ class XPathConfig(db.Model):
             'field_name': self.field_name,
             'comment_xpath': self.comment_xpath,
             'status': self.status,
+            'enabled': self.enabled,
             'is_public': self.is_public,
             'usage_count': self.usage_count,
             'last_used_at': self.last_used_at.isoformat() if self.last_used_at else None,

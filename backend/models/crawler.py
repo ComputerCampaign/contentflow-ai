@@ -68,6 +68,9 @@ class CrawlerConfig(db.Model):
     
     # --list-rules: 列出所有可用的XPath规则（这是一个动作参数，不需要存储）
     
+    # 启用/禁用状态字段
+    enabled = db.Column(db.Boolean, default=True)  # 配置是否启用
+    
     # 时间戳字段保留
     
     # 时间戳
@@ -75,7 +78,7 @@ class CrawlerConfig(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, 
                           onupdate=datetime.utcnow, nullable=False)
     
-    # 关联字段（移除外键约束）
+    # 关联信息
     user_id = db.Column(db.String(36), nullable=False)  # 用户ID
     
     # 移除关联关系 - 使用简化的数据库设计
@@ -142,6 +145,8 @@ class CrawlerConfig(db.Model):
             # XPath配置
             'rule_ids': self.rule_ids,
             'enable_xpath': self.enable_xpath,
+            # 启用状态
+            'enabled': self.enabled,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'user_id': self.user_id

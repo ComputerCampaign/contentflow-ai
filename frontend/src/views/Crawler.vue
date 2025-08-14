@@ -7,7 +7,7 @@
         <p>配置和管理爬虫规则</p>
       </div>
       <div class="header-right">
-        <el-button type="primary" @click="showCreateDialog = true">
+        <el-button type="primary" @click="openCreateDialog">
           <i class="fas fa-plus"></i>
           新建配置
         </el-button>
@@ -60,9 +60,9 @@
             <i class="fas fa-edit"></i>
             编辑
           </el-button>
-          <el-button size="small" @click="testConfig(config)">
-            <i class="fas fa-play"></i>
-            测试
+          <el-button size="small" type="info" @click="generateCommand(config)">
+            <i class="fas fa-terminal"></i>
+            生成命令
           </el-button>
           <el-button size="small" type="danger" @click="deleteConfig(config)">
             <i class="fas fa-trash"></i>
@@ -173,8 +173,27 @@
           <el-switch v-model="createForm.enable_xpath" />
         </el-form-item>
         <el-form-item label="规则ID列表">
-          <el-input v-model="createForm.rule_ids" placeholder="用逗号分隔的规则ID，如：reddit_media,reddit_comments" />
-          <div style="font-size: 12px; color: #999; margin-top: 4px;">指定要使用的XPath规则ID，用逗号分隔</div>
+          <el-select
+            v-model="createForm.rule_ids"
+            multiple
+            filterable
+            placeholder="请选择要使用的XPath规则"
+            style="width: 100%"
+            :loading="loadingXPathRules"
+          >
+            <el-option
+              v-for="rule in enabledXPathRules"
+              :key="rule.rule_id"
+              :label="`${rule.name} (${rule.rule_id})`"
+              :value="rule.rule_id"
+            >
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span>{{ rule.name }}</span>
+                <span style="color: #999; font-size: 12px;">{{ rule.rule_id }}</span>
+              </div>
+            </el-option>
+          </el-select>
+          <div style="font-size: 12px; color: #999; margin-top: 4px;">选择要使用的XPath规则，支持多选和搜索</div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -269,7 +288,7 @@
         <el-row :gutter="20">
           <el-col :span="8">
             <el-form-item label="无头模式">
-              <el-switch v-model="editForm.selenium_headless" />
+              <el-switch v-model="editForm.headless" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
@@ -307,8 +326,27 @@
           <el-switch v-model="editForm.enable_xpath" />
         </el-form-item>
         <el-form-item label="规则ID列表">
-          <el-input v-model="editForm.rule_ids" placeholder="用逗号分隔的规则ID，如：reddit_media,reddit_comments" />
-          <div style="font-size: 12px; color: #999; margin-top: 4px;">指定要使用的XPath规则ID，用逗号分隔</div>
+          <el-select
+            v-model="editForm.rule_ids"
+            multiple
+            filterable
+            placeholder="请选择要使用的XPath规则"
+            style="width: 100%"
+            :loading="loadingXPathRules"
+          >
+            <el-option
+              v-for="rule in enabledXPathRules"
+              :key="rule.rule_id"
+              :label="`${rule.name} (${rule.rule_id})`"
+              :value="rule.rule_id"
+            >
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span>{{ rule.name }}</span>
+                <span style="color: #999; font-size: 12px;">{{ rule.rule_id }}</span>
+              </div>
+            </el-option>
+          </el-select>
+          <div style="font-size: 12px; color: #999; margin-top: 4px;">选择要使用的XPath规则，支持多选和搜索</div>
         </el-form-item>
         <el-row :gutter="20">
           <el-col :span="12">
@@ -342,8 +380,62 @@
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="showEditDialog = false">取消</el-button>
+          <el-button type="info" @click="generateCommandFromEdit">
+            <i class="fas fa-terminal"></i>
+            生成命令
+          </el-button>
           <el-button type="primary" @click="updateConfig" :loading="updating">
             更新配置
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 命令生成对话框 -->
+    <el-dialog
+      v-model="showCommandDialog"
+      title="生成爬虫命令"
+      width="800px"
+      :close-on-click-modal="false"
+    >
+      <div class="command-generator">
+        <el-form :model="commandForm" label-width="100px">
+          <el-form-item label="目标URL" required>
+            <el-input
+              v-model="commandForm.url"
+              placeholder="请输入要爬取的网站URL"
+              maxlength="500"
+            />
+          </el-form-item>
+        </el-form>
+        
+        <div v-if="generatedCommand" class="command-result">
+          <h4>生成的命令：</h4>
+          <div class="command-display">
+            <pre>{{ generatedCommand }}</pre>
+            <el-button
+              type="primary"
+              size="small"
+              @click="copyCommand"
+              class="copy-btn"
+            >
+              <i class="fas fa-copy"></i>
+              复制命令
+            </el-button>
+          </div>
+        </div>
+      </div>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="showCommandDialog = false">关闭</el-button>
+          <el-button
+            type="primary"
+            @click="generateCommandAction"
+            :loading="generatingCommand"
+            :disabled="!commandForm.url"
+          >
+            生成命令
           </el-button>
         </div>
       </template>
@@ -356,14 +448,21 @@ import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import dayjs from 'dayjs'
 import { crawlerAPI } from '@/api/crawler'
+import { xpathAPI } from '@/api/xpath'
 
 const showCreateDialog = ref(false)
 const showEditDialog = ref(false)
+const showCommandDialog = ref(false)
 const createFormRef = ref(null)
 const editFormRef = ref(null)
 const loading = ref(false)
 const creating = ref(false)
 const updating = ref(false)
+const loadingXPathRules = ref(false)
+const enabledXPathRules = ref([])
+const generatingCommand = ref(false)
+const generatedCommand = ref('')
+const currentConfig = ref(null)
 
 const createForm = ref({
   name: '',
@@ -386,6 +485,8 @@ const createForm = ref({
   selenium_page_load_timeout: 30,
   selenium_implicit_wait: 10,
   // XPath配置
+  enable_xpath: false,
+  rule_ids: [],
   xpath_rules_path: 'crawler/config/xpath/xpath_rules.json',
   xpath_default_rule_id: 'general_article',
   // 脚本配置
@@ -396,6 +497,9 @@ const createForm = ref({
 
 const editForm = ref({})
 const configs = ref([])
+const commandForm = ref({
+  url: ''
+})
 
 // 验证配置名称唯一性
 const validateConfigNameUnique = async (rule, value, callback) => {
@@ -444,6 +548,20 @@ const fetchConfigs = async () => {
   }
 }
 
+// 获取启用状态的XPath规则
+const fetchEnabledXPathRules = async () => {
+  try {
+    loadingXPathRules.value = true
+    const response = await xpathAPI.getRules({ enabled: 'true' })
+    enabledXPathRules.value = response.data.rules || response.data || []
+  } catch (error) {
+    console.error('获取XPath规则失败:', error)
+    ElMessage.error('获取XPath规则失败: ' + (error.response?.data?.message || error.message))
+  } finally {
+    loadingXPathRules.value = false
+  }
+}
+
 // 格式化时间
 const formatTime = (time) => {
   if (!time) return '-'
@@ -461,21 +579,22 @@ const toggleConfig = async (config) => {
   }
 }
 
+// 打开新建对话框
+const openCreateDialog = () => {
+  fetchEnabledXPathRules()
+  showCreateDialog.value = true
+}
+
 // 编辑配置
 const editConfig = (config) => {
   editForm.value = { ...config }
-  showEditDialog.value = true
-}
-
-// 测试配置
-const testConfig = async (config) => {
-  try {
-    ElMessage.info('正在测试配置...')
-    await crawlerAPI.testConfig(config.id)
-    ElMessage.success(`配置 "${config.name}" 测试成功`)
-  } catch (error) {
-    ElMessage.error('配置测试失败: ' + error.message)
+  // 处理rule_ids字段：如果是字符串，转换为数组
+  if (typeof editForm.value.rule_ids === 'string') {
+    editForm.value.rule_ids = editForm.value.rule_ids ? editForm.value.rule_ids.split(',').map(id => id.trim()) : []
   }
+  // 获取最新的启用XPath规则列表
+  fetchEnabledXPathRules()
+  showEditDialog.value = true
 }
 
 // 删除配置
@@ -532,7 +651,7 @@ const createConfig = async () => {
       proxy: createForm.value.proxy,
       page_load_wait: createForm.value.page_load_wait,
       user_agent: createForm.value.user_agent,
-      rule_ids: createForm.value.rule_ids,
+      rule_ids: Array.isArray(createForm.value.rule_ids) ? createForm.value.rule_ids.join(',') : createForm.value.rule_ids,
       enable_xpath: createForm.value.enable_xpath
     }
     
@@ -559,7 +678,12 @@ const createConfig = async () => {
 const updateConfig = async () => {
   try {
     updating.value = true
-    const response = await crawlerAPI.updateConfig(editForm.value.id, editForm.value)
+    // 处理rule_ids：如果是数组，转换为字符串
+    const updateData = { ...editForm.value }
+    if (Array.isArray(updateData.rule_ids)) {
+      updateData.rule_ids = updateData.rule_ids.join(',')
+    }
+    const response = await crawlerAPI.updateConfig(editForm.value.id, updateData)
     const index = configs.value.findIndex(c => c.id === editForm.value.id)
     if (index > -1) {
       // 后端返回的数据结构: {config: {...}}
@@ -572,6 +696,64 @@ const updateConfig = async () => {
     ElMessage.error('更新配置失败: ' + (error.response?.data?.message || error.message))
   } finally {
     updating.value = false
+  }
+}
+
+// 生成命令（从配置卡片）
+const generateCommand = (config) => {
+  currentConfig.value = config
+  commandForm.value.url = 'https://example.com' // 使用默认URL
+  generatedCommand.value = ''
+  showCommandDialog.value = true
+  // 自动生成命令
+  generateCommandAction()
+}
+
+// 生成命令（从编辑对话框）
+const generateCommandFromEdit = () => {
+  currentConfig.value = editForm.value
+  commandForm.value.url = 'https://example.com' // 使用默认URL
+  generatedCommand.value = ''
+  showCommandDialog.value = true
+  // 自动生成命令
+  generateCommandAction()
+}
+
+// 执行命令生成
+const generateCommandAction = async () => {
+  if (!commandForm.value.url || !currentConfig.value) {
+    ElMessage.error('请输入URL')
+    return
+  }
+  
+  try {
+    generatingCommand.value = true
+    // 直接在URL中拼接查询参数，避免axios参数序列化问题
+    const url = `/crawler/configs/${currentConfig.value.id}/command?url=${encodeURIComponent(commandForm.value.url)}`
+    const response = await crawlerAPI.getCommandDirect(url)
+    generatedCommand.value = response.data.command
+    ElMessage.success('命令生成成功')
+  } catch (error) {
+    ElMessage.error('生成命令失败: ' + (error.response?.data?.message || error.message))
+  } finally {
+    generatingCommand.value = false
+  }
+}
+
+// 复制命令到剪贴板
+const copyCommand = async () => {
+  try {
+    await navigator.clipboard.writeText(generatedCommand.value)
+    ElMessage.success('命令已复制到剪贴板')
+  } catch (error) {
+    // 降级方案：创建临时文本区域
+    const textArea = document.createElement('textarea')
+    textArea.value = generatedCommand.value
+    document.body.appendChild(textArea)
+    textArea.select()
+    document.execCommand('copy')
+    document.body.removeChild(textArea)
+    ElMessage.success('命令已复制到剪贴板')
   }
 }
 
@@ -604,6 +786,7 @@ const resetCreateForm = () => {
 // 组件挂载时获取数据
 onMounted(() => {
   fetchConfigs()
+  fetchEnabledXPathRules()
 })
 </script>
 
@@ -694,6 +877,44 @@ onMounted(() => {
   .config-actions {
     display: flex;
     gap: 8px;
+  }
+}
+
+// 命令生成对话框样式
+.command-generator {
+  .command-result {
+    margin-top: 20px;
+    
+    h4 {
+      margin: 0 0 12px 0;
+      color: var(--text-primary);
+      font-size: 14px;
+      font-weight: 600;
+    }
+    
+    .command-display {
+      position: relative;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 16px;
+      
+      pre {
+        margin: 0;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--text-primary);
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+      
+      .copy-btn {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+      }
+    }
   }
 }
 </style>

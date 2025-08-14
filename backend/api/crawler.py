@@ -176,6 +176,7 @@ def get_crawler_configs():
         search = request.args.get('search', '').strip()
         use_selenium = request.args.get('use_selenium')
         enable_xpath = request.args.get('enable_xpath')
+        enabled = request.args.get('enabled')
         
         # 构建查询
         query = CrawlerConfig.query.filter_by(user_id=current_user.id)
@@ -197,6 +198,10 @@ def get_crawler_configs():
         if enable_xpath is not None:
             enable_xpath_bool = enable_xpath.lower() == 'true'
             query = query.filter(CrawlerConfig.enable_xpath == enable_xpath_bool)
+        
+        if enabled is not None:
+            enabled_bool = enabled.lower() == 'true'
+            query = query.filter(CrawlerConfig.enabled == enabled_bool)
         
         # 排序和分页
         query = query.order_by(CrawlerConfig.created_at.desc())
@@ -257,11 +262,9 @@ def get_crawler_config(config_id):
         
         return jsonify({
             'success': True,
-            'message': '获取爬虫配置详情成功',
-            'data': {
-                'config': config.to_dict(include_stats=True),
-                'recent_results': [result.to_dict() for result in recent_results]
-            }
+            'message': '获取配置成功',
+            'data': config.to_dict(include_results=True),
+            'recent_results': [result.to_dict() for result in recent_results]
         }), 200
         
     except Exception as e:
@@ -330,7 +333,8 @@ def update_crawler_config(config_id):
         updatable_fields = [
             'name', 'description', 'output', 'data_dir', 'use_selenium',
             'timeout', 'retry', 'config', 'email_notification', 'headless',
-            'proxy', 'page_load_wait', 'user_agent', 'rule_ids', 'enable_xpath'
+            'proxy', 'page_load_wait', 'user_agent', 'rule_ids', 'enable_xpath',
+            'enabled'
         ]
         
         for field in updatable_fields:
@@ -360,7 +364,7 @@ def update_crawler_config(config_id):
 @crawler_bp.route('/configs/<config_id>', methods=['DELETE'])
 @jwt_required()
 def delete_crawler_config(config_id):
-    """删除爬虫配置"""
+    """逻辑删除爬虫配置"""
     try:
         current_user = get_current_user()
         if not current_user:
@@ -378,14 +382,11 @@ def delete_crawler_config(config_id):
                 'message': '爬虫配置不存在'
             }), 404
         
-        # 配置状态检查已移除（status字段不存在）
-        
         # 删除相关的爬取结果
         CrawlerResult.query.filter_by(config_id=config_id).delete()
         
         # 删除配置
         db.session.delete(config)
-        db.session.commit()
         
         return jsonify({
             'success': True,
@@ -403,7 +404,7 @@ def delete_crawler_config(config_id):
 
 def generate_crawler_command(config_data, url):
     """生成爬虫命令"""
-    command_parts = ['python', 'crawler.py']
+    command_parts = ['uv', 'run', 'python', '-m', 'crawler.crawler']
     
     # 添加基本参数
     command_parts.extend(['--url', url])
@@ -414,8 +415,9 @@ def generate_crawler_command(config_data, url):
     if config_data.get('data_dir'):
         command_parts.extend(['--data-dir', config_data['data_dir']])
     
-    if config_data.get('use_selenium'):
-        command_parts.append('--selenium')
+    # 处理selenium参数，根据数据库值映射
+    selenium_value = config_data.get('use_selenium', False)
+    command_parts.extend(['--use-selenium', str(selenium_value).lower()])
     
     if config_data.get('timeout'):
         command_parts.extend(['--timeout', str(config_data['timeout'])])
@@ -426,8 +428,9 @@ def generate_crawler_command(config_data, url):
     if config_data.get('config'):
         command_parts.extend(['--config', config_data['config']])
     
-    if config_data.get('headless', True):
-        command_parts.append('--headless')
+    # 处理headless参数，根据数据库值映射
+    headless_value = config_data.get('headless', True)
+    command_parts.extend(['--headless', str(headless_value).lower()])
     
     if config_data.get('proxy'):
         command_parts.extend(['--proxy', config_data['proxy']])
@@ -438,17 +441,77 @@ def generate_crawler_command(config_data, url):
     if config_data.get('user_agent'):
         command_parts.extend(['--user-agent', config_data['user_agent']])
     
+    # 验证并过滤有效的rule_ids
     if config_data.get('rule_ids'):
-        command_parts.extend(['--rules', config_data['rule_ids']])
+        valid_rule_ids = config_data['rule_ids']
+        try:
+            from backend.models.xpath import XPathConfig
+            # 获取当前存在且启用的规则ID列表
+            rule_id_list = [rid.strip() for rid in config_data['rule_ids'].split(',') if rid.strip()]
+            existing_rules = XPathConfig.query.filter(
+            XPathConfig.rule_id.in_(rule_id_list),
+            XPathConfig.enabled == True,
+            XPathConfig.status == 'active'
+        ).all()
+            existing_rule_ids = [rule.rule_id for rule in existing_rules]
+            
+            if existing_rule_ids:
+                valid_rule_ids = ','.join(existing_rule_ids)
+                
+                # 如果有规则被删除，记录警告
+                if len(existing_rule_ids) != len(rule_id_list):
+                    removed_rules = set(rule_id_list) - set(existing_rule_ids)
+                    current_app.logger.warning(f"配置中的部分XPath规则已被删除: {removed_rules}")
+            else:
+                current_app.logger.warning("配置中的所有XPath规则都已被删除或禁用")
+                # 如果所有规则都被删除，使用原始配置以保持向后兼容
+                valid_rule_ids = config_data['rule_ids']
+                
+            command_parts.extend(['--rules', valid_rule_ids])
+        except Exception as e:
+            current_app.logger.error(f"验证XPath规则时出错: {str(e)}")
+            # 如果验证失败，使用原始配置
+            command_parts.extend(['--rules', config_data['rule_ids']])
     
-    if config_data.get('enable_xpath'):
-        command_parts.append('--xpath')
+    # 处理enable_xpath参数，根据数据库值映射
+    xpath_value = config_data.get('enable_xpath', False)
+    command_parts.extend(['--enable_xpath', str(xpath_value).lower()])
     
     return ' '.join(command_parts)
 
 
 def generate_crawler_command_from_config(config, url):
     """从配置对象生成爬虫命令"""
+    # 验证并过滤有效的rule_ids
+    valid_rule_ids = config.rule_ids
+    if config.rule_ids:
+        try:
+            from backend.models.xpath import XPathConfig
+            # 获取当前存在且启用的规则ID列表
+            rule_id_list = [rid.strip() for rid in config.rule_ids.split(',') if rid.strip()]
+            existing_rules = XPathConfig.query.filter(
+            XPathConfig.rule_id.in_(rule_id_list),
+            XPathConfig.enabled == True,
+            XPathConfig.status == 'active'
+        ).all()
+            existing_rule_ids = [rule.rule_id for rule in existing_rules]
+            
+            if existing_rule_ids:
+                valid_rule_ids = ','.join(existing_rule_ids)
+                
+                # 如果有规则被删除，记录警告
+                if len(existing_rule_ids) != len(rule_id_list):
+                    removed_rules = set(rule_id_list) - set(existing_rule_ids)
+                    current_app.logger.warning(f"配置中的部分XPath规则已被删除: {removed_rules}")
+            else:
+                current_app.logger.warning("配置中的所有XPath规则都已被删除或禁用")
+                # 如果所有规则都被删除，使用原始配置以保持向后兼容
+                valid_rule_ids = config.rule_ids
+        except Exception as e:
+            current_app.logger.error(f"验证XPath规则时出错: {str(e)}")
+            # 如果验证失败，使用原始配置
+            pass
+    
     config_data = {
         'output': config.output,
         'data_dir': config.data_dir,
@@ -460,7 +523,7 @@ def generate_crawler_command_from_config(config, url):
         'proxy': config.proxy,
         'page_load_wait': config.page_load_wait,
         'user_agent': config.user_agent,
-        'rule_ids': config.rule_ids,
+        'rule_ids': valid_rule_ids,
         'enable_xpath': config.enable_xpath
     }
     return generate_crawler_command(config_data, url)
@@ -532,7 +595,7 @@ def validate_config():
         }), 500
 
 
-@crawler_bp.route('/configs/<int:config_id>/command', methods=['GET'])
+@crawler_bp.route('/configs/<config_id>/command', methods=['GET'])
 @jwt_required()
 @limiter.limit("60 per minute")
 def get_crawler_command(config_id):
@@ -566,12 +629,22 @@ def get_crawler_command(config_id):
                 'error_code': 'VALIDATION_ERROR'
             }), 400
         
-        if not is_valid_url(url):
+        # 记录原始URL参数用于调试
+        current_app.logger.info(f"原始URL参数: '{url}', 类型: {type(url)}")
+        
+        # 清理URL参数，去除空格和反引号
+        cleaned_url = url.strip().strip('`')
+        current_app.logger.info(f"清理后URL参数: '{cleaned_url}'")
+        
+        if not is_valid_url(cleaned_url):
+            current_app.logger.error(f"URL验证失败: '{cleaned_url}'")
             return jsonify({
                 'success': False,
-                'message': '无效的URL格式',
+                'message': f'无效的URL格式: {cleaned_url}',
                 'error_code': 'VALIDATION_ERROR'
             }), 400
+        
+        url = cleaned_url
         
         # 生成命令
         command = generate_crawler_command_from_config(config, url)

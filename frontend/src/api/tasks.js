@@ -110,6 +110,11 @@ export const tasksAPI = {
   // 删除任务模板
   deleteTaskTemplate(templateId) {
     return request.delete(`/tasks/templates/${templateId}`)
+  },
+
+  // 获取任务执行命令
+  getTaskCommand(taskId) {
+    return request.get(`/tasks/${taskId}/command`)
   }
 }
 

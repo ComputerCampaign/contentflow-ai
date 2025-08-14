@@ -10,7 +10,7 @@
         <p class="page-subtitle">管理和监控您的爬虫任务</p>
       </div>
       <div class="header-right">
-        <el-button type="primary" @click="showCreateDialog = true">
+        <el-button type="primary" @click="openCreateDialog">
           <i class="fas fa-plus"></i>
           创建任务
         </el-button>
@@ -127,50 +127,14 @@
                 <i class="fas fa-copy"></i>
                 克隆
               </el-button>
-              <el-dropdown @command="handleTaskAction" trigger="click" @click.stop>
-                <el-button size="small">
-                  更多
-                  <i class="fas fa-chevron-down"></i>
-                </el-button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item 
-                      v-if="task.status === 'paused'"
-                      :command="{action: 'resume', task}"
-                    >
-                      <i class="fas fa-play"></i>
-                      继续
-                    </el-dropdown-item>
-                    <el-dropdown-item 
-                      v-if="task.status === 'running'"
-                      :command="{action: 'pause', task}"
-                    >
-                      <i class="fas fa-pause"></i>
-                      暂停
-                    </el-dropdown-item>
-                    <el-dropdown-item 
-                      v-if="task.status === 'failed'"
-                      :command="{action: 'retry', task}"
-                    >
-                      <i class="fas fa-redo"></i>
-                      重试
-                    </el-dropdown-item>
-                    <el-dropdown-item 
-                      :command="{action: 'logs', task}"
-                    >
-                      <i class="fas fa-file-alt"></i>
-                      查看日志
-                    </el-dropdown-item>
-                    <el-dropdown-item 
-                      :command="{action: 'delete', task}"
-                      divided
-                    >
-                      <i class="fas fa-trash"></i>
-                      删除
-                    </el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
+              <el-button 
+                size="small" 
+                type="danger" 
+                @click.stop="deleteTask(task)"
+              >
+                <i class="fas fa-trash"></i>
+                删除
+              </el-button>
             </div>
           </div>
         </div>
@@ -193,7 +157,7 @@
     <!-- 创建任务对话框 -->
     <el-dialog
       v-model="showCreateDialog"
-      title="创建任务"
+      :title="isEditMode ? '编辑任务' : '创建任务'"
       width="600px"
       :close-on-click-modal="false"
     >
@@ -281,9 +245,9 @@
       
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="showCreateDialog = false">取消</el-button>
-          <el-button type="primary" @click="createTask" :loading="createLoading">
-            创建任务
+          <el-button @click="cancelDialog">取消</el-button>
+          <el-button type="primary" @click="submitTask" :loading="createLoading">
+            {{ isEditMode ? '保存修改' : '创建任务' }}
           </el-button>
         </div>
       </template>
@@ -312,6 +276,10 @@
               <span class="info-label">目标URL:</span>
               <span class="info-value">{{ selectedTask.url || '-' }}</span>
             </div>
+            <div v-if="selectedTask.crawler_config_id" class="info-item">
+              <span class="info-label">爬虫配置:</span>
+              <span class="info-value">{{ crawlerConfigName || '加载中...' }}</span>
+            </div>
             <div class="info-item">
               <span class="info-label">创建时间:</span>
               <span class="info-value">{{ formatDate(selectedTask.created_at) }}</span>
@@ -330,48 +298,39 @@
         </div>
         
         <div class="detail-section">
-          <h4>执行统计</h4>
-          <div class="stats-grid">
-            <div class="stat-item">
-              <div class="stat-value">{{ selectedTask.total_executions || 0 }}</div>
-              <div class="stat-label">总执行次数</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-value">{{ selectedTask.success_executions || 0 }}</div>
-              <div class="stat-label">成功次数</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-value">{{ getSuccessRate(selectedTask) }}%</div>
-              <div class="stat-label">成功率</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-value">{{ formatDuration(selectedTask.total_duration) }}</div>
-              <div class="stat-label">总耗时</div>
+          <h4>执行信息</h4>
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="info-label">最后执行时间:</span>
+              <span class="info-value">{{ formatDate(selectedTask.last_run) || '未执行' }}</span>
             </div>
           </div>
         </div>
         
         <div class="detail-section">
-          <h4>最近日志</h4>
-          <div class="logs-container">
-            <div v-if="taskLogs.length === 0" class="no-logs">
-              暂无执行日志
+          <h4>执行命令生成</h4>
+          <div class="command-section">
+            <div class="command-actions">
+              <el-button type="primary" @click="generateCommand">
+                <i class="fas fa-terminal"></i>
+                生成执行命令
+              </el-button>
             </div>
-            <div v-else class="logs-list">
-              <div v-for="log in taskLogs" :key="log.id" class="log-item">
-                <div class="log-header">
-                  <span class="log-time">{{ formatDate(log.created_at) }}</span>
-                  <el-tag :type="getStatusType(log.status)" size="small">
-                    {{ getStatusLabel(log.status) }}
-                  </el-tag>
-                </div>
-                <div v-if="log.error_message" class="log-error">
-                  {{ log.error_message }}
-                </div>
-                <div v-if="log.result" class="log-result">
-                  执行结果: {{ JSON.stringify(log.result) }}
-                </div>
-              </div>
+            <div v-if="generatedCommand" class="command-output">
+              <el-input
+                v-model="generatedCommand"
+                type="textarea"
+                :rows="3"
+                readonly
+                placeholder="点击上方按钮生成执行命令"
+              >
+                <template #append>
+                  <el-button @click="copyCommand">
+                    <i class="fas fa-copy"></i>
+                    复制
+                  </el-button>
+                </template>
+              </el-input>
             </div>
           </div>
         </div>
@@ -391,6 +350,7 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { tasksAPI } from '@/api/tasks'
 import { crawlerAPI } from '@/api/crawler'
+import { xpathAPI } from '@/api/xpath'
 
 // 响应式数据
 const loading = ref(false)
@@ -402,12 +362,16 @@ const selectedTask = ref(null)
 const taskLogs = ref([])
 const crawlerConfigs = ref([])
 const sourceTasks = ref([])
+const generatedCommand = ref('')
+const crawlerConfigName = ref('')
 const searchQuery = ref('')
 const statusFilter = ref('')
 const typeFilter = ref('')
 const showCreateDialog = ref(false)
 const showDetailDialog = ref(false)
 const createFormRef = ref(null)
+const isEditMode = ref(false)
+const editingTaskId = ref(null)
 
 // 分页数据
 const pagination = reactive({
@@ -508,7 +472,7 @@ const getTasks = async () => {
 const getCrawlerConfigs = async () => {
   configsLoading.value = true
   try {
-    const response = await crawlerAPI.getConfigs()
+    const response = await crawlerAPI.getConfigs({ enabled: 'true' })
     crawlerConfigs.value = response.data.configs || []
   } catch (error) {
     ElMessage.error('获取爬虫配置列表失败')
@@ -605,6 +569,58 @@ const resetCreateForm = () => {
     description: ''
   })
   createFormRef.value?.resetFields()
+  isEditMode.value = false
+  editingTaskId.value = null
+}
+
+// 打开创建对话框
+const openCreateDialog = () => {
+  resetCreateForm()
+  showCreateDialog.value = true
+}
+
+// 取消对话框
+const cancelDialog = () => {
+  showCreateDialog.value = false
+  resetCreateForm()
+}
+
+// 提交任务（创建或更新）
+const submitTask = async () => {
+  if (isEditMode.value) {
+    await updateTask()
+  } else {
+    await createTask()
+  }
+}
+
+// 更新任务
+const updateTask = async () => {
+  if (!createFormRef.value || !editingTaskId.value) return
+  
+  try {
+    await createFormRef.value.validate()
+    createLoading.value = true
+    
+    const taskData = {
+      name: createForm.name,
+      url: createForm.url,
+      crawler_config_id: createForm.crawler_config_id,
+      description: createForm.description
+    }
+    
+    await tasksAPI.updateTask(editingTaskId.value, taskData)
+    
+    ElMessage.success('任务更新成功')
+    showCreateDialog.value = false
+    resetCreateForm()
+    getTasks()
+  } catch (error) {
+    ElMessage.error('任务更新失败')
+    console.error('任务更新失败:', error)
+  } finally {
+    createLoading.value = false
+  }
 }
 
 // 显示任务详情
@@ -612,18 +628,41 @@ const showTaskDetail = async (task) => {
   selectedTask.value = task
   showDetailDialog.value = true
   
-  // 获取任务日志
-  try {
-    const response = await tasksAPI.getTaskLogs(task.id)
-    taskLogs.value = response.data || []
-  } catch (error) {
-    console.error('获取任务日志失败:', error)
-    taskLogs.value = []
+  // 不再获取任务日志，避免404错误
+  taskLogs.value = []
+  // 清空之前生成的命令
+  generatedCommand.value = ''
+  // 清空爬虫配置名称
+  crawlerConfigName.value = ''
+  
+  // 如果任务有爬虫配置ID，获取配置名称
+  if (task.crawler_config_id) {
+    try {
+      console.log('正在获取爬虫配置，ID:', task.crawler_config_id)
+      const response = await crawlerAPI.getConfig(task.crawler_config_id)
+      console.log('爬虫配置API响应:', response)
+      
+      // 根据后端实际返回的数据结构处理
+      if (response.data && response.data.name) {
+        crawlerConfigName.value = response.data.name
+        console.log('成功设置爬虫配置名称:', response.data.name)
+      } else {
+        console.log('响应数据结构不符合预期:', response)
+        crawlerConfigName.value = '未知配置'
+      }
+    } catch (error) {
+      console.error('获取爬虫配置名称失败:', error)
+      crawlerConfigName.value = '未知配置'
+    }
   }
 }
 
 // 编辑任务
 const editTask = (task) => {
+  // 设置编辑模式
+  isEditMode.value = true
+  editingTaskId.value = task.id
+  
   // 填充编辑表单
   Object.assign(createForm, {
     name: task.name,
@@ -654,64 +693,31 @@ const cloneTask = async (task) => {
   }
 }
 
-// 处理任务操作
-const handleTaskAction = async ({ action, task }) => {
-  switch (action) {
-    case 'resume':
-      try {
-        await tasksAPI.resumeTask(task.id)
-        ElMessage.success('任务已继续')
-        getTasks()
-      } catch (error) {
-        ElMessage.error('继续任务失败')
+// 删除任务
+const deleteTask = async (task) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除任务 "${task.name}" 吗？此操作不可恢复。`,
+      '确认删除',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
       }
-      break
-      
-    case 'pause':
-      try {
-        await tasksAPI.pauseTask(task.id)
-        ElMessage.success('任务已暂停')
-        getTasks()
-      } catch (error) {
-        ElMessage.error('暂停任务失败')
-      }
-      break
-      
-    case 'retry':
-      try {
-        await tasksAPI.retryTask(task.id)
-        ElMessage.success('任务重试已启动')
-        getTasks()
-      } catch (error) {
-        ElMessage.error('重试任务失败')
-      }
-      break
-      
-    case 'logs':
-      showTaskDetail(task)
-      break
-      
-    case 'delete':
-      ElMessageBox.confirm(
-        `确定要删除任务 "${task.name}" 吗？此操作不可恢复。`,
-        '确认删除',
-        {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          type: 'warning'
-        }
-      ).then(async () => {
-        try {
-          await tasksAPI.deleteTask(task.id)
-          ElMessage.success('任务删除成功')
-          getTasks()
-        } catch (error) {
-          ElMessage.error('任务删除失败')
-        }
-      })
-      break
+    )
+    
+    await tasksAPI.deleteTask(task.id)
+    ElMessage.success('任务删除成功')
+    getTasks()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('任务删除失败')
+      console.error('任务删除失败:', error)
+    }
   }
 }
+
+
 
 // 搜索处理
 const handleSearch = () => {
@@ -756,6 +762,82 @@ const handleCurrentChange = (page) => {
   getTasks()
 }
 
+// 获取当前启用的XPath规则ID列表
+const getActiveRuleIds = async () => {
+  try {
+    const response = await xpathAPI.getRules({ status: 'active', enabled: 'true', per_page: 100 })
+    if (response.success && response.data && response.data.rules) {
+      return response.data.rules.map(rule => rule.rule_id).join(',')
+    }
+  } catch (error) {
+    console.warn('获取XPath规则失败:', error)
+  }
+  return '' // 如果获取失败，返回空字符串
+}
+
+// 生成执行命令
+const generateCommand = async () => {
+  if (!selectedTask.value || !selectedTask.value.id) {
+    ElMessage.error('请选择有效的任务')
+    return
+  }
+  
+  try {
+    console.log('正在生成命令，任务ID:', selectedTask.value.id)
+    const response = await tasksAPI.getTaskCommand(selectedTask.value.id)
+    console.log('任务命令API响应:', response)
+    
+    // 处理不同的响应数据结构
+    if (response.data) {
+      // 尝试多种可能的数据结构
+      const commandData = response.data.data || response.data.command || response.data
+      
+      if (typeof commandData === 'string') {
+        // 如果直接返回命令字符串
+        generatedCommand.value = commandData
+        console.log('成功生成命令:', commandData)
+        ElMessage.success('命令生成成功')
+      } else if (commandData && commandData.command) {
+        // 如果返回包含command字段的对象
+        generatedCommand.value = commandData.command
+        console.log('成功生成命令:', commandData.command)
+        ElMessage.success('命令生成成功')
+      } else {
+        console.log('命令生成失败，响应数据结构不符合预期:', response)
+        ElMessage.error(response.data.message || '生成命令失败：响应数据格式错误')
+      }
+    } else {
+      console.log('命令生成失败，响应数据为空:', response)
+      ElMessage.error('生成命令失败：服务器响应为空')
+    }
+  } catch (error) {
+    console.error('生成命令失败:', error)
+    ElMessage.error('生成命令失败，请稍后重试')
+  }
+}
+
+// 复制命令到剪贴板
+const copyCommand = async () => {
+  if (!generatedCommand.value) {
+    ElMessage.warning('请先生成执行命令')
+    return
+  }
+  
+  try {
+    await navigator.clipboard.writeText(generatedCommand.value)
+    ElMessage.success('命令已复制到剪贴板')
+  } catch (error) {
+    // 降级方案：使用传统方法复制
+    const textArea = document.createElement('textarea')
+    textArea.value = generatedCommand.value
+    document.body.appendChild(textArea)
+    textArea.select()
+    document.execCommand('copy')
+    document.body.removeChild(textArea)
+    ElMessage.success('命令已复制到剪贴板')
+  }
+}
+
 // 工具函数
 const getTaskTypeLabel = (type) => {
   const typeMap = {
@@ -792,25 +874,7 @@ const formatDate = (dateString) => {
   return new Date(dateString).toLocaleString('zh-CN')
 }
 
-const formatDuration = (seconds) => {
-  if (!seconds) return '0秒'
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  const secs = seconds % 60
-  
-  if (hours > 0) {
-    return `${hours}小时${minutes}分钟${secs}秒`
-  } else if (minutes > 0) {
-    return `${minutes}分钟${secs}秒`
-  } else {
-    return `${secs}秒`
-  }
-}
 
-const getSuccessRate = (task) => {
-  if (!task.total_executions || task.total_executions === 0) return 0
-  return Math.round((task.success_executions / task.total_executions) * 100)
-}
 
 // 生命周期
 onMounted(() => {
@@ -1166,6 +1230,39 @@ onMounted(() => {
   color: #67c23a;
   font-family: monospace;
   font-size: 12px;
+}
+
+.command-section {
+  margin-top: 16px;
+}
+
+.command-actions {
+  margin-bottom: 16px;
+}
+
+.command-output {
+  margin-top: 16px;
+}
+
+.command-output .el-input {
+  font-family: 'Courier New', monospace;
+}
+
+.command-output .el-textarea__inner {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+}
+
+.command-output .el-input-group__append {
+  padding: 0;
+}
+
+.command-output .el-input-group__append .el-button {
+  border-left: none;
+  border-radius: 0 4px 4px 0;
 }
 
 @media (max-width: 768px) {

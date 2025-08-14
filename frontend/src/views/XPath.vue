@@ -23,9 +23,6 @@
       >
         <div class="config-header">
           <h3>{{ config.name }}</h3>
-          <el-tag :type="config.status === 'active' ? 'success' : 'info'">
-            {{ config.status === 'active' ? '启用' : '禁用' }}
-          </el-tag>
         </div>
         <p class="config-description">{{ config.description }}</p>
         <div class="config-details">
@@ -58,10 +55,6 @@
           <el-button size="small" @click="editConfig(config)">
             <i class="fas fa-edit"></i>
             编辑
-          </el-button>
-          <el-button size="small" @click="testConfig(config)">
-            <i class="fas fa-play"></i>
-            测试
           </el-button>
           <el-button size="small" type="danger" @click="deleteConfig(config)">
             <i class="fas fa-trash"></i>
@@ -104,15 +97,14 @@
         <!-- 域名配置 -->
         <el-divider content-position="left">域名配置</el-divider>
         <el-form-item label="域名匹配" prop="domain_patterns">
-          <el-select
-            v-model="createForm.domain_patterns"
-            multiple
-            filterable
-            allow-create
-            placeholder="请输入域名，如：reddit.com"
-            style="width: 100%"
-          >
-          </el-select>
+          <el-input
+            v-model="domainPatternsText"
+            type="textarea"
+            :rows="2"
+            placeholder="请输入域名，多个域名用逗号分隔，如：reddit.com,example.com"
+            @blur="updateDomainPatterns"
+          />
+          <div style="font-size: 12px; color: #999; margin-top: 4px;">支持通配符匹配，如：*.reddit.com</div>
         </el-form-item>
         
         <!-- XPath配置 -->
@@ -172,23 +164,11 @@
           </el-form-item>
         </div>
         
-        <!-- 状态配置 -->
-        <el-divider content-position="left">状态配置</el-divider>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="状态">
-              <el-select v-model="createForm.status" style="width: 100%">
-                <el-option label="启用" value="active"></el-option>
-                <el-option label="禁用" value="inactive"></el-option>
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="公开规则">
-              <el-switch v-model="createForm.is_public" />
-            </el-form-item>
-          </el-col>
-        </el-row>
+        <!-- 公开规则配置 -->
+        <el-divider content-position="left">规则配置</el-divider>
+        <el-form-item label="公开规则">
+          <el-switch v-model="createForm.is_public" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <div class="dialog-footer">
@@ -233,15 +213,14 @@
         <!-- 域名配置 -->
         <el-divider content-position="left">域名配置</el-divider>
         <el-form-item label="域名匹配" prop="domain_patterns">
-          <el-select
-            v-model="editForm.domain_patterns"
-            multiple
-            filterable
-            allow-create
-            placeholder="请输入域名"
-            style="width: 100%"
-          >
-          </el-select>
+          <el-input
+            v-model="editDomainPatternsText"
+            type="textarea"
+            :rows="2"
+            placeholder="请输入域名，多个域名用逗号分隔，如：reddit.com,example.com"
+            @blur="updateEditDomainPatterns"
+          />
+          <div style="font-size: 12px; color: #999; margin-top: 4px;">支持通配符匹配，如：*.reddit.com</div>
         </el-form-item>
         
         <!-- XPath配置 -->
@@ -301,23 +280,11 @@
           </el-form-item>
         </div>
         
-        <!-- 状态配置 -->
-        <el-divider content-position="left">状态配置</el-divider>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="状态">
-              <el-select v-model="editForm.status" style="width: 100%">
-                <el-option label="启用" value="active"></el-option>
-                <el-option label="禁用" value="inactive"></el-option>
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="公开规则">
-              <el-switch v-model="editForm.is_public" />
-            </el-form-item>
-          </el-col>
-        </el-row>
+        <!-- 公开规则配置 -->
+        <el-divider content-position="left">规则配置</el-divider>
+        <el-form-item label="公开规则">
+          <el-switch v-model="editForm.is_public" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <div class="dialog-footer">
@@ -346,6 +313,8 @@ const creating = ref(false)
 const updating = ref(false)
 const enableCommentXpath = ref(false)
 const editEnableCommentXpath = ref(false)
+const domainPatternsText = ref('')
+const editDomainPatternsText = ref('')
 
 const createForm = ref({
   rule_id: '',
@@ -411,9 +380,35 @@ const getSuccessRate = (config) => {
   return Math.round((config.success_count || 0) / config.usage_count * 100)
 }
 
+// 域名文本转换方法
+const updateDomainPatterns = () => {
+  if (domainPatternsText.value) {
+    createForm.value.domain_patterns = domainPatternsText.value
+      .split(',')
+      .map(domain => domain.trim())
+      .filter(domain => domain.length > 0)
+  } else {
+    createForm.value.domain_patterns = []
+  }
+}
+
+const updateEditDomainPatterns = () => {
+  if (editDomainPatternsText.value) {
+    editForm.value.domain_patterns = editDomainPatternsText.value
+      .split(',')
+      .map(domain => domain.trim())
+      .filter(domain => domain.length > 0)
+  } else {
+    editForm.value.domain_patterns = []
+  }
+}
+
 // 编辑配置
 const editConfig = (config) => {
   editForm.value = { ...config }
+  
+  // 将域名数组转换为文本
+  editDomainPatternsText.value = (config.domain_patterns || []).join(', ')
   
   // 处理comment_xpath对象到扁平化字段的映射
   if (config.comment_xpath && typeof config.comment_xpath === 'object') {
@@ -431,18 +426,6 @@ const editConfig = (config) => {
   }
   
   showEditDialog.value = true
-}
-
-// 测试配置
-const testConfig = async (config) => {
-  try {
-    ElMessage.info('正在测试XPath规则...')
-    await xpathApi.testRule({ rule_id: config.rule_id, url: 'https://example.com' })
-    ElMessage.success(`XPath规则 "${config.name}" 测试成功`)
-  } catch (error) {
-    console.error('XPath规则测试失败:', error)
-    ElMessage.error('XPath规则测试失败: ' + (error.message || '未知错误'))
-  }
 }
 
 // 删除配置
@@ -475,6 +458,9 @@ const deleteConfig = async (config) => {
 // 创建配置
 const createConfig = async () => {
   try {
+    // 确保域名文本转换为数组
+    updateDomainPatterns()
+    
     await createFormRef.value.validate()
     creating.value = true
     
@@ -486,7 +472,8 @@ const createConfig = async () => {
       xpath: createForm.value.xpath,
       rule_type: createForm.value.rule_type,
       field_name: createForm.value.field_name,
-      status: createForm.value.status,
+      status: 'active',
+      enabled: true,
       is_public: createForm.value.is_public
     }
     
@@ -521,10 +508,17 @@ const createConfig = async () => {
 // 更新配置
 const updateConfig = async () => {
   try {
+    // 确保域名文本转换为数组
+    updateEditDomainPatterns()
+    
     await editFormRef.value.validate()
     updating.value = true
     
     const configData = { ...editForm.value }
+    
+    // 所有规则都设置为启用状态
+    configData.status = 'active'
+    configData.enabled = true
     
     // 如果启用了扩展XPath配置
     if (editEnableCommentXpath.value) {
@@ -576,6 +570,7 @@ const resetCreateForm = () => {
     status: 'active',
     is_public: false
   }
+  domainPatternsText.value = ''
   enableCommentXpath.value = false
 }
 

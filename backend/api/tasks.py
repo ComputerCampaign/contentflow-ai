@@ -192,6 +192,111 @@ def create_crawler_task():
         }), 500
 
 
+@tasks_bp.route('/<task_id>/command', methods=['GET'])
+@jwt_required()
+@limiter.limit("60 per minute")
+def get_task_command(task_id):
+    """生成任务执行命令"""
+    try:
+        current_app.logger.info(f"开始生成任务命令，任务ID: {task_id}")
+        
+        current_user = get_current_user()
+        if not current_user:
+            current_app.logger.error(f"用户未找到，任务ID: {task_id}")
+            return jsonify({
+                'success': False,
+                'message': '用户未找到',
+                'error_code': 'UNAUTHORIZED'
+            }), 401
+        
+        current_app.logger.info(f"用户验证成功，用户ID: {current_user.id}")
+        
+        # 获取任务
+        task = Task.query.filter_by(
+            id=task_id, user_id=current_user.id
+        ).first()
+        if not task:
+            current_app.logger.error(f"任务未找到，任务ID: {task_id}, 用户ID: {current_user.id}")
+            return jsonify({
+                'success': False,
+                'message': '任务未找到',
+                'error_code': 'TASK_NOT_FOUND'
+            }), 404
+        
+        current_app.logger.info(f"任务找到，任务名称: {task.name}, 类型: {task.type}, URL: {task.url}, 爬虫配置ID: {task.crawler_config_id}")
+        
+        # 只支持爬虫任务
+        if task.type != 'crawler':
+            current_app.logger.error(f"不支持的任务类型: {task.type}，任务ID: {task_id}")
+            return jsonify({
+                'success': False,
+                'message': '只支持爬虫任务的命令生成',
+                'error_code': 'INVALID_TASK_TYPE'
+            }), 400
+        
+        # 检查必需字段
+        if not task.url:
+            current_app.logger.error(f"任务缺少URL，任务ID: {task_id}")
+            return jsonify({
+                'success': False,
+                'message': '任务缺少URL',
+                'error_code': 'VALIDATION_ERROR'
+            }), 400
+        
+        if not task.crawler_config_id:
+            current_app.logger.error(f"任务缺少爬虫配置ID，任务ID: {task_id}")
+            return jsonify({
+                'success': False,
+                'message': '任务缺少爬虫配置ID',
+                'error_code': 'VALIDATION_ERROR'
+            }), 400
+        
+        # 使用crawler API的命令生成逻辑
+        from backend.api.crawler import generate_crawler_command_from_config
+        from backend.models.crawler import CrawlerConfig
+        
+        current_app.logger.info(f"开始获取爬虫配置，配置ID: {task.crawler_config_id}")
+        
+        # 获取爬虫配置
+        crawler_config = CrawlerConfig.query.get(task.crawler_config_id)
+        if not crawler_config:
+            current_app.logger.error(f"爬虫配置不存在，配置ID: {task.crawler_config_id}")
+            return jsonify({
+                'success': False,
+                'message': '爬虫配置不存在',
+                'error_code': 'CONFIG_NOT_FOUND'
+            }), 404
+        
+        current_app.logger.info(f"爬虫配置找到，配置名称: {crawler_config.name}")
+        
+        # 生成命令
+        current_app.logger.info(f"开始生成命令，URL: {task.url}")
+        command = generate_crawler_command_from_config(crawler_config, task.url)
+        current_app.logger.info(f"命令生成成功: {command}")
+        
+        return jsonify({
+            'success': True,
+            'message': '命令生成成功',
+            'data': {
+                'command': command,
+                'task_id': task_id,
+                'task_name': task.name,
+                'url': task.url,
+                'crawler_config_name': crawler_config.name
+            }
+        })
+        
+    except Exception as e:
+        import traceback
+        current_app.logger.error(f"生成任务命令失败: {str(e)}")
+        current_app.logger.error(f"错误堆栈: {traceback.format_exc()}")
+        return jsonify({
+            'success': False,
+            'message': f'生成命令失败: {str(e)}',
+            'error_code': 'INTERNAL_ERROR'
+        }), 500
+
+
 @tasks_bp.route('/content-generation', methods=['POST'])
 @jwt_required()
 @limiter.limit("20 per minute")
@@ -225,7 +330,7 @@ def create_content_generation_task():
             }), 400
         
         # 验证源任务是否存在且已完成
-        source_task = Task.query.filter_by(id=source_task_id, user_id=current_user.id).first()
+        source_task = Task.query.filter_by(id=source_task_id, user_id=current_user.id, is_deleted=False).first()
         if not source_task:
             return jsonify({
                 'success': False,
@@ -456,8 +561,8 @@ def get_tasks():
         task_type = request.args.get('type')
         search = request.args.get('search', '').strip()
         
-        # 构建查询
-        query = Task.query.filter_by(user_id=current_user.id)
+        # 构建查询，排除已删除的任务
+        query = Task.query.filter_by(user_id=current_user.id, is_deleted=False)
         
         # 状态过滤
         if status:
@@ -520,7 +625,7 @@ def get_task(task_id):
                 'message': '用户不存在'
             }), 401
         
-        task = Task.query.filter_by(id=task_id, user_id=current_user.id).first()
+        task = Task.query.filter_by(id=task_id, user_id=current_user.id, is_deleted=False).first()
         if not task:
             return jsonify({
                 'success': False,
@@ -560,7 +665,7 @@ def update_task(task_id):
                 'message': '用户不存在'
             }), 401
         
-        task = Task.query.filter_by(id=task_id, user_id=current_user.id).first()
+        task = Task.query.filter_by(id=task_id, user_id=current_user.id, is_deleted=False).first()
         if not task:
             return jsonify({
                 'success': False,
@@ -634,7 +739,7 @@ def update_task(task_id):
 @tasks_bp.route('/<task_id>', methods=['DELETE'])
 @jwt_required()
 def delete_task(task_id):
-    """删除任务"""
+    """逻辑删除任务"""
     try:
         current_user = get_current_user()
         if not current_user:
@@ -643,7 +748,7 @@ def delete_task(task_id):
                 'message': '用户不存在'
             }), 401
         
-        task = Task.query.filter_by(id=task_id, user_id=current_user.id).first()
+        task = Task.query.filter_by(id=task_id, user_id=current_user.id, is_deleted=False).first()
         if not task:
             return jsonify({
                 'success': False,
@@ -657,12 +762,8 @@ def delete_task(task_id):
                 'message': '运行中的任务无法删除'
             }), 400
         
-        # 删除相关的执行记录
-        TaskExecution.query.filter_by(task_id=task_id).delete()
-        
-        # 删除任务
-        db.session.delete(task)
-        db.session.commit()
+        # 执行逻辑删除
+        task.soft_delete()
         
         return jsonify({
             'success': True,
@@ -691,7 +792,7 @@ def update_task_status(task_id):
                 'message': '用户不存在'
             }), 401
         
-        task = Task.query.filter_by(id=task_id, user_id=current_user.id).first()
+        task = Task.query.filter_by(id=task_id, user_id=current_user.id, is_deleted=False).first()
         if not task:
             return jsonify({
                 'success': False,
@@ -822,7 +923,7 @@ def control_task(task_id):
                 'message': '用户不存在'
             }), 401
         
-        task = Task.query.filter_by(id=task_id, user_id=current_user.id).first()
+        task = Task.query.filter_by(id=task_id, user_id=current_user.id, is_deleted=False).first()
         if not task:
             return jsonify({
                 'success': False,
@@ -922,7 +1023,7 @@ def get_task_executions(task_id):
                 'message': '用户不存在'
             }), 401
         
-        task = Task.query.filter_by(id=task_id, user_id=current_user.id).first()
+        task = Task.query.filter_by(id=task_id, user_id=current_user.id, is_deleted=False).first()
         if not task:
             return jsonify({
                 'success': False,
@@ -984,7 +1085,7 @@ def get_crawler_params(task_id):
                 'message': '用户不存在'
             }), 401
         
-        task = Task.query.filter_by(id=task_id, user_id=current_user.id).first()
+        task = Task.query.filter_by(id=task_id, user_id=current_user.id, is_deleted=False).first()
         if not task:
             return jsonify({
                 'success': False,
@@ -1016,6 +1117,62 @@ def get_crawler_params(task_id):
         }), 500
 
 
+@tasks_bp.route('/<task_id>/clone', methods=['POST'])
+@jwt_required()
+@limiter.limit("10 per minute")
+def clone_task(task_id):
+    """克隆任务"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 401
+        
+        # 获取原任务
+        original_task = Task.query.filter_by(id=task_id, user_id=current_user.id, is_deleted=False).first()
+        if not original_task:
+            return jsonify({
+                'success': False,
+                'message': '任务不存在'
+            }), 404
+        
+        # 创建克隆任务
+        cloned_task = Task(
+            name=f"{original_task.name} (副本)",
+            type=original_task.type,
+            url=original_task.url,
+            config=original_task.config,
+            crawler_config_id=original_task.crawler_config_id,
+            source_task_id=original_task.source_task_id,
+            crawler_task_id=original_task.crawler_task_id,
+            ai_content_config_id=original_task.ai_content_config_id,
+            xpath_config_id=original_task.xpath_config_id,
+            user_id=current_user.id,
+            description=original_task.description,
+            priority=original_task.priority,
+            status='pending'  # 克隆的任务状态为待执行
+        )
+        
+        db.session.add(cloned_task)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '任务克隆成功',
+            'data': cloned_task.to_dict()
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"克隆任务失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '克隆任务失败，请稍后重试'
+        }), 500
+
+
 @tasks_bp.route('/stats', methods=['GET'])
 @jwt_required()
 def get_task_stats():
@@ -1030,19 +1187,19 @@ def get_task_stats():
         
         # 统计各状态任务数量
         stats = {
-            'total': Task.query.filter_by(user_id=current_user.id).count(),
-            'pending': Task.query.filter_by(user_id=current_user.id, status='pending').count(),
-            'running': Task.query.filter_by(user_id=current_user.id, status='running').count(),
-            'completed': Task.query.filter_by(user_id=current_user.id, status='completed').count(),
-            'failed': Task.query.filter_by(user_id=current_user.id, status='failed').count(),
-            'paused': Task.query.filter_by(user_id=current_user.id, status='paused').count()
+            'total': Task.query.filter_by(user_id=current_user.id, is_deleted=False).count(),
+            'pending': Task.query.filter_by(user_id=current_user.id, status='pending', is_deleted=False).count(),
+            'running': Task.query.filter_by(user_id=current_user.id, status='running', is_deleted=False).count(),
+            'completed': Task.query.filter_by(user_id=current_user.id, status='completed', is_deleted=False).count(),
+            'failed': Task.query.filter_by(user_id=current_user.id, status='failed', is_deleted=False).count(),
+            'paused': Task.query.filter_by(user_id=current_user.id, status='paused', is_deleted=False).count()
         }
         
         # 按类型统计
         type_stats = {}
         for task_type in ['crawler', 'content_generation', 'combined']:
             type_stats[task_type] = Task.query.filter_by(
-                user_id=current_user.id, type=task_type
+                user_id=current_user.id, type=task_type, is_deleted=False
             ).count()
         
         return jsonify({
@@ -1075,7 +1232,7 @@ def cancel_task(task_id):
                 'message': '用户不存在'
             }), 401
         
-        task = Task.query.filter_by(id=task_id, user_id=current_user.id).first()
+        task = Task.query.filter_by(id=task_id, user_id=current_user.id, is_deleted=False).first()
         if not task:
             return jsonify({
                 'success': False,
@@ -1144,7 +1301,7 @@ def retry_task(task_id):
                 'message': '用户不存在'
             }), 401
         
-        task = Task.query.filter_by(id=task_id, user_id=current_user.id).first()
+        task = Task.query.filter_by(id=task_id, user_id=current_user.id, is_deleted=False).first()
         if not task:
             return jsonify({
                 'success': False,

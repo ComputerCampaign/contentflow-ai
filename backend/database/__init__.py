@@ -13,7 +13,7 @@ from backend.database.session import (
     db_session_scope,
     DatabaseSession
 )
-from backend.database.migration import MigrationManager
+
 from backend.database.pool import ConnectionPoolManager, get_pool_manager
 from backend.database.query_builder import QueryBuilder, query
 
@@ -25,7 +25,7 @@ __all__ = [
     'db_transaction',
     'db_session_scope',
     'DatabaseSession',
-    'MigrationManager',
+
     'ConnectionPoolManager',
     'get_pool_manager',
     'QueryBuilder',

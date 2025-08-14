@@ -55,7 +55,11 @@ class Task(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, 
                           onupdate=datetime.utcnow, nullable=False)
     
-    # 关联字段（移除外键约束）
+    # 逻辑删除
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)  # 逻辑删除标记
+    deleted_at = db.Column(db.DateTime)  # 删除时间
+    
+    # 关联信息
     user_id = db.Column(db.String(36), nullable=False)  # 用户ID
     crawler_config_id = db.Column(db.String(36))  # 爬虫配置ID
     xpath_config_id = db.Column(db.String(36))  # XPath配置ID
@@ -174,10 +178,23 @@ class Task(db.Model):
         
         return params
     
+    def soft_delete(self):
+        """逻辑删除任务"""
+        self.is_deleted = True
+        self.deleted_at = datetime.utcnow()
+        db.session.commit()
+    
+    def restore(self):
+        """恢复已删除的任务"""
+        self.is_deleted = False
+        self.deleted_at = None
+        db.session.commit()
+    
     def to_dict(self, include_executions=False):
         """转换为字典"""
         data = {
-            'task_id': self.id,
+            'id': self.id,  # 修复：使用'id'而不是'task_id'以保持前端一致性
+            'task_id': self.id,  # 保留task_id以兼容现有代码
             'name': self.name,
             'description': self.description,
             'type': self.type,

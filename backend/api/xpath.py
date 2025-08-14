@@ -142,12 +142,7 @@ def validate_xpath_config(config_data, partial=False):
         if not field_name:
             return False, '字段名称不能为空'
     
-    # 验证状态
-    if 'status' in config_data:
-        status = config_data['status']
-        valid_statuses = ['active', 'inactive', 'testing']
-        if status not in valid_statuses:
-            return False, f'状态必须是以下之一: {", ".join(valid_statuses)}'
+    # 所有规则都是启用状态，不需要验证status字段
     
     # 验证布尔值字段
     if 'is_public' in config_data and not isinstance(config_data['is_public'], bool):
@@ -178,8 +173,8 @@ def create_xpath_rule():
                 'error_code': 'VALIDATION_ERROR'
             }), 400
         
-        # 验证配置数据
-        is_valid, error_message = validate_xpath_config(data)
+        # 验证配置数据（部分验证，因为更新时可能只传递部分字段）
+        is_valid, error_message = validate_xpath_config(data, partial=True)
         if not is_valid:
             return jsonify({
                 'success': False,
@@ -265,6 +260,7 @@ def get_xpath_rules():
         rule_type = request.args.get('rule_type', '').strip()
         status = request.args.get('status', '').strip()
         is_public = request.args.get('is_public', '').strip()
+        enabled = request.args.get('enabled', '').strip()
         domain = request.args.get('domain', '').strip()
         
         # 构建查询 - 显示用户自己的规则和公开规则
@@ -297,6 +293,11 @@ def get_xpath_rules():
         if is_public:
             is_public_bool = is_public.lower() == 'true'
             query = query.filter(XPathConfig.is_public == is_public_bool)
+        
+        # 启用状态过滤
+        if enabled:
+            enabled_bool = enabled.lower() == 'true'
+            query = query.filter(XPathConfig.enabled == enabled_bool)
         
         # 域名过滤
         if domain:
@@ -507,6 +508,7 @@ def delete_xpath_rule(rule_id):
                 'error_code': 'RULE_IN_USE'
             }), 400
         
+        # 执行物理删除
         db.session.delete(config)
         db.session.commit()
         
@@ -532,6 +534,9 @@ def delete_xpath_rule(rule_id):
         }), 500
 
 
+
+
+
 @xpath_bp.route('/rules/validate', methods=['POST'])
 @jwt_required()
 @limiter.limit("30 per minute")
@@ -555,11 +560,11 @@ def validate_xpath_rule():
             }), 400
         
         # 验证规则数据
-        validation_error = validate_xpath_config(data)
-        if validation_error:
+        is_valid, error_message = validate_xpath_config(data)
+        if not is_valid:
             return jsonify({
                 'success': False,
-                'message': validation_error,
+                'message': error_message,
                 'error_code': 'VALIDATION_ERROR'
             }), 400
         

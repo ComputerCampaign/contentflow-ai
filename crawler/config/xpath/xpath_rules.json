@@ -2,8 +2,8 @@
     "rules": [
         {
             "id": "reddit_post_title",
-            "name": "Reddit帖子标题解析",
-            "description": "提取Reddit帖子的标题信息",
+            "name": "Reddit帖子标题",
+            "description": "提取Reddit帖子的标题",
             "domain_patterns": [
                 "reddit.com",
                 "www.reddit.com"

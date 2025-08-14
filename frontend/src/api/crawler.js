@@ -65,6 +65,16 @@ export const crawlerAPI = {
   // 克隆配置
   cloneConfig(configId) {
     return request.post(`/crawler/configs/${configId}/clone`)
+  },
+
+  // 生成爬虫命令
+  getCommand(configId, params = {}) {
+    return request.get(`/crawler/configs/${configId}/command`, { params })
+  },
+
+  // 直接URL调用，避免参数序列化问题
+  getCommandDirect(url) {
+    return request.get(url)
   }
 }
 

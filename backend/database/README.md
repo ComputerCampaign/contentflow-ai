@@ -189,38 +189,25 @@ if optimization['success']:
     print(f"优化建议: {optimization['recommendations']}")
 ```
 
-### 6. 迁移管理 (MigrationManager)
+### 6. 数据库迁移
 
-管理数据库版本控制和迁移。
+项目使用 Flask-Migrate 进行数据库迁移管理。
 
-```python
-from backend.database import MigrationManager
-
-migration_manager = MigrationManager()
-
+```bash
 # 初始化迁移环境
-migration_manager.init_migration()
+flask db init
 
-# 创建迁移
-migration_manager.create_migration('添加用户表索引')
+# 创建迁移文件
+flask db migrate -m "添加用户表索引"
 
-# 升级数据库
-migration_manager.upgrade_database()
+# 执行迁移
+flask db upgrade
 
-# 检查迁移状态
-status = migration_manager.check_migration_status()
-print(f"当前版本: {status['current_revision']}")
-print(f"待执行迁移: {len(status['pending_migrations'])}")
+# 查看迁移历史
+flask db history
 
-# 验证迁移
-validation = migration_manager.validate_migration('abc123')
-if not validation['valid']:
-    print(f"迁移错误: {validation['errors']}")
-
-# 自动迁移
-result = migration_manager.auto_migrate(create_backup=True)
-if result['success']:
-    print(f"应用了 {len(result['applied_migrations'])} 个迁移")
+# 回滚到指定版本
+flask db downgrade <revision>
 ```
 
 ## 最佳实践
