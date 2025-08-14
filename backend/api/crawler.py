@@ -402,12 +402,16 @@ def delete_crawler_config(config_id):
         }), 500
 
 
-def generate_crawler_command(config_data, url):
+def generate_crawler_command(config_data, url, task_id=None):
     """生成爬虫命令"""
     command_parts = ['uv', 'run', 'python', '-m', 'crawler.crawler']
     
     # 添加基本参数
     command_parts.extend(['--url', url])
+    
+    # 添加任务ID参数
+    if task_id:
+        command_parts.extend(['--task-id', task_id])
     
     if config_data.get('output'):
         command_parts.extend(['--output', config_data['output']])
@@ -480,7 +484,7 @@ def generate_crawler_command(config_data, url):
     return ' '.join(command_parts)
 
 
-def generate_crawler_command_from_config(config, url):
+def generate_crawler_command_from_config(config, url, task_id=None):
     """从配置对象生成爬虫命令"""
     # 验证并过滤有效的rule_ids
     valid_rule_ids = config.rule_ids
@@ -526,7 +530,7 @@ def generate_crawler_command_from_config(config, url):
         'rule_ids': valid_rule_ids,
         'enable_xpath': config.enable_xpath
     }
-    return generate_crawler_command(config_data, url)
+    return generate_crawler_command(config_data, url, task_id)
 
 
 def is_valid_url(url):

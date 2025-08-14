@@ -51,6 +51,7 @@
         >
           <el-option label="全部类型" value="" />
           <el-option label="爬虫任务" value="crawler" />
+          <el-option label="文本生成任务" value="content_generation" />
           <el-option label="完整流水线" value="full_pipeline" />
         </el-select>
       </div>
@@ -180,6 +181,7 @@
         <el-form-item label="任务类型" prop="type">
           <el-select v-model="createForm.type" placeholder="请选择任务类型" style="width: 100%" @change="onTaskTypeChange">
             <el-option label="爬虫任务" value="crawler" />
+            <el-option label="文本生成任务" value="content_generation" />
             <el-option label="完整流水线" value="full_pipeline" />
           </el-select>
         </el-form-item>
@@ -222,6 +224,48 @@
                 暂无可用的爬虫配置，请先到
                 <el-link type="primary" href="/crawler" target="_blank">爬虫配置页面</el-link>
                 创建配置
+              </el-text>
+            </div>
+          </div>
+        </el-form-item>
+        
+        <!-- 源任务选择（文本生成任务） -->
+        <el-form-item 
+          v-if="createForm.type === 'content_generation'" 
+          label="源爬虫任务" 
+          prop="source_task_id"
+        >
+          <div style="width: 100%">
+            <el-select 
+              v-model="createForm.source_task_id" 
+              placeholder="请选择源爬虫任务" 
+              style="width: 100%"
+              :loading="sourceTasksLoading"
+            >
+              <el-option 
+                v-for="task in allCrawlerTasks" 
+                :key="task.id" 
+                :label="`${task.name} (${getStatusLabel(task.status)}) - ${task.url}`" 
+                :value="task.id"
+                :disabled="task.status !== 'completed'"
+              >
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span>{{ task.name }}</span>
+                  <el-tag :type="getStatusType(task.status)" size="small">
+                    {{ getStatusLabel(task.status) }}
+                  </el-tag>
+                </div>
+              </el-option>
+            </el-select>
+            <div v-if="allCrawlerTasks.length === 0 && !sourceTasksLoading" class="config-tip">
+              <el-text type="warning" size="small">
+                暂无爬虫任务，请先创建爬虫任务
+              </el-text>
+            </div>
+            <div v-else-if="sourceTasks.length === 0 && allCrawlerTasks.length > 0" class="config-tip">
+              <el-text type="warning" size="small">
+                暂无已完成的爬虫任务，只有已完成的任务才能用于生成内容。
+                当前有 {{ allCrawlerTasks.filter(task => task.status !== 'completed').length }} 个任务未完成，请等待任务完成后再试。
               </el-text>
             </div>
           </div>
@@ -362,6 +406,7 @@ const selectedTask = ref(null)
 const taskLogs = ref([])
 const crawlerConfigs = ref([])
 const sourceTasks = ref([])
+const allCrawlerTasks = ref([])
 const generatedCommand = ref('')
 const crawlerConfigName = ref('')
 const searchQuery = ref('')
@@ -435,8 +480,18 @@ const createFormRules = {
       message: '请选择源任务',
       trigger: 'change',
       validator: (rule, value, callback) => {
-        if (createForm.type === 'content_generation' && !value) {
-          callback(new Error('请选择源任务'))
+        if (createForm.type === 'content_generation') {
+          if (!value) {
+            callback(new Error('请选择源任务'))
+          } else {
+            // 检查选择的任务是否已完成
+            const selectedTask = allCrawlerTasks.value.find(task => task.id === value)
+            if (selectedTask && selectedTask.status !== 'completed') {
+              callback(new Error('只能选择已完成的爬虫任务，请等待任务完成后再试'))
+            } else {
+              callback()
+            }
+          }
         } else {
           callback()
         }
@@ -489,16 +544,25 @@ const getCrawlerConfigs = async () => {
 const getSourceTasks = async () => {
   sourceTasksLoading.value = true
   try {
-    const response = await tasksAPI.getTasks({
+    // 获取所有爬虫任务
+    const allTasksResponse = await tasksAPI.getTasks({
+      type: 'crawler',
+      per_page: 100
+    })
+    allCrawlerTasks.value = allTasksResponse.data.tasks || []
+    
+    // 获取已完成的爬虫任务
+    const completedTasksResponse = await tasksAPI.getTasks({
       type: 'crawler',
       status: 'completed',
       per_page: 100
     })
-    sourceTasks.value = response.data.tasks || []
+    sourceTasks.value = completedTasksResponse.data.tasks || []
   } catch (error) {
     ElMessage.error('获取源任务列表失败')
     console.error('获取源任务列表失败:', error)
     sourceTasks.value = []
+    allCrawlerTasks.value = []
   } finally {
     sourceTasksLoading.value = false
   }
@@ -510,10 +574,13 @@ const onTaskTypeChange = (type) => {
   createForm.url = ''
   createForm.crawler_config_id = ''
   createForm.source_task_id = ''
+  createForm.ai_content_config_id = ''
   
   // 根据任务类型获取相应的配置列表
   if (type === 'crawler' || type === 'full_pipeline') {
     getCrawlerConfigs()
+  } else if (type === 'content_generation') {
+    getSourceTasks()
   }
 }
 
@@ -535,6 +602,22 @@ const createTask = async () => {
     if (createForm.type === 'crawler') {
       // 调用爬虫任务创建端点
       await tasksAPI.createCrawlerTask(taskData)
+    } else if (createForm.type === 'content_generation') {
+      // 再次检查源任务状态
+      const selectedTask = allCrawlerTasks.value.find(task => task.id === createForm.source_task_id)
+      if (!selectedTask || selectedTask.status !== 'completed') {
+        ElMessage.error('源任务未完成或不存在，无法创建内容生成任务')
+        return
+      }
+      
+      // 调用文本生成任务创建端点
+      const contentTaskData = {
+        name: createForm.name,
+        source_task_id: createForm.source_task_id,
+        ai_content_config_id: createForm.ai_content_config_id,
+        description: createForm.description
+      }
+      await tasksAPI.createContentGenerationTask(contentTaskData)
     } else if (createForm.type === 'full_pipeline') {
       // 全流程任务需要AI配置ID，这里暂时使用默认值或从表单获取
       taskData.ai_config_id = createForm.ai_config_id || 'default'
@@ -566,6 +649,7 @@ const resetCreateForm = () => {
     url: '',
     crawler_config_id: '',
     source_task_id: '',
+    ai_content_config_id: '',
     description: ''
   })
   createFormRef.value?.resetFields()
@@ -842,6 +926,7 @@ const copyCommand = async () => {
 const getTaskTypeLabel = (type) => {
   const typeMap = {
     crawler: '爬虫任务',
+    content_generation: '文本生成任务',
     full_pipeline: '完整流水线'
   }
   return typeMap[type] || type

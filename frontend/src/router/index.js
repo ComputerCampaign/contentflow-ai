@@ -56,9 +56,15 @@ const routes = [
           icon: 'Position'
         }
       },
-
-
-
+      {
+        path: '/ai-config',
+        name: 'AIConfig',
+        component: () => import('@/views/AIConfig.vue'),
+        meta: {
+          title: 'AI配置',
+          icon: 'MagicStick'
+        }
+      },
       {
         path: '/monitoring',
         name: 'Monitoring',

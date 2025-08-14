@@ -225,66 +225,96 @@ def get_task_command(task_id):
         
         current_app.logger.info(f"任务找到，任务名称: {task.name}, 类型: {task.type}, URL: {task.url}, 爬虫配置ID: {task.crawler_config_id}")
         
-        # 只支持爬虫任务
-        if task.type != 'crawler':
+        # 支持爬虫任务和内容生成任务
+        if task.type not in ['crawler', 'content_generation']:
             current_app.logger.error(f"不支持的任务类型: {task.type}，任务ID: {task_id}")
             return jsonify({
                 'success': False,
-                'message': '只支持爬虫任务的命令生成',
+                'message': '只支持爬虫任务和内容生成任务的命令生成',
                 'error_code': 'INVALID_TASK_TYPE'
             }), 400
         
-        # 检查必需字段
-        if not task.url:
-            current_app.logger.error(f"任务缺少URL，任务ID: {task_id}")
+        # 根据任务类型处理不同的命令生成逻辑
+        if task.type == 'crawler':
+            # 爬虫任务的命令生成逻辑
+            # 检查必需字段
+            if not task.url:
+                current_app.logger.error(f"任务缺少URL，任务ID: {task_id}")
+                return jsonify({
+                    'success': False,
+                    'message': '任务缺少URL',
+                    'error_code': 'VALIDATION_ERROR'
+                }), 400
+            
+            if not task.crawler_config_id:
+                current_app.logger.error(f"任务缺少爬虫配置ID，任务ID: {task_id}")
+                return jsonify({
+                    'success': False,
+                    'message': '任务缺少爬虫配置ID',
+                    'error_code': 'VALIDATION_ERROR'
+                }), 400
+            
+            # 使用crawler API的命令生成逻辑
+            from backend.api.crawler import generate_crawler_command_from_config
+            from backend.models.crawler import CrawlerConfig
+            
+            current_app.logger.info(f"开始获取爬虫配置，配置ID: {task.crawler_config_id}")
+            
+            # 获取爬虫配置
+            crawler_config = CrawlerConfig.query.get(task.crawler_config_id)
+            if not crawler_config:
+                current_app.logger.error(f"爬虫配置不存在，配置ID: {task.crawler_config_id}")
+                return jsonify({
+                    'success': False,
+                    'message': '爬虫配置不存在',
+                    'error_code': 'CONFIG_NOT_FOUND'
+                }), 404
+            
+            current_app.logger.info(f"爬虫配置找到，配置名称: {crawler_config.name}")
+            
+            # 生成命令
+            current_app.logger.info(f"开始生成命令，URL: {task.url}")
+            command = generate_crawler_command_from_config(crawler_config, task.url, task_id)
+            current_app.logger.info(f"命令生成成功: {command}")
+            
             return jsonify({
-                'success': False,
-                'message': '任务缺少URL',
-                'error_code': 'VALIDATION_ERROR'
-            }), 400
-        
-        if not task.crawler_config_id:
-            current_app.logger.error(f"任务缺少爬虫配置ID，任务ID: {task_id}")
+                'success': True,
+                'message': '命令生成成功',
+                'data': {
+                    'command': command,
+                    'task_id': task_id,
+                    'task_name': task.name,
+                    'url': task.url,
+                    'crawler_config_name': crawler_config.name
+                }
+            })
+            
+        elif task.type == 'content_generation':
+            # 内容生成任务的命令生成逻辑
+            # 检查必需字段
+            if not task.crawler_task_id:
+                current_app.logger.error(f"内容生成任务缺少爬虫任务ID，任务ID: {task_id}")
+                return jsonify({
+                    'success': False,
+                    'message': '内容生成任务缺少爬虫任务ID',
+                    'error_code': 'VALIDATION_ERROR'
+                }), 400
+            
+            # 生成内容生成任务的命令
+            command = f'uv run python -m ai_content_generator.example {task.crawler_task_id}'
+            current_app.logger.info(f"内容生成命令生成成功: {command}")
+            
             return jsonify({
-                'success': False,
-                'message': '任务缺少爬虫配置ID',
-                'error_code': 'VALIDATION_ERROR'
-            }), 400
-        
-        # 使用crawler API的命令生成逻辑
-        from backend.api.crawler import generate_crawler_command_from_config
-        from backend.models.crawler import CrawlerConfig
-        
-        current_app.logger.info(f"开始获取爬虫配置，配置ID: {task.crawler_config_id}")
-        
-        # 获取爬虫配置
-        crawler_config = CrawlerConfig.query.get(task.crawler_config_id)
-        if not crawler_config:
-            current_app.logger.error(f"爬虫配置不存在，配置ID: {task.crawler_config_id}")
-            return jsonify({
-                'success': False,
-                'message': '爬虫配置不存在',
-                'error_code': 'CONFIG_NOT_FOUND'
-            }), 404
-        
-        current_app.logger.info(f"爬虫配置找到，配置名称: {crawler_config.name}")
-        
-        # 生成命令
-        current_app.logger.info(f"开始生成命令，URL: {task.url}")
-        command = generate_crawler_command_from_config(crawler_config, task.url)
-        current_app.logger.info(f"命令生成成功: {command}")
-        
-        return jsonify({
-            'success': True,
-            'message': '命令生成成功',
-            'data': {
-                'command': command,
-                'task_id': task_id,
-                'task_name': task.name,
-                'url': task.url,
-                'crawler_config_name': crawler_config.name
-            }
-        })
+                'success': True,
+                'message': '命令生成成功',
+                'data': {
+                    'command': command,
+                    'task_id': task_id,
+                    'task_name': task.name,
+                    'crawler_task_id': task.crawler_task_id,
+                    'task_type': 'content_generation'
+                }
+            })
         
     except Exception as e:
         import traceback

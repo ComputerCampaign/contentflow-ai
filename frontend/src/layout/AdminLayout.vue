@@ -171,6 +171,7 @@ const menuItems = [
   { name: 'Tasks', path: '/tasks', title: '任务管理', icon: 'tasks' },
   { name: 'Crawler', path: '/crawler', title: '爬虫配置', icon: 'spider' },
   { name: 'XPath', path: '/xpath', title: 'XPath配置', icon: 'code' },
+  { name: 'AIConfig', path: '/ai-config', title: 'AI配置', icon: 'magic' },
   { name: 'Monitoring', path: '/monitoring', title: '系统监控', icon: 'chart-bar' },
   { name: 'Settings', path: '/settings', title: '系统设置', icon: 'cog' }
 ]

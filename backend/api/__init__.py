@@ -10,6 +10,7 @@ from backend.api.tasks import tasks_bp
 from backend.api.crawler import crawler_bp
 from backend.api.monitoring import monitoring_bp
 from backend.api.xpath import xpath_bp
+from backend.api.ai_config import ai_config_bp
 
 
 def register_blueprints(app):
@@ -30,6 +31,9 @@ def register_blueprints(app):
     # 注册XPath配置API
     app.register_blueprint(xpath_bp, url_prefix=f'{api_prefix}/xpath')
     
+    # 注册AI配置API
+    app.register_blueprint(ai_config_bp, url_prefix=f'{api_prefix}/ai-config')
+    
     # 注册监控API
     app.register_blueprint(monitoring_bp, url_prefix=f'{api_prefix}/monitor')
 
@@ -40,5 +44,6 @@ __all__ = [
     'tasks_bp', 
     'crawler_bp',
     'xpath_bp',
+    'ai_config_bp',
     'monitoring_bp'
 ]
