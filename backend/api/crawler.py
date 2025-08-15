@@ -442,8 +442,9 @@ def generate_crawler_command(config_data, url, task_id=None):
     if config_data.get('page_load_wait'):
         command_parts.extend(['--wait', str(config_data['page_load_wait'])])
     
-    if config_data.get('user_agent'):
-        command_parts.extend(['--user-agent', config_data['user_agent']])
+    # 注释掉user-agent参数，避免shell执行时的空格问题
+    # if config_data.get('user_agent'):
+    #     command_parts.extend(['--user-agent', config_data['user_agent']])
     
     # 验证并过滤有效的rule_ids
     if config_data.get('rule_ids'):

@@ -1412,3 +1412,440 @@ def retry_task(task_id):
             'success': False,
             'message': '重试任务失败，请稍后重试'
         }), 500
+
+
+@tasks_bp.route('/next-airflow', methods=['GET'])
+def get_next_task_for_airflow():
+    """为Airflow获取下一个待执行的任务（无需JWT认证）"""
+    try:
+        # 检查API Key认证
+        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        expected_api_key = current_app.config.get('AIRFLOW_API_KEY', 'airflow-secret-key')
+        
+        if not api_key or api_key != expected_api_key:
+            return jsonify({
+                'success': False,
+                'message': 'API Key认证失败'
+            }), 401
+        
+        # 获取查询参数
+        task_type = request.args.get('type', '').strip()
+        
+        if not task_type:
+            return jsonify({
+                'success': False,
+                'message': '任务类型参数不能为空'
+            }), 400
+        
+        # 验证任务类型
+        valid_types = ['crawler', 'ai_generation', 'blog_generation']
+        if task_type not in valid_types:
+            return jsonify({
+                'success': False,
+                'message': f'无效的任务类型，支持的类型: {", ".join(valid_types)}'
+            }), 400
+        
+        # 查询下一个待执行的任务（不限制用户）
+        # 按优先级降序、创建时间升序排列
+        query = Task.query.filter(
+            and_(
+                Task.type == task_type,
+                Task.status == 'pending'
+            )
+        ).order_by(
+            Task.priority.desc(),
+            Task.created_at.asc()
+        )
+        
+        task = query.first()
+        
+        if not task:
+            return jsonify({
+                'success': True,
+                'message': f'暂无待执行的{task_type}任务',
+                'data': None
+            }), 200
+        
+        # 更新任务状态为执行中
+        old_status = task.status
+        task.status = 'running'
+        task.last_run = datetime.utcnow()
+        task.updated_at = datetime.utcnow()
+        
+        # 创建任务执行记录
+        execution = TaskExecution(
+            task_id=task.id,
+            status='running'
+        )
+        
+        db.session.add(execution)
+        db.session.commit()
+        
+        current_app.logger.info(f"Airflow获取到下一个{task_type}任务: {task.id} - {task.name}")
+        
+        return jsonify({
+            'success': True,
+            'message': '成功获取下一个任务',
+            'data': {
+                'id': task.id,
+                'name': task.name,
+                'task_type': task.type,
+                'url': task.url,
+                'config': task.config,
+                'priority': task.priority,
+                'status': task.status,
+                'old_status': old_status,
+                'created_at': task.created_at.isoformat(),
+                'started_at': task.last_run.isoformat() if task.last_run else None,
+                'execution_id': execution.id
+            }
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Airflow获取下一个任务失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '获取下一个任务失败，请稍后重试'
+        }), 500
+
+
+@tasks_bp.route('/<task_id>/status-airflow', methods=['PUT'])
+def update_task_status_for_airflow(task_id):
+    """为Airflow更新任务状态（使用API Key认证）"""
+    try:
+        # 验证API Key
+        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        expected_key = current_app.config.get('AIRFLOW_API_KEY', 'airflow-secret-key')
+        
+        if not api_key or api_key != expected_key:
+            current_app.logger.warning(f"无效的API Key访问任务状态更新接口，任务ID: {task_id}")
+            return jsonify({
+                'success': False,
+                'message': '无效的API Key',
+                'error_code': 'INVALID_API_KEY'
+            }), 401
+        
+        current_app.logger.info(f"Airflow请求更新任务状态，任务ID: {task_id}")
+        
+        # 查找任务
+        task = Task.query.get(task_id)
+        if not task:
+            current_app.logger.error(f"任务不存在，任务ID: {task_id}")
+            return jsonify({
+                'success': False,
+                'message': '任务不存在',
+                'error_code': 'TASK_NOT_FOUND'
+            }), 404
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'message': '请求数据不能为空',
+                'error_code': 'VALIDATION_ERROR'
+            }), 400
+        
+        # 获取状态参数
+        status = data.get('status', '').strip()
+        if not status:
+            return jsonify({
+                'success': False,
+                'message': '状态不能为空',
+                'error_code': 'VALIDATION_ERROR'
+            }), 400
+        
+        # 验证状态值
+        valid_statuses = ['pending', 'running', 'completed', 'failed', 'cancelled', 'paused']
+        if status not in valid_statuses:
+            return jsonify({
+                'success': False,
+                'message': f'无效的状态值，支持的状态: {", ".join(valid_statuses)}',
+                'error_code': 'INVALID_STATUS'
+            }), 400
+        
+        # 更新任务状态
+        old_status = task.status
+        task.status = status
+        task.updated_at = datetime.utcnow()
+        
+        # 处理进度信息
+        progress = data.get('progress')
+        if progress is not None:
+            if not isinstance(progress, (int, float)) or progress < 0 or progress > 100:
+                return jsonify({
+                    'success': False,
+                    'message': '进度值必须是0-100之间的数字',
+                    'error_code': 'VALIDATION_ERROR'
+                }), 400
+            task.progress = progress
+        
+        # 创建或更新执行记录
+        dag_run_id = data.get('dag_run_id')
+        error_message = data.get('error_message')
+        execution_info = data.get('execution_info', {})
+        
+        # 查找现有执行记录或创建新的
+        execution = None
+        if dag_run_id:
+            execution = TaskExecution.query.filter_by(
+                task_id=task_id,
+                dag_run_id=dag_run_id
+            ).first()
+        
+        if not execution:
+            # 创建新的执行记录
+            execution = TaskExecution(
+                task_id=task_id,
+                status=status,
+                dag_run_id=dag_run_id,
+                error_message=error_message,
+                execution_info=execution_info,
+                started_at=datetime.utcnow() if status == 'running' else None,
+                completed_at=datetime.utcnow() if status in ['completed', 'failed', 'cancelled'] else None
+            )
+            db.session.add(execution)
+        else:
+            # 更新现有执行记录
+            execution.status = status
+            execution.error_message = error_message
+            execution.execution_info = execution_info
+            execution.updated_at = datetime.utcnow()
+            
+            if status == 'running' and not execution.started_at:
+                execution.started_at = datetime.utcnow()
+            elif status in ['completed', 'failed', 'cancelled'] and not execution.completed_at:
+                execution.completed_at = datetime.utcnow()
+        
+        # 更新任务统计
+        if status == 'completed':
+            task.success_count = (task.success_count or 0) + 1
+            task.last_success_at = datetime.utcnow()
+        elif status == 'failed':
+            task.failure_count = (task.failure_count or 0) + 1
+            task.last_failure_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        current_app.logger.info(f"任务状态更新成功，任务ID: {task_id}, 状态: {old_status} -> {status}")
+        
+        return jsonify({
+            'success': True,
+            'message': '任务状态更新成功',
+            'data': {
+                'task_id': task_id,
+                'old_status': old_status,
+                'new_status': status,
+                'progress': task.progress,
+                'updated_at': task.updated_at.isoformat(),
+                'execution_id': execution.id if execution else None
+            }
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        db.session.rollback()
+        current_app.logger.error(f"Airflow更新任务状态失败: {str(e)}")
+        current_app.logger.error(f"错误堆栈: {traceback.format_exc()}")
+        return jsonify({
+            'success': False,
+            'message': '更新任务状态失败',
+            'error_code': 'INTERNAL_ERROR'
+        }), 500
+
+
+@tasks_bp.route('/<task_id>/detail-airflow', methods=['GET'])
+def get_task_detail_for_airflow(task_id):
+    """为Airflow获取任务详情（使用API Key认证）"""
+    try:
+        # 验证API Key
+        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        expected_key = current_app.config.get('AIRFLOW_API_KEY', 'airflow-secret-key')
+        
+        if not api_key or api_key != expected_key:
+            current_app.logger.warning(f"无效的API Key访问任务详情接口，任务ID: {task_id}")
+            return jsonify({
+                'success': False,
+                'message': '无效的API Key',
+                'error_code': 'INVALID_API_KEY'
+            }), 401
+        
+        current_app.logger.info(f"Airflow请求获取任务详情，任务ID: {task_id}")
+        
+        # 查找任务
+        task = Task.query.get(task_id)
+        if not task:
+            current_app.logger.error(f"任务不存在，任务ID: {task_id}")
+            return jsonify({
+                'success': False,
+                'message': '任务不存在',
+                'error_code': 'TASK_NOT_FOUND'
+            }), 404
+        
+        # 获取最近的执行记录
+        latest_execution = TaskExecution.query.filter_by(
+            task_id=task_id
+        ).order_by(TaskExecution.created_at.desc()).first()
+        
+        return jsonify({
+            'success': True,
+            'message': '获取任务详情成功',
+            'data': {
+                'id': task.id,
+                'name': task.name,
+                'type': task.type,
+                'url': task.url,
+                'status': task.status,
+                'progress': task.progress,
+                'created_at': task.created_at.isoformat() if task.created_at else None,
+                'updated_at': task.updated_at.isoformat() if task.updated_at else None,
+                'last_run': task.last_run.isoformat() if task.last_run else None,
+                'crawler_config_id': task.crawler_config_id,
+                'crawler_task_id': task.crawler_task_id,
+                'ai_content_config_id': task.ai_content_config_id,
+                'success_count': task.success_count or 0,
+                'failure_count': task.failure_count or 0,
+                'last_success_at': task.last_success_at.isoformat() if task.last_success_at else None,
+                'last_failure_at': task.last_failure_at.isoformat() if task.last_failure_at else None,
+                'latest_execution': {
+                    'id': latest_execution.id,
+                    'status': latest_execution.status,
+                    'started_at': latest_execution.started_at.isoformat() if latest_execution.started_at else None,
+                    'completed_at': latest_execution.completed_at.isoformat() if latest_execution.completed_at else None,
+                    'error_message': latest_execution.error_message,
+                    'dag_run_id': latest_execution.dag_run_id
+                } if latest_execution else None
+            }
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        current_app.logger.error(f"Airflow获取任务详情失败: {str(e)}")
+        current_app.logger.error(f"错误堆栈: {traceback.format_exc()}")
+        return jsonify({
+            'success': False,
+            'message': '获取任务详情失败',
+            'error_code': 'INTERNAL_ERROR'
+        }), 500
+
+
+@tasks_bp.route('/<task_id>/command-airflow', methods=['GET'])
+def get_task_command_for_airflow(task_id):
+    """为Airflow获取任务执行命令（使用API Key认证）"""
+    try:
+        # 验证API Key
+        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        expected_key = current_app.config.get('AIRFLOW_API_KEY', 'airflow-secret-key')
+        
+        if not api_key or api_key != expected_key:
+            current_app.logger.warning(f"无效的API Key访问任务命令接口，任务ID: {task_id}")
+            return jsonify({
+                'success': False,
+                'message': '无效的API Key',
+                'error_code': 'INVALID_API_KEY'
+            }), 401
+        
+        current_app.logger.info(f"Airflow请求获取任务命令，任务ID: {task_id}")
+        
+        # 查找任务
+        task = Task.query.get(task_id)
+        if not task:
+            current_app.logger.error(f"任务不存在，任务ID: {task_id}")
+            return jsonify({
+                'success': False,
+                'message': '任务不存在',
+                'error_code': 'TASK_NOT_FOUND'
+            }), 404
+        
+        current_app.logger.info(f"任务找到，任务类型: {task.type}, 任务名称: {task.name}")
+        
+        # 根据任务类型生成命令
+        if task.type == 'crawler':
+            # 爬虫任务的命令生成逻辑
+            if not task.crawler_config_id:
+                current_app.logger.error(f"任务缺少爬虫配置ID，任务ID: {task_id}")
+                return jsonify({
+                    'success': False,
+                    'message': '任务缺少爬虫配置ID',
+                    'error_code': 'VALIDATION_ERROR'
+                }), 400
+            
+            # 使用crawler API的命令生成逻辑
+            from backend.api.crawler import generate_crawler_command_from_config
+            from backend.models.crawler import CrawlerConfig
+            
+            current_app.logger.info(f"开始获取爬虫配置，配置ID: {task.crawler_config_id}")
+            
+            # 获取爬虫配置
+            crawler_config = CrawlerConfig.query.get(task.crawler_config_id)
+            if not crawler_config:
+                current_app.logger.error(f"爬虫配置不存在，配置ID: {task.crawler_config_id}")
+                return jsonify({
+                    'success': False,
+                    'message': '爬虫配置不存在',
+                    'error_code': 'CONFIG_NOT_FOUND'
+                }), 404
+            
+            current_app.logger.info(f"爬虫配置找到，配置名称: {crawler_config.name}")
+            
+            # 生成命令
+            current_app.logger.info(f"开始生成命令，URL: {task.url}")
+            command = generate_crawler_command_from_config(crawler_config, task.url, task_id)
+            current_app.logger.info(f"命令生成成功: {command}")
+            
+            return jsonify({
+                'success': True,
+                'message': '命令生成成功',
+                'data': {
+                    'command': command,
+                    'task_id': task_id,
+                    'task_name': task.name,
+                    'url': task.url,
+                    'crawler_config_name': crawler_config.name
+                }
+            })
+            
+        elif task.type == 'content_generation':
+            # 内容生成任务的命令生成逻辑
+            # 检查必需字段
+            if not task.crawler_task_id:
+                current_app.logger.error(f"内容生成任务缺少爬虫任务ID，任务ID: {task_id}")
+                return jsonify({
+                    'success': False,
+                    'message': '内容生成任务缺少爬虫任务ID',
+                    'error_code': 'VALIDATION_ERROR'
+                }), 400
+            
+            # 生成内容生成任务的命令
+            command = f'uv run python -m ai_content_generator.example {task.crawler_task_id}'
+            current_app.logger.info(f"内容生成命令生成成功: {command}")
+            
+            return jsonify({
+                'success': True,
+                'message': '命令生成成功',
+                'data': {
+                    'command': command,
+                    'task_id': task_id,
+                    'task_name': task.name,
+                    'crawler_task_id': task.crawler_task_id,
+                    'task_type': 'content_generation'
+                }
+            })
+        
+        else:
+            current_app.logger.error(f"不支持的任务类型: {task.type}")
+            return jsonify({
+                'success': False,
+                'message': f'不支持的任务类型: {task.type}',
+                'error_code': 'UNSUPPORTED_TASK_TYPE'
+            }), 400
+        
+    except Exception as e:
+        import traceback
+        current_app.logger.error(f"获取任务命令时发生错误: {str(e)}")
+        current_app.logger.error(f"错误堆栈: {traceback.format_exc()}")
+        return jsonify({
+            'success': False,
+            'message': '获取任务命令失败',
+            'error_code': 'INTERNAL_ERROR'
+        }), 500
