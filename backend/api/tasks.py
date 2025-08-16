@@ -366,74 +366,40 @@ def execute_task_for_airflow(task_id):
         db.session.commit()
         current_app.logger.info(f"✅ [BACKEND] 任务 {task_id} 状态已更新为运行中，开始时间: {task.last_run}")
         
-        def execute_command(app):
-            """在后台线程中执行命令"""
-            import os
-            try:
-                logging.info(f"开始执行任务: {task_id}")
-                
-                # 设置工作目录为项目根目录
-                project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-                
-                # 执行命令
-                result = subprocess.run(
-                    command,
-                    shell=True,
-                    cwd=project_root,
-                    capture_output=True,
-                    text=True,
-                    timeout=3600  # 1小时超时
-                )
-                
-                # 更新任务状态
-                with app.app_context():
-                    task_obj = Task.query.get(task_id)
-                    if task_obj:
-                        if result.returncode == 0:
-                            task_obj.status = 'completed'
-                            task_obj.updated_at = datetime.utcnow()
-                            logging.info(f"任务 {task_id} 执行成功")
-                        else:
-                            task_obj.status = 'failed'
-                            task_obj.updated_at = datetime.utcnow()
-                            logging.error(f"任务 {task_id} 执行失败，返回码: {result.returncode}")
-                            if result.stderr:
-                                logging.error(f"错误信息: {result.stderr[:200]}{'...' if len(result.stderr) > 200 else ''}")
-                        
-                        # 提交数据库更改
-                        db.session.commit()
-                    else:
-                        logging.error(f"无法查询任务对象: {task_id}")
-                        
-            except subprocess.TimeoutExpired:
-                logging.error(f"任务执行超时，任务ID: {task_id}")
-                with app.app_context():
-                    task_obj = Task.query.get(task_id)
-                    if task_obj:
-                        task_obj.status = 'failed'
-                        task_obj.updated_at = datetime.utcnow()
-                        
-                        # 提交数据库更改
-                        db.session.commit()
-                        
-            except Exception as e:
-                logging.error(f"任务执行异常，任务ID: {task_id}, 错误: {str(e)}")
-                with app.app_context():
-                    task_obj = Task.query.get(task_id)
-                    if task_obj:
-                        task_obj.status = 'failed'
-                        task_obj.updated_at = datetime.utcnow()
-                        
-                        # 提交数据库更改
-                        db.session.commit()
+        # 直接启动命令，不监听子进程
+        # 设置工作目录为项目根目录
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         
-        # 获取当前应用实例
-        app = current_app._get_current_object()
+        current_app.logger.info(f"🚀 [BACKEND] 启动命令执行，工作目录: {project_root}")
+        current_app.logger.info(f"🚀 [BACKEND] 执行命令: {command}")
         
-        # 在后台线程中执行命令
-        thread = threading.Thread(target=execute_command, args=(app,))
-        thread.daemon = True
-        thread.start()
+        try:
+            # 使用 Popen 启动进程但不等待结果
+            # 爬虫模块会在执行完成后主动调用后端接口更新状态
+            process = subprocess.Popen(
+                command,
+                shell=True,
+                cwd=project_root,
+                stdout=subprocess.DEVNULL,  # 不捕获输出
+                stderr=subprocess.DEVNULL,  # 不捕获错误
+                start_new_session=True      # 创建新的进程组，避免被父进程影响
+            )
+            
+            current_app.logger.info(f"✅ [BACKEND] 命令已启动，进程ID: {process.pid}")
+            current_app.logger.info(f"✅ [BACKEND] 任务 {task_id} 已提交执行，等待爬虫模块完成后回调状态更新")
+            
+        except Exception as e:
+            current_app.logger.error(f"❌ [BACKEND] 启动命令失败: {str(e)}")
+            # 如果启动失败，立即更新任务状态为失败
+            task.status = 'failed'
+            task.updated_at = datetime.utcnow()
+            db.session.commit()
+            
+            return jsonify({
+                'success': False,
+                'message': f'启动任务失败: {str(e)}',
+                'error_code': 'EXECUTION_ERROR'
+            }), 500
         
         response_data = {
             'success': True,

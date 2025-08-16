@@ -134,12 +134,39 @@ class GitHubImageUploader:
             github_api_url = f"https://api.github.com/repos/{self.repo_owner}/{self.repo_name}/contents/{image_path_clean}/{new_file_name}"
             logger.info(f"构建GitHub API URL: {github_api_url}")
             
-            # 准备请求头和数据
-            headers = {
-                'Authorization': f'token {self.token[:8]}***',  # 只显示token前8位用于调试
+            # 准备请求头
+            actual_headers = {
+                'Authorization': f'token {self.token}',
                 'Accept': 'application/vnd.github.v3+json'
             }
-            logger.debug(f"请求头: {headers}")
+            
+            # 检查文件是否已存在
+            logger.info(f"检查文件是否已存在: {new_file_name}")
+            existing_file_sha = None
+            try:
+                check_response = requests.get(github_api_url, headers=actual_headers, timeout=30)
+                if check_response.status_code == 200:
+                    # 文件已存在，获取SHA值
+                    existing_data = check_response.json()
+                    existing_file_sha = existing_data.get('sha')
+                    logger.info(f"文件已存在，SHA值: {existing_file_sha}")
+                    
+                    # 检查内容是否相同（通过SHA值比较）
+                    local_content_sha = hashlib.sha1(f"blob {len(file_content)}\0".encode() + file_content).hexdigest()
+                    if existing_file_sha == local_content_sha:
+                        logger.info(f"文件内容相同，直接返回现有URL")
+                        base_url = self.base_url if self.base_url.endswith('/') else f"{self.base_url}/"
+                        image_url = f"{base_url}{quote(new_file_name)}"
+                        logger.info(f"返回现有图片URL: {image_url}")
+                        return image_url
+                    else:
+                        logger.info(f"文件内容不同，需要更新文件")
+                elif check_response.status_code == 404:
+                    logger.info(f"文件不存在，将创建新文件")
+                else:
+                    logger.warning(f"检查文件存在性时收到意外状态码: {check_response.status_code}")
+            except Exception as check_error:
+                logger.warning(f"检查文件存在性时发生错误: {check_error}，继续尝试上传")
             
             # 将图片内容编码为base64
             logger.debug("开始将图片内容编码为base64")
@@ -148,21 +175,22 @@ class GitHubImageUploader:
             logger.debug(f"base64编码完成，大小: {base64_size} 字符")
             
             # 准备请求数据
-            commit_message = f'Upload image {new_file_name}'
+            commit_message = f'Upload image {new_file_name}' if not existing_file_sha else f'Update image {new_file_name}'
             data = {
                 'message': commit_message,
                 'content': content_base64,
                 'branch': self.branch
             }
-            logger.debug(f"请求数据准备完成: message='{commit_message}', branch='{self.branch}', content_size={base64_size}")
+            
+            # 如果文件已存在，需要提供SHA值
+            if existing_file_sha:
+                data['sha'] = existing_file_sha
+                logger.debug(f"文件已存在，添加SHA值到请求数据: {existing_file_sha}")
+            
+            logger.debug(f"请求数据准备完成: message='{commit_message}', branch='{self.branch}', content_size={base64_size}, sha={'已设置' if existing_file_sha else '未设置'}")
             
             # 发送请求
             logger.info(f"发送PUT请求到GitHub API: {github_api_url}")
-            # 准备实际请求头（包含完整token）
-            actual_headers = {
-                'Authorization': f'token {self.token}',
-                'Accept': 'application/vnd.github.v3+json'
-            }
             response = requests.put(github_api_url, headers=actual_headers, json=data, timeout=30)
             
             # 检查响应

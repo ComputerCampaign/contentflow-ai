@@ -78,6 +78,9 @@ class Config:
     GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
     GITHUB_REPO = os.environ.get('GITHUB_REPO')
     
+    # Airflow API Key配置
+    AIRFLOW_API_KEY = os.environ.get('AIRFLOW_API_KEY') or 'airflow-secret-key'
+    
 
 class DevelopmentConfig(Config):
     """开发环境配置"""

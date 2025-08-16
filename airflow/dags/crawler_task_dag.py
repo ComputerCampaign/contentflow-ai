@@ -84,38 +84,35 @@ submit_crawler_task = PythonOperator(
     dag=dag,
 )
 
-# 3. 轮询检查任务执行状态
+# 3. 轮询爬虫任务状态
 poll_crawler_status = PythonOperator(
     task_id='poll_crawler_status',
     python_callable=poll_task_status,
     dag=dag,
 )
 
-# 4. 处理成功情况
-handle_success = PythonOperator(
+# 4. 处理爬虫任务成功
+handle_crawler_success = PythonOperator(
     task_id='handle_crawler_success',
     python_callable=handle_crawler_success,
-    trigger_rule='none_failed_or_skipped',
     dag=dag,
 )
 
-# 5. 存储爬虫结果（占位）
-store_results = PythonOperator(
-    task_id='store_crawler_results',
-    python_callable=store_crawler_results,
-    trigger_rule='none_failed_or_skipped',
-    dag=dag,
-)
-
-# 6. 处理失败情况
-handle_failure = PythonOperator(
+# 5. 处理爬虫任务失败
+handle_crawler_failure = PythonOperator(
     task_id='handle_crawler_failure',
     python_callable=handle_crawler_failure,
-    trigger_rule='one_failed',
     dag=dag,
 )
 
-# 任务依赖关系
+# 6. 存储爬虫结果
+store_crawler_results = PythonOperator(
+    task_id='store_crawler_results',
+    python_callable=store_crawler_results,
+    dag=dag,
+)
+
+# 设置任务依赖关系
 get_task >> submit_crawler_task >> poll_crawler_status
-poll_crawler_status >> [handle_success, handle_failure]
-handle_success >> store_results
+poll_crawler_status >> [handle_crawler_success, handle_crawler_failure]
+handle_crawler_success >> store_crawler_results

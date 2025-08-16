@@ -69,25 +69,24 @@ def create_app(config_class=Config):
 
 def configure_logging(app):
     """配置日志"""
-    if not app.debug and not app.testing:
-        # 确保日志目录存在
-        log_dir = app.config.get('LOG_DIR', 'logs')
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir)
-        
-        # 配置文件日志
-        log_file = os.path.join(log_dir, 'app.log')
-        file_handler = RotatingFileHandler(
-            log_file, maxBytes=10240000, backupCount=10
-        )
-        file_handler.setFormatter(logging.Formatter(
-            '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
-        ))
-        file_handler.setLevel(logging.INFO)
-        app.logger.addHandler(file_handler)
-        
-        app.logger.setLevel(logging.INFO)
-        app.logger.info('Flask应用启动')
+    # 确保日志目录存在
+    log_dir = app.config.get('LOG_DIR', 'logs')
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    
+    # 配置文件日志（无论是否为调试模式都输出到文件）
+    log_file = os.path.join(log_dir, 'app.log')
+    file_handler = RotatingFileHandler(
+        log_file, maxBytes=10240000, backupCount=10
+    )
+    file_handler.setFormatter(logging.Formatter(
+        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+    ))
+    file_handler.setLevel(logging.INFO)
+    app.logger.addHandler(file_handler)
+    
+    app.logger.setLevel(logging.INFO)
+    app.logger.info('Flask应用启动')
 
 
 def register_error_handlers(app):

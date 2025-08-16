@@ -5,6 +5,7 @@ import argparse
 import os
 import sys
 import json
+import requests
 from urllib.parse import urlparse
 
 # 导入自定义模块
@@ -25,6 +26,53 @@ class SimpleNotifier:
         pass
 
 notifier = SimpleNotifier()
+
+def _update_task_status_via_api(task_id, status, result=None, error_message=None):
+    """调用后端接口更新任务状态
+    
+    Args:
+        task_id (str): 任务ID
+        status (str): 任务状态 ('success', 'failed')
+        result (str, optional): 任务结果
+        error_message (str, optional): 错误信息
+    """
+    try:
+        # 从环境变量或配置文件获取后端API地址
+        api_base_url = os.getenv('BACKEND_API_URL', 'http://localhost:5002/api/v1')
+        url = f"{api_base_url}/tasks/{task_id}/status-airflow"
+        
+        payload = {'status': status}
+        if result:
+            payload['result'] = result
+        if error_message:
+            payload['error_message'] = error_message
+        
+        headers = {
+            'Content-Type': 'application/json',
+            'X-API-Key': os.getenv('AIRFLOW_API_KEY', 'airflow-secret-key')
+        }
+        
+        logger.info(f"🌐 [CRAWLER] 调用后端接口更新任务状态")
+        logger.info(f"   - URL: {url}")
+        logger.info(f"   - Payload: {payload}")
+        logger.info(f"   - API Key: {headers['X-API-Key'][:10]}...")
+        
+        response = requests.put(url, json=payload, headers=headers, timeout=30)
+        
+        if response.status_code == 200:
+            logger.info(f"✅ [CRAWLER] 任务 {task_id} 状态已成功更新为: {status}")
+            try:
+                response_data = response.json()
+                logger.info(f"   - 后端响应: {response_data}")
+            except:
+                logger.info(f"   - 后端响应: {response.text}")
+        else:
+            logger.error(f"❌ [CRAWLER] 更新任务状态失败: HTTP {response.status_code}")
+            logger.error(f"   - 响应内容: {response.text}")
+            
+    except Exception as e:
+        logger.error(f"💥 [CRAWLER] 调用后端接口更新任务状态失败: {str(e)}")
+        # 不抛出异常，避免影响爬虫主流程
 
 class Crawler:
     """网页爬虫，用于抓取图片和标题信息"""
@@ -54,7 +102,6 @@ class Crawler:
         
         logger.info(f"爬虫初始化完成，输出目录: {self.crawler_core.output_dir}, 数据目录: {self.crawler_core.data_dir}")
         logger.info(f"邮件通知: {'已启用' if notifier.enabled else '未启用'}")
-        logger.info("博客生成：请在爬虫完成后使用generate_blog_from_crawler.py脚本")
     
     def crawl(self, url, rule_ids=None, task_id=None):
         """爬取指定URL的图片和标题
@@ -166,13 +213,28 @@ def main():
         
         # 开始爬取，传入规则ID列表和任务ID
         success, task_id, task_dir = crawler.crawl(args.url, rule_ids, args.task_id)
+        
+        # 打印爬取结果信息
+        logger.info(f"🎯 [CRAWLER] 爬取结果 - 成功: {success}, 任务ID: {task_id}, 任务目录: {task_dir}")
+        
+        # 调用后端接口更新任务状态
+        if args.task_id:
+            logger.info(f"📡 [CRAWLER] 准备调用后端接口更新任务状态，任务ID: {args.task_id}")
+            _update_task_status_via_api(args.task_id, 'completed' if success else 'failed', task_dir if success else None)
+        else:
+            logger.warning(f"⚠️ [CRAWLER] 未提供任务ID，跳过状态回传")
+        
         if not success:
             sys.exit(1)
         logger.info(f"爬取完成，任务ID: {task_id}, 任务目录: {task_dir}")
     except KeyboardInterrupt:
         logger.info("用户中断，正在退出...")
+        if args.task_id:
+            _update_task_status_via_api(args.task_id, 'failed', None, '用户中断')
     except Exception as e:
         logger.exception(f"爬取过程中发生错误: {str(e)}")
+        if args.task_id:
+            _update_task_status_via_api(args.task_id, 'failed', None, str(e))
         sys.exit(1)
     finally:
         # 关闭资源
