@@ -43,6 +43,15 @@ class APIClient:
         kwargs.setdefault('headers', self.headers)
         kwargs.setdefault('timeout', self.timeout)
         
+        # 打印请求信息用于调试
+        params = kwargs.get('params')
+        if params:
+            import urllib.parse
+            params_str = f"?{urllib.parse.urlencode(params)}"
+        else:
+            params_str = ""
+        logging.info(f"[Airflow API调用] {method} {url}{params_str}")
+        
         for attempt in range(self.retry_count + 1):
             try:
                 response = requests.request(method, url, **kwargs)
@@ -150,6 +159,59 @@ class APIClient:
             logging.error(f"更新任务 {task_id} 状态失败: {str(e)}")
             raise
     
+    def execute_task(self, task_id: int) -> Dict[str, Any]:
+        """
+        执行指定任务
+        
+        Args:
+            task_id: 任务ID
+        
+        Returns:
+            Dict: 执行结果
+        
+        Raises:
+            requests.exceptions.RequestException: 请求失败时抛出异常
+        """
+        try:
+            url = get_api_url('tasks', 'execute_task', task_id=task_id)
+            response = self._make_request('POST', url)
+            
+            result = response.json()
+            logging.info(f"任务 {task_id} 执行请求已发送")
+            return result
+            
+        except Exception as e:
+            logging.error(f"执行任务 {task_id} 失败: {str(e)}")
+            raise
+    
+    def get_task_status(self, task_id: int) -> Optional[Dict[str, Any]]:
+        """
+        获取任务状态
+        
+        Args:
+            task_id: 任务ID
+        
+        Returns:
+            Dict: 任务状态信息，如果任务不存在返回None
+        
+        Raises:
+            requests.exceptions.RequestException: 请求失败时抛出异常
+        """
+        try:
+            url = get_api_url('tasks', 'get_task_detail', task_id=task_id)
+            response = self._make_request('GET', url)
+            
+            result = response.json()
+            if result.get('success'):
+                return result.get('data')
+            else:
+                logging.warning(f"获取任务 {task_id} 状态失败: {result.get('message')}")
+                return None
+            
+        except Exception as e:
+            logging.error(f"获取任务 {task_id} 状态失败: {str(e)}")
+            return None
+    
     def check_health(self) -> Dict[str, Any]:
         """
         检查后端服务健康状态
@@ -172,6 +234,229 @@ class APIClient:
 
 # 全局API客户端实例
 api_client = APIClient()
+
+
+def submit_task_via_api(**context) -> Dict[str, Any]:
+    """
+    通过API提交任务执行请求（不等待完成）
+    
+    Args:
+        **context: Airflow上下文，包含task_instance等信息
+    
+    Returns:
+        Dict: 提交结果
+    """
+    try:
+        # 从XCom获取任务ID
+        task_id = context['task_instance'].xcom_pull(key='task_id')
+        
+        if not task_id:
+            # 如果XCom中没有task_id，尝试从crawler_task中获取
+            crawler_task = context['task_instance'].xcom_pull(key='crawler_task')
+            if crawler_task and 'id' in crawler_task:
+                task_id = crawler_task['id']
+            else:
+                raise ValueError("无法获取任务ID")
+        
+        logging.info(f"🚀 [AIRFLOW] 开始提交任务执行请求 {task_id}")
+        
+        # 执行前检查任务状态
+        logging.info(f"📋 [AIRFLOW] 检查任务 {task_id} 的当前状态...")
+        pre_status = api_client.get_task_status(task_id)
+        if pre_status:
+            current_status = pre_status.get('status', '未知')
+            task_name = pre_status.get('name', '未知任务')
+            logging.info(f"📋 [AIRFLOW] 任务 {task_id} ({task_name}) 当前状态: {current_status}")
+            
+            # 如果任务已经在运行中，记录详细信息
+            if current_status == 'running':
+                started_at = pre_status.get('started_at')
+                logging.warning(f"⚠️ [AIRFLOW] 任务 {task_id} 当前状态为 running，可能已在执行中")
+                if started_at:
+                    logging.warning(f"⚠️ [AIRFLOW] 任务开始时间: {started_at}")
+        else:
+            logging.warning(f"⚠️ [AIRFLOW] 无法获取任务 {task_id} 的执行前状态")
+        
+        # 调用API执行任务
+        logging.info(f"🔄 [AIRFLOW] 发送执行请求到后端API...")
+        result = api_client.execute_task(task_id)
+        
+        logging.info(f"✅ [AIRFLOW] 任务 {task_id} 执行请求成功发送")
+        logging.info(f"📤 [AIRFLOW] API响应: {result}")
+        
+        # 执行后立即检查状态
+        logging.info(f"📋 [AIRFLOW] 执行后立即检查任务状态...")
+        post_status = api_client.get_task_status(task_id)
+        if post_status:
+            new_status = post_status.get('status', '未知')
+            logging.info(f"📋 [AIRFLOW] 任务 {task_id} 执行后状态: {new_status}")
+            if new_status != pre_status.get('status') if pre_status else None:
+                logging.info(f"🔄 [AIRFLOW] 任务状态已从 {pre_status.get('status') if pre_status else '未知'} 变更为 {new_status}")
+        
+        # 将任务ID和提交结果存储到XCom
+        context['task_instance'].xcom_push(key='submitted_task_id', value=task_id)
+        context['task_instance'].xcom_push(key='submit_result', value=result)
+        
+        submit_result = {
+            'success': True,
+            'task_id': task_id,
+            'message': '任务提交成功',
+            'api_response': result
+        }
+        
+        logging.info(f"✅ [AIRFLOW] 任务 {task_id} 提交完成")
+        return submit_result
+        
+    except Exception as e:
+        logging.error(f"💥 [AIRFLOW] 提交任务失败: {str(e)}")
+        context['task_instance'].xcom_push(key='submit_result', value={'success': False, 'error': str(e)})
+        raise
+
+
+def poll_task_status(**context) -> Dict[str, Any]:
+    """
+    轮询检查任务执行状态直到完成
+    
+    Args:
+        **context: Airflow上下文，包含task_instance等信息
+    
+    Returns:
+        Dict: 执行结果
+    """
+    import time
+    
+    try:
+        # 从XCom获取任务ID
+        task_id = context['task_instance'].xcom_pull(key='submitted_task_id')
+        
+        if not task_id:
+            # 尝试从其他可能的key获取
+            task_id = context['task_instance'].xcom_pull(key='task_id')
+            if not task_id:
+                crawler_task = context['task_instance'].xcom_pull(key='crawler_task')
+                if crawler_task and 'id' in crawler_task:
+                    task_id = crawler_task['id']
+                else:
+                    raise ValueError("无法获取任务ID")
+        
+        logging.info(f"⏳ [AIRFLOW] 开始轮询任务 {task_id} 的执行状态...")
+        
+        # 轮询等待任务完成
+        max_wait_time = 3600  # 最大等待时间1小时
+        poll_interval = 10    # 轮询间隔10秒
+        start_time = time.time()
+        poll_count = 0
+        
+        logging.info(f"⏳ [AIRFLOW] 轮询配置: 最大等待时间 {max_wait_time}秒，轮询间隔 {poll_interval}秒")
+        
+        while time.time() - start_time < max_wait_time:
+            poll_count += 1
+            elapsed_time = int(time.time() - start_time)
+            
+            logging.info(f"🔍 [AIRFLOW] [轮询 #{poll_count}] 任务 {task_id} - 已等待 {elapsed_time}秒，开始获取任务状态...")
+            
+            # 获取任务状态
+            try:
+                task_status = api_client.get_task_status(task_id)
+            except Exception as e:
+                logging.error(f"❌ [AIRFLOW] [轮询 #{poll_count}] 获取任务 {task_id} 状态时发生异常: {str(e)}")
+                logging.info(f"⏳ [AIRFLOW] [轮询 #{poll_count}] 将在 {poll_interval} 秒后重试...")
+                time.sleep(poll_interval)
+                continue
+            
+            if not task_status:
+                logging.error(f"❌ [AIRFLOW] [轮询 #{poll_count}] 无法获取任务 {task_id} 的状态信息")
+                logging.info(f"⏳ [AIRFLOW] [轮询 #{poll_count}] 将在 {poll_interval} 秒后重试...")
+                time.sleep(poll_interval)
+                continue
+            
+            current_status = task_status.get('status')
+            task_name = task_status.get('name', '未知任务')
+            
+            logging.info(f"📊 [AIRFLOW] [轮询 #{poll_count}] 任务 {task_id} ({task_name}) 当前状态: {current_status}")
+            
+            # 检查任务是否完成
+            if current_status == 'completed':
+                logging.info(f"✅ [AIRFLOW] [轮询 #{poll_count}] 任务 {task_id} 执行成功完成！")
+                logging.info(f"⏱️ [AIRFLOW] [轮询 #{poll_count}] 总等待时间: {elapsed_time}秒，轮询次数: {poll_count}")
+                
+                final_result = {
+                    'success': True,
+                    'status': 'completed',
+                    'task_id': task_id,
+                    'task_data': task_status,
+                    'message': '任务执行成功',
+                    'elapsed_time': elapsed_time,
+                    'poll_count': poll_count
+                }
+                break
+            elif current_status == 'failed':
+                error_message = task_status.get('error_message', '未知错误')
+                logging.error(f"❌ [AIRFLOW] [轮询 #{poll_count}] 任务 {task_id} 执行失败！")
+                logging.error(f"💥 [AIRFLOW] [轮询 #{poll_count}] 失败原因: {error_message}")
+                logging.info(f"⏱️ [AIRFLOW] [轮询 #{poll_count}] 总等待时间: {elapsed_time}秒，轮询次数: {poll_count}")
+                
+                final_result = {
+                    'success': False,
+                    'status': 'failed',
+                    'task_id': task_id,
+                    'task_data': task_status,
+                    'message': f'任务执行失败: {error_message}',
+                    'elapsed_time': elapsed_time,
+                    'poll_count': poll_count
+                }
+                break
+            elif current_status in ['running', 'pending']:
+                # 任务仍在执行中，继续等待
+                remaining_time = max_wait_time - elapsed_time
+                logging.info(f"⏳ [AIRFLOW] [轮询 #{poll_count}] 任务 {task_id} 仍在执行中 (状态: {current_status})")
+                
+                # 每5次轮询输出一次进度摘要
+                if poll_count % 5 == 0:
+                    logging.info(f"📊 [AIRFLOW] [进度摘要] 任务 {task_id} 已轮询 {poll_count} 次，累计等待 {elapsed_time}秒，状态: {current_status}")
+                
+                time.sleep(poll_interval)
+                continue
+            else:
+                # 未知状态
+                logging.warning(f"⚠️ [AIRFLOW] [轮询 #{poll_count}] 任务 {task_id} 状态未知: {current_status}")
+                time.sleep(poll_interval)
+                continue
+        else:
+            # 超时
+            elapsed_time = int(time.time() - start_time)
+            final_status = current_status if 'current_status' in locals() else '未知'
+            logging.error(f"⏰ [AIRFLOW] 任务 {task_id} 执行超时！总等待时间: {elapsed_time}秒，轮询次数: {poll_count}")
+            
+            final_result = {
+                'success': False,
+                'status': 'timeout',
+                'task_id': task_id,
+                'message': f'任务等待超时，已等待 {elapsed_time}秒，轮询 {poll_count} 次',
+                'elapsed_time': elapsed_time,
+                'poll_count': poll_count
+            }
+        
+        # 将执行结果存储到XCom
+        context['task_instance'].xcom_push(key='execution_result', value=final_result)
+        context['task_instance'].xcom_push(key='execution_status', value=final_result['status'])
+        
+        # 如果任务失败或超时，抛出异常让Airflow知道任务失败
+        if not final_result['success']:
+            error_msg = final_result['message']
+            logging.error(f"💥 [AIRFLOW] 任务执行失败，准备抛出异常: {error_msg}")
+            context['task_instance'].xcom_push(key='error_message', value=error_msg)
+            raise Exception(error_msg)
+        
+        logging.info(f"✅ [AIRFLOW] 任务 {task_id} 轮询完成，最终结果: {final_result}")
+        return final_result
+        
+    except Exception as e:
+        logging.error(f"💥 [AIRFLOW] 轮询任务状态失败: {str(e)}")
+        context['task_instance'].xcom_push(key='execution_result', value={'success': False, 'error': str(e)})
+        context['task_instance'].xcom_push(key='execution_status', value='error')
+        context['task_instance'].xcom_push(key='error_message', value=str(e))
+        raise
 
 
 def get_pending_task(task_type: str, **context) -> Optional[Dict[str, Any]]:

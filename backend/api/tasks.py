@@ -16,9 +16,44 @@ from backend.models.ai_content import AIContentConfig
 from backend.utils.xpath_manager import xpath_manager
 from datetime import datetime
 from sqlalchemy import and_, or_
+import subprocess
+import threading
+import time
+import logging
+import os
+from logging.handlers import RotatingFileHandler
 
 
 tasks_bp = Blueprint('tasks', __name__)
+
+# 配置logging输出到文件
+def configure_thread_logging():
+    """配置线程中的logging输出到文件"""
+    log_dir = 'logs'
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    
+    log_file = os.path.join(log_dir, 'app.log')
+    
+    # 获取root logger
+    logger = logging.getLogger()
+    
+    # 检查是否已经配置过文件handler
+    has_file_handler = any(isinstance(handler, RotatingFileHandler) for handler in logger.handlers)
+    
+    if not has_file_handler:
+        file_handler = RotatingFileHandler(
+            log_file, maxBytes=10240000, backupCount=10
+        )
+        file_handler.setFormatter(logging.Formatter(
+            '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+        ))
+        file_handler.setLevel(logging.INFO)
+        logger.addHandler(file_handler)
+        logger.setLevel(logging.INFO)
+
+# 初始化logging配置
+configure_thread_logging()
 
 
 def get_current_user():
@@ -189,6 +224,252 @@ def create_crawler_task():
         return jsonify({
             'success': False,
             'message': '创建爬虫任务失败，请稍后重试'
+        }), 500
+
+
+@tasks_bp.route('/<task_id>/execute-airflow', methods=['POST'])
+def execute_task_for_airflow(task_id):
+    """为Airflow执行任务（使用API Key认证）"""
+    import subprocess
+    import threading
+    import os
+    
+    try:
+        # 验证API Key - 先检查headers，避免在空请求体时解析JSON
+        api_key = request.headers.get('X-API-Key')
+        
+        # 如果headers中没有API Key，尝试从JSON中获取（安全地处理空请求体）
+        if not api_key:
+            try:
+                json_data = request.get_json(silent=True)
+                if json_data:
+                    api_key = json_data.get('api_key')
+            except Exception:
+                # 忽略JSON解析错误，继续使用headers中的API Key
+                pass
+        
+        expected_key = current_app.config.get('AIRFLOW_API_KEY', 'airflow-secret-key')
+        
+        if not api_key or api_key != expected_key:
+            current_app.logger.warning(f"无效的API Key访问任务执行接口，任务ID: {task_id}")
+            return jsonify({
+                'success': False,
+                'message': '无效的API Key',
+                'error_code': 'INVALID_API_KEY'
+            }), 401
+        
+        current_app.logger.info(f"🚀 [BACKEND] Airflow请求执行任务，任务ID: {task_id}")
+        
+        # 查找任务
+        task = Task.query.get(task_id)
+        if not task:
+            current_app.logger.error(f"❌ [BACKEND] 任务不存在，任务ID: {task_id}")
+            return jsonify({
+                'success': False,
+                'message': '任务不存在',
+                'error_code': 'TASK_NOT_FOUND'
+            }), 404
+        
+        current_app.logger.info(f"📋 [BACKEND] 任务查找成功 - ID: {task_id}, 名称: {task.name}, 类型: {task.type}")
+        current_app.logger.info(f"📊 [BACKEND] 任务当前状态: {task.status}")
+        current_app.logger.info(f"📅 [BACKEND] 任务创建时间: {task.created_at}")
+        if task.last_run:
+            current_app.logger.info(f"📅 [BACKEND] 任务最后运行时间: {task.last_run}")
+        current_app.logger.info(f"📅 [BACKEND] 任务更新时间: {task.updated_at}")
+        
+        # 检查任务状态
+        current_app.logger.info(f"🔍 [BACKEND] 检查任务状态是否允许执行...")
+        allowed_statuses = ['pending', 'failed']
+        current_app.logger.info(f"🔍 [BACKEND] 允许执行的状态: {allowed_statuses}")
+        allowed_statuses = ['pending', 'failed', 'running']
+        if task.status not in allowed_statuses:
+            current_app.logger.warning(f"⚠️ [BACKEND] 任务状态不允许执行！")
+            current_app.logger.warning(f"⚠️ [BACKEND] 当前状态: {task.status}，允许的状态: {allowed_statuses}")
+            current_app.logger.warning(f"⚠️ [BACKEND] 任务ID: {task_id}")
+            return jsonify({
+                'success': False,
+                'message': f'任务状态不允许执行，当前状态: {task.status}',
+                'error_code': 'INVALID_TASK_STATUS'
+            }), 400
+        
+        current_app.logger.info(f"✅ [BACKEND] 任务状态检查通过，可以执行")
+        
+        current_app.logger.info(f"任务找到，任务类型: {task.type}, 任务名称: {task.name}")
+        
+        # 获取执行命令
+        if task.type == 'crawler':
+            if not task.crawler_config_id:
+                current_app.logger.error(f"任务缺少爬虫配置ID，任务ID: {task_id}")
+                return jsonify({
+                    'success': False,
+                    'message': '任务缺少爬虫配置ID',
+                    'error_code': 'VALIDATION_ERROR'
+                }), 400
+            
+            # 使用crawler API的命令生成逻辑
+            from backend.api.crawler import generate_crawler_command_from_config
+            from backend.models.crawler import CrawlerConfig
+            
+            # 获取爬虫配置
+            crawler_config = CrawlerConfig.query.get(task.crawler_config_id)
+            if not crawler_config:
+                current_app.logger.error(f"爬虫配置不存在，配置ID: {task.crawler_config_id}")
+                return jsonify({
+                    'success': False,
+                    'message': '爬虫配置不存在',
+                    'error_code': 'CONFIG_NOT_FOUND'
+                }), 404
+            
+            # 生成命令
+            command = generate_crawler_command_from_config(crawler_config, task.url, task_id)
+            current_app.logger.info(f"生成的执行命令: {command}")
+            current_app.logger.info(f"🔧 [BACKEND] [DEBUG] 爬虫任务命令详情:")
+            current_app.logger.info(f"🔧 [BACKEND] [DEBUG] - 任务ID: {task_id}")
+            current_app.logger.info(f"🔧 [BACKEND] [DEBUG] - 任务URL: {task.url}")
+            current_app.logger.info(f"🔧 [BACKEND] [DEBUG] - 爬虫配置ID: {task.crawler_config_id}")
+            current_app.logger.info(f"🔧 [BACKEND] [DEBUG] - 完整命令: {command}")
+            
+        elif task.type == 'content_generation':
+            if not task.crawler_task_id:
+                current_app.logger.error(f"内容生成任务缺少爬虫任务ID，任务ID: {task_id}")
+                return jsonify({
+                    'success': False,
+                    'message': '内容生成任务缺少爬虫任务ID',
+                    'error_code': 'VALIDATION_ERROR'
+                }), 400
+            
+            command = f'uv run python -m ai_content_generator.example {task.crawler_task_id}'
+            current_app.logger.info(f"生成的执行命令: {command}")
+            current_app.logger.info(f"🔧 [BACKEND] [DEBUG] 内容生成任务命令详情:")
+            current_app.logger.info(f"🔧 [BACKEND] [DEBUG] - 任务ID: {task_id}")
+            current_app.logger.info(f"🔧 [BACKEND] [DEBUG] - 爬虫任务ID: {task.crawler_task_id}")
+            current_app.logger.info(f"🔧 [BACKEND] [DEBUG] - 完整命令: {command}")
+            
+        else:
+            current_app.logger.error(f"不支持的任务类型: {task.type}")
+            return jsonify({
+                'success': False,
+                'message': f'不支持的任务类型: {task.type}',
+                'error_code': 'UNSUPPORTED_TASK_TYPE'
+            }), 400
+        
+        # 更新任务状态为运行中
+        old_status = task.status
+        old_last_run = task.last_run
+        
+        current_app.logger.info(f"🔄 [BACKEND] 准备更新任务状态...")
+        current_app.logger.info(f"🔄 [BACKEND] 状态变化: {old_status} → running")
+        
+        task.status = 'running'
+        task.last_run = datetime.utcnow()
+        
+        db.session.commit()
+        current_app.logger.info(f"✅ [BACKEND] 任务 {task_id} 状态已更新为运行中，开始时间: {task.last_run}")
+        
+        def execute_command(app):
+            """在后台线程中执行命令"""
+            import os
+            try:
+                logging.info(f"开始执行任务: {task_id}")
+                
+                # 设置工作目录为项目根目录
+                project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                
+                # 执行命令
+                result = subprocess.run(
+                    command,
+                    shell=True,
+                    cwd=project_root,
+                    capture_output=True,
+                    text=True,
+                    timeout=3600  # 1小时超时
+                )
+                
+                # 更新任务状态
+                with app.app_context():
+                    task_obj = Task.query.get(task_id)
+                    if task_obj:
+                        if result.returncode == 0:
+                            task_obj.status = 'completed'
+                            task_obj.updated_at = datetime.utcnow()
+                            logging.info(f"任务 {task_id} 执行成功")
+                        else:
+                            task_obj.status = 'failed'
+                            task_obj.updated_at = datetime.utcnow()
+                            logging.error(f"任务 {task_id} 执行失败，返回码: {result.returncode}")
+                            if result.stderr:
+                                logging.error(f"错误信息: {result.stderr[:200]}{'...' if len(result.stderr) > 200 else ''}")
+                        
+                        # 提交数据库更改
+                        db.session.commit()
+                    else:
+                        logging.error(f"无法查询任务对象: {task_id}")
+                        
+            except subprocess.TimeoutExpired:
+                logging.error(f"任务执行超时，任务ID: {task_id}")
+                with app.app_context():
+                    task_obj = Task.query.get(task_id)
+                    if task_obj:
+                        task_obj.status = 'failed'
+                        task_obj.updated_at = datetime.utcnow()
+                        
+                        # 提交数据库更改
+                        db.session.commit()
+                        
+            except Exception as e:
+                logging.error(f"任务执行异常，任务ID: {task_id}, 错误: {str(e)}")
+                with app.app_context():
+                    task_obj = Task.query.get(task_id)
+                    if task_obj:
+                        task_obj.status = 'failed'
+                        task_obj.updated_at = datetime.utcnow()
+                        
+                        # 提交数据库更改
+                        db.session.commit()
+        
+        # 获取当前应用实例
+        app = current_app._get_current_object()
+        
+        # 在后台线程中执行命令
+        thread = threading.Thread(target=execute_command, args=(app,))
+        thread.daemon = True
+        thread.start()
+        
+        response_data = {
+            'success': True,
+            'message': '任务已开始执行',
+            'data': {
+                'task_id': task_id,
+                'task_name': task.name,
+                'command': command,
+                'status': 'running',
+                'started_at': task.last_run.isoformat() if task.last_run else None
+            }
+        }
+        
+
+        
+        return jsonify(response_data)
+        
+    except Exception as e:
+        import traceback
+        current_app.logger.error(f"执行任务时发生错误: {str(e)}")
+        current_app.logger.error(f"错误堆栈: {traceback.format_exc()}")
+        
+        # 如果任务状态已更新为运行中，需要回滚
+        try:
+            task_obj = Task.query.get(task_id)
+            if task_obj and task_obj.status == 'running':
+                task_obj.status = 'failed'
+                task_obj.updated_at = datetime.utcnow()
+                db.session.commit()
+        except:
+            pass
+            
+        return jsonify({
+            'success': False,
+            'message': '执行任务失败',
+            'error_code': 'INTERNAL_ERROR'
         }), 500
 
 
@@ -893,8 +1174,8 @@ def update_task_status(task_id):
                 dag_run_id=dag_run_id,
                 error_message=error_message,
                 execution_info=execution_info,
-                started_at=datetime.utcnow() if status == 'running' else None,
-                completed_at=datetime.utcnow() if status in ['completed', 'failed', 'cancelled'] else None
+                start_time=datetime.utcnow() if status == 'running' else None,
+                 end_time=datetime.utcnow() if status in ['completed', 'failed', 'cancelled'] else None
             )
             db.session.add(execution)
         else:
@@ -904,18 +1185,14 @@ def update_task_status(task_id):
             execution.execution_info = execution_info
             execution.updated_at = datetime.utcnow()
             
-            if status == 'running' and not execution.started_at:
-                execution.started_at = datetime.utcnow()
-            elif status in ['completed', 'failed', 'cancelled'] and not execution.completed_at:
-                execution.completed_at = datetime.utcnow()
+            if status == 'running' and not execution.start_time:
+                execution.start_time = datetime.utcnow()
+            elif status in ['completed', 'failed', 'cancelled'] and not execution.end_time:
+                execution.end_time = datetime.utcnow()
         
-        # 更新任务统计
-        if status == 'completed':
-            task.success_count = (task.success_count or 0) + 1
-            task.last_success_at = datetime.utcnow()
-        elif status == 'failed':
-            task.failure_count = (task.failure_count or 0) + 1
-            task.last_failure_at = datetime.utcnow()
+        # 更新任务统计 - 移除不存在的字段引用
+        # Task模型中没有success_count, failure_count, last_success_at, last_failure_at字段
+        # 这些统计信息通过TaskExecution记录来跟踪
         
         db.session.commit()
         
@@ -1291,7 +1568,7 @@ def cancel_task(task_id):
             task_id=task_id,
             status='cancelled',
             error_message=f'任务被取消: {reason}',
-            completed_at=datetime.utcnow()
+            end_time=datetime.utcnow()
         )
         db.session.add(execution)
         
@@ -1585,6 +1862,17 @@ def update_task_status_for_airflow(task_id):
         error_message = data.get('error_message')
         execution_info = data.get('execution_info', {})
         
+        # 映射任务状态到执行状态
+        execution_status_map = {
+            'pending': 'running',
+            'running': 'running', 
+            'completed': 'success',
+            'failed': 'failed',
+            'cancelled': 'cancelled',
+            'paused': 'running'
+        }
+        execution_status = execution_status_map.get(status, 'running')
+        
         # 查找现有执行记录或创建新的
         execution = None
         if dag_run_id:
@@ -1597,33 +1885,28 @@ def update_task_status_for_airflow(task_id):
             # 创建新的执行记录
             execution = TaskExecution(
                 task_id=task_id,
-                status=status,
+                status=execution_status,
                 dag_run_id=dag_run_id,
                 error_message=error_message,
                 execution_info=execution_info,
-                started_at=datetime.utcnow() if status == 'running' else None,
-                completed_at=datetime.utcnow() if status in ['completed', 'failed', 'cancelled'] else None
+                start_time=datetime.utcnow() if status == 'running' else None,
+                end_time=datetime.utcnow() if status in ['completed', 'failed', 'cancelled'] else None
             )
             db.session.add(execution)
         else:
             # 更新现有执行记录
-            execution.status = status
+            execution.status = execution_status
             execution.error_message = error_message
             execution.execution_info = execution_info
             execution.updated_at = datetime.utcnow()
             
-            if status == 'running' and not execution.started_at:
-                execution.started_at = datetime.utcnow()
-            elif status in ['completed', 'failed', 'cancelled'] and not execution.completed_at:
-                execution.completed_at = datetime.utcnow()
+            if status == 'running' and not execution.start_time:
+                execution.start_time = datetime.utcnow()
+            elif status in ['completed', 'failed', 'cancelled'] and not execution.end_time:
+                execution.end_time = datetime.utcnow()
         
-        # 更新任务统计
-        if status == 'completed':
-            task.success_count = (task.success_count or 0) + 1
-            task.last_success_at = datetime.utcnow()
-        elif status == 'failed':
-            task.failure_count = (task.failure_count or 0) + 1
-            task.last_failure_at = datetime.utcnow()
+        # 更新任务最后运行时间
+        task.last_run = datetime.utcnow()
         
         db.session.commit()
         
@@ -1670,12 +1953,10 @@ def get_task_detail_for_airflow(task_id):
                 'error_code': 'INVALID_API_KEY'
             }), 401
         
-        current_app.logger.info(f"Airflow请求获取任务详情，任务ID: {task_id}")
-        
         # 查找任务
         task = Task.query.get(task_id)
         if not task:
-            current_app.logger.error(f"任务不存在，任务ID: {task_id}")
+            current_app.logger.error(f"❌ [BACKEND] 任务不存在: {task_id}")
             return jsonify({
                 'success': False,
                 'message': '任务不存在',
@@ -1686,6 +1967,24 @@ def get_task_detail_for_airflow(task_id):
         latest_execution = TaskExecution.query.filter_by(
             task_id=task_id
         ).order_by(TaskExecution.created_at.desc()).first()
+        
+        # 计算执行统计信息
+        success_count = TaskExecution.query.filter_by(
+            task_id=task_id, status='success'
+        ).count()
+        
+        failure_count = TaskExecution.query.filter_by(
+            task_id=task_id, status='failed'
+        ).count()
+        
+        # 获取最后成功和失败的时间
+        last_success = TaskExecution.query.filter_by(
+            task_id=task_id, status='success'
+        ).order_by(TaskExecution.end_time.desc()).first()
+        
+        last_failure = TaskExecution.query.filter_by(
+            task_id=task_id, status='failed'
+        ).order_by(TaskExecution.end_time.desc()).first()
         
         return jsonify({
             'success': True,
@@ -1703,15 +2002,16 @@ def get_task_detail_for_airflow(task_id):
                 'crawler_config_id': task.crawler_config_id,
                 'crawler_task_id': task.crawler_task_id,
                 'ai_content_config_id': task.ai_content_config_id,
-                'success_count': task.success_count or 0,
-                'failure_count': task.failure_count or 0,
-                'last_success_at': task.last_success_at.isoformat() if task.last_success_at else None,
-                'last_failure_at': task.last_failure_at.isoformat() if task.last_failure_at else None,
+                'success_count': success_count,
+                'failure_count': failure_count,
+                'total_executions': task.total_executions or 0,
+                'last_success_at': last_success.end_time.isoformat() if last_success and last_success.end_time else None,
+                'last_failure_at': last_failure.end_time.isoformat() if last_failure and last_failure.end_time else None,
                 'latest_execution': {
                     'id': latest_execution.id,
                     'status': latest_execution.status,
-                    'started_at': latest_execution.started_at.isoformat() if latest_execution.started_at else None,
-                    'completed_at': latest_execution.completed_at.isoformat() if latest_execution.completed_at else None,
+                    'start_time': latest_execution.start_time.isoformat() if latest_execution.start_time else None,
+                    'end_time': latest_execution.end_time.isoformat() if latest_execution.end_time else None,
                     'error_message': latest_execution.error_message,
                     'dag_run_id': latest_execution.dag_run_id
                 } if latest_execution else None

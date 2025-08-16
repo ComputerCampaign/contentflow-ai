@@ -440,7 +440,7 @@ def generate_crawler_command(config_data, url, task_id=None):
         command_parts.extend(['--proxy', config_data['proxy']])
     
     if config_data.get('page_load_wait'):
-        command_parts.extend(['--wait', str(config_data['page_load_wait'])])
+        command_parts.extend(['--page-load-wait', str(config_data['page_load_wait'])])
     
     # 注释掉user-agent参数，避免shell执行时的空格问题
     # if config_data.get('user_agent'):
@@ -472,15 +472,15 @@ def generate_crawler_command(config_data, url, task_id=None):
                 # 如果所有规则都被删除，使用原始配置以保持向后兼容
                 valid_rule_ids = config_data['rule_ids']
                 
-            command_parts.extend(['--rules', valid_rule_ids])
+            command_parts.extend(['--rule-ids', valid_rule_ids])
         except Exception as e:
             current_app.logger.error(f"验证XPath规则时出错: {str(e)}")
             # 如果验证失败，使用原始配置
-            command_parts.extend(['--rules', config_data['rule_ids']])
+            command_parts.extend(['--rule-ids', config_data['rule_ids']])
     
     # 处理enable_xpath参数，根据数据库值映射
     xpath_value = config_data.get('enable_xpath', False)
-    command_parts.extend(['--enable_xpath', str(xpath_value).lower()])
+    command_parts.extend(['--enable-xpath', str(xpath_value).lower()])
     
     return ' '.join(command_parts)
 

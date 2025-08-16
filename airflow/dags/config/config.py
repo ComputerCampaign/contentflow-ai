@@ -7,7 +7,7 @@ Airflow DAGs 配置文件
 import os
 
 # 后端API基础配置
-BACKEND_BASE_URL = os.environ.get('BACKEND_BASE_URL', 'http://192.168.212.188:5002')
+BACKEND_BASE_URL = os.environ.get('BACKEND_BASE_URL', 'http://host.docker.internal:5002')
 
 # API接口配置
 API_ENDPOINTS = {
@@ -18,6 +18,7 @@ API_ENDPOINTS = {
         'get_task_command': f'{BACKEND_BASE_URL}/api/v1/tasks/{{task_id}}/command-airflow',
         'update_task_status': f'{BACKEND_BASE_URL}/api/v1/tasks/{{task_id}}/status-airflow',
         'get_task_detail': f'{BACKEND_BASE_URL}/api/v1/tasks/{{task_id}}/detail-airflow',
+        'execute_task': f'{BACKEND_BASE_URL}/api/v1/tasks/{{task_id}}/execute-airflow',
     },
     
     # 爬虫相关接口

@@ -103,22 +103,10 @@
           />
         </el-form-item>
         
-        <!-- 路径配置 -->
-        <el-divider content-position="left">路径配置</el-divider>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="输出目录">
-              <el-input v-model="createForm.output" placeholder="输出目录路径" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="数据目录">
-              <el-input v-model="createForm.data_dir" placeholder="数据存储目录路径" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-form-item label="配置文件路径">
-          <el-input v-model="createForm.config" placeholder="config.json" />
+        <!-- 存储配置 -->
+        <el-divider content-position="left">存储配置</el-divider>
+        <el-form-item label="数据目录">
+          <el-input v-model="createForm.data_dir" placeholder="crawler_data" />
         </el-form-item>
         
         <!-- 爬虫核心配置 -->
@@ -265,23 +253,9 @@
         
         <!-- 存储配置 -->
         <el-divider content-position="left">存储配置</el-divider>
-        <el-row :gutter="20">
-          <el-col :span="8">
-            <el-form-item label="基础目录">
-              <el-input v-model="editForm.storage_base_dir" placeholder="crawler_data" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="输出目录">
-              <el-input v-model="editForm.storage_output_dir" placeholder="output" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="日志目录">
-              <el-input v-model="editForm.storage_logs_dir" placeholder="logs" />
-            </el-form-item>
-          </el-col>
-        </el-row>
+        <el-form-item label="数据目录">
+          <el-input v-model="editForm.data_dir" placeholder="crawler_data" />
+        </el-form-item>
         
         <!-- Selenium配置 -->
         <el-divider content-position="left">Selenium配置</el-divider>
@@ -474,9 +448,7 @@ const createForm = ref({
   use_selenium: false,
   user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
   // 存储配置
-  storage_base_dir: 'crawler_data',
-  storage_output_dir: 'output',
-  storage_logs_dir: 'logs',
+  data_dir: 'crawler_data',
   // Selenium配置
   selenium_headless: true,
   selenium_disable_gpu: true,
@@ -762,12 +734,10 @@ const resetCreateForm = () => {
   createForm.value = {
     name: '',
     description: '',
-    output: '',
-    data_dir: '',
+    data_dir: 'crawler_data',
     use_selenium: false,
     timeout: 30,
     retry: 3,
-    config: 'config.json',
     email_notification: false,
     headless: true,
     proxy: '',

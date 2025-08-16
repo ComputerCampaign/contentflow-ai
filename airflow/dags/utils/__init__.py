@@ -11,7 +11,9 @@ from .utils import (
     generate_task_command,
     handle_task_success,
     handle_task_failure,
-    store_task_results
+    store_task_results,
+    submit_task_via_api,
+    poll_task_status
 )
 
 __all__ = [
@@ -20,5 +22,7 @@ __all__ = [
     'generate_task_command',
     'handle_task_success',
     'handle_task_failure',
-    'store_task_results'
+    'store_task_results',
+    'submit_task_via_api',
+    'poll_task_status'
 ]

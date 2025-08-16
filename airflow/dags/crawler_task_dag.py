@@ -13,8 +13,8 @@ import requests
 import json
 import logging
 from config import API_CONFIG, get_api_url, get_task_type_param, TASK_STATUS, DAG_CONFIG
-from utils import (get_pending_task, generate_task_command, handle_task_success, 
-                   handle_task_failure, store_task_results)
+from utils import (get_pending_task, handle_task_success, 
+                   handle_task_failure, store_task_results, submit_task_via_api, poll_task_status)
 
 # 默认参数
 default_args = {
@@ -32,7 +32,7 @@ dag = DAG(
     'crawler_task_pipeline',
     default_args=default_args,
     description='爬虫任务处理流水线',
-    schedule_interval=timedelta(minutes=60),  # 每30分钟执行一次
+    schedule_interval=timedelta(minutes=600),  # 每30分钟执行一次
     catchup=False,
     tags=['crawler', 'pipeline'],
 )
@@ -49,14 +49,6 @@ def get_pending_crawler_task(**context):
     获取待执行的爬虫任务
     """
     return get_pending_task('CRAWLER', **context)
-
-def generate_crawler_command(**context):
-    """
-    生成爬虫执行命令
-    """
-    return generate_task_command('CRAWLER', **context)
-
-# 任务状态更新功能已移至utils模块中的APIClient类
 
 def handle_crawler_success(**context):
     """
@@ -85,17 +77,17 @@ get_task = PythonOperator(
     dag=dag,
 )
 
-# 2. 生成爬虫执行命令
-generate_command = PythonOperator(
-    task_id='generate_crawler_command',
-    python_callable=generate_crawler_command,
+# 2. 提交爬虫任务执行请求
+submit_crawler_task = PythonOperator(
+    task_id='submit_crawler_task',
+    python_callable=submit_task_via_api,
     dag=dag,
 )
 
-# 3. 执行爬虫任务
-execute_crawler = BashOperator(
-    task_id='execute_crawler_task',
-    bash_command="{{ task_instance.xcom_pull(key='crawler_command') or 'echo \"没有找到爬虫命令，跳过执行\"' }}",
+# 3. 轮询检查任务执行状态
+poll_crawler_status = PythonOperator(
+    task_id='poll_crawler_status',
+    python_callable=poll_task_status,
     dag=dag,
 )
 
@@ -124,6 +116,6 @@ handle_failure = PythonOperator(
 )
 
 # 任务依赖关系
-get_task >> generate_command >> execute_crawler
-execute_crawler >> [handle_success, handle_failure]
+get_task >> submit_crawler_task >> poll_crawler_status
+poll_crawler_status >> [handle_success, handle_failure]
 handle_success >> store_results

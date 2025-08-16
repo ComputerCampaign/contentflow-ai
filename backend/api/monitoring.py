@@ -187,7 +187,7 @@ def get_system_stats():
             ).count(),
             'successful_executions_24h': TaskExecution.query.filter(
                 TaskExecution.created_at >= last_24h,
-                TaskExecution.status == 'completed'
+                TaskExecution.status == 'success'
             ).count(),
             'failed_executions_24h': TaskExecution.query.filter(
                 TaskExecution.created_at >= last_24h,
@@ -240,7 +240,7 @@ def get_performance_stats():
         task_performance = db.session.query(
             func.date(TaskExecution.created_at).label('date'),
             func.count(TaskExecution.id).label('total'),
-            func.sum(func.case([(TaskExecution.status == 'completed', 1)], else_=0)).label('success'),
+            func.sum(func.case([(TaskExecution.status == 'success', 1)], else_=0)).label('success'),
             func.sum(func.case([(TaskExecution.status == 'failed', 1)], else_=0)).label('failed'),
             func.avg(TaskExecution.duration).label('avg_duration')
         ).filter(

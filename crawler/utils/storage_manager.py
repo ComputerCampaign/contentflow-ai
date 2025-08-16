@@ -49,6 +49,13 @@ class StorageManager:
         
         # 创建任务目录
         task_dir = os.path.join(self.base_dir, task_id)
+        
+        # 如果任务目录已存在，先删除再重新创建
+        if os.path.exists(task_dir):
+            logger.info(f"删除已存在的任务目录: {task_dir}")
+            shutil.rmtree(task_dir)
+        
+        # 创建新的任务目录
         os.makedirs(task_dir, exist_ok=True)
         
         # 创建图片目录
