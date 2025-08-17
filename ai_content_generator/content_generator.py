@@ -97,18 +97,19 @@ class ContentGenerator:
         
         logger.info(f"AI内容生成器初始化完成，数据路径: {base_path}")
     
-    def generate_content(self, task_id: str, custom_prompt: Optional[str] = None) -> tuple:
+    def generate_content(self, task_id: str, custom_prompt: Optional[str] = None, save_to_file: bool = True) -> tuple:
         """生成内容
         
         Args:
             task_id (str): 任务ID
             custom_prompt (str, optional): 自定义提示词
+            save_to_file (bool): 是否保存到文件
             
         Returns:
             tuple: (是否成功, 生成的内容)
         """
         try:
-            content = self.generator.generate_from_crawler_data(task_id, custom_prompt)
+            content = self.generator.generate_from_crawler_data(task_id, custom_prompt, save_to_file)
             if content:
                 return True, content
             else:

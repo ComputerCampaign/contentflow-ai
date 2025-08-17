@@ -8,7 +8,7 @@
                 "reddit.com",
                 "www.reddit.com"
             ],
-            "xpath": "//h1[@id='post-title-t3_1mgqbmr']/text()",
+            "xpath": "//h1[@slot='title']/text()",
             "rule_type": "text",
             "field_name": "title"
         },
@@ -32,7 +32,7 @@
                 "reddit.com",
                 "www.reddit.com"
             ],
-            "xpath": "//div[@id='t3_1mgqbmr-post-rtjson-content']//p[1]/text()",
+            "xpath": "//div[@property='schema:articleBody']//p[1]/text()",
             "rule_type": "text",
             "field_name": "description"
         },
