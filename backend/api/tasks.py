@@ -882,11 +882,11 @@ def get_tasks():
             }), 401
         
         # 获取查询参数
-        page = request.args.get('page', 1, type=int)
-        per_page = min(request.args.get('per_page', 20, type=int), 100)
-        status = request.args.get('status')
-        task_type = request.args.get('type')
-        search = request.args.get('search', '').strip()
+        page = request.args.get('params[page]', request.args.get('page', 1), type=int)
+        per_page = min(request.args.get('params[per_page]', request.args.get('per_page', 20), type=int), 100)
+        status = request.args.get('params[status]', request.args.get('status'))
+        task_type = request.args.get('params[type]', request.args.get('type'))
+        search = request.args.get('params[search]', request.args.get('search', '')).strip()
         
         # 构建查询，排除已删除的任务
         query = Task.query.filter_by(user_id=current_user.id, is_deleted=False)

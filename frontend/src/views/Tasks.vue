@@ -91,7 +91,7 @@
 
     <!-- 任务列表 -->
     <div class="tasks-grid" v-loading="loading">
-      <div v-if="filteredTasks.length === 0 && !loading" class="empty-state">
+      <div v-if="tasks.length === 0 && !loading" class="empty-state">
         <i class="fas fa-inbox empty-icon"></i>
         <h3>{{ activeTab === 'all' ? '暂无任务' : `暂无${activeTab === 'crawler' ? '爬虫' : '内容生成'}任务` }}</h3>
         <p>{{ activeTab === 'all' ? '点击上方"创建任务"按钮开始创建您的第一个任务' : `当前没有${activeTab === 'crawler' ? '爬虫' : '内容生成'}任务` }}</p>
@@ -99,7 +99,7 @@
       
       <div v-else class="task-cards">
         <div
-          v-for="task in filteredTasks"
+          v-for="task in tasks"
           :key="task.id"
           class="task-card"
           @click="showTaskDetail(task)"
@@ -177,8 +177,8 @@
     <!-- 分页 -->
     <div class="pagination-wrapper" v-if="pagination.total > 0">
       <el-pagination
-        v-model:current-page="pagination.page"
-        v-model:page-size="pagination.per_page"
+        :current-page="pagination.page"
+        :page-size="pagination.per_page"
         :total="pagination.total"
         :page-sizes="[10, 20, 50, 100]"
         layout="total, sizes, prev, pager, next, jumper"
@@ -501,36 +501,34 @@ const editingTaskId = ref(null)
 // 分页数据
 const pagination = reactive({
   page: 1,
-  per_page: 20,
+  per_page: 10,
   total: 0
 })
 
 // 任务统计数据
-const taskStats = computed(() => {
-  const stats = {
-    total: tasks.value.length,
-    crawler: 0,
-    content_generation: 0
-  }
-  
-  tasks.value.forEach(task => {
-    if (task.type === 'crawler') {
-      stats.crawler++
-    } else if (task.type === 'content_generation') {
-      stats.content_generation++
-    }
-  })
-  
-  return stats
+const taskStats = ref({
+  total: 0,
+  crawler: 0,
+  content_generation: 0
 })
 
-// 过滤后的任务列表
-const filteredTasks = computed(() => {
-  if (activeTab.value === 'all') {
-    return tasks.value
+// 获取任务统计数据
+const getTaskStats = async () => {
+  try {
+    const response = await tasksAPI.getTaskStats()
+    if (response.data) {
+      taskStats.value = {
+        total: response.data.type_stats.crawler + response.data.type_stats.content_generation + (response.data.type_stats.combined || 0),
+        crawler: response.data.type_stats.crawler || 0,
+        content_generation: response.data.type_stats.content_generation || 0
+      }
+    }
+  } catch (error) {
+    console.error('获取任务统计失败:', error)
   }
-  return tasks.value.filter(task => task.type === activeTab.value)
-})
+}
+
+// 注意：任务过滤现在由后端处理，不再需要前端过滤
 
 // 创建任务表单
 const createForm = reactive({
@@ -612,9 +610,29 @@ const getTasks = async () => {
       type: typeFilter.value
     }
     
+    // 添加调试日志
+    console.log('🔍 发送分页请求参数:', params)
+    console.log('📄 当前页码:', pagination.page)
+    
     const response = await tasksAPI.getTasks(params)
+    
+    // 添加响应调试日志
+    console.log('📥 API响应数据:', response.data)
+    console.log('📋 任务数量:', response.data.tasks?.length || 0)
+    console.log('📊 分页信息:', response.data.pagination)
+    
     tasks.value = response.data.tasks || []
-    pagination.total = response.data.pagination?.total || 0
+    
+    // 更新分页信息
+    if (response.data.pagination) {
+      pagination.total = response.data.pagination.total || 0
+      // 确保分页组件状态正确
+      if (pagination.page > response.data.pagination.pages && response.data.pagination.pages > 0) {
+        pagination.page = response.data.pagination.pages
+      }
+    } else {
+      pagination.total = 0
+    }
   } catch (error) {
     ElMessage.error('获取任务列表失败')
     console.error('获取任务列表失败:', error)
@@ -736,6 +754,7 @@ const createTask = async () => {
     showCreateDialog.value = false
     resetCreateForm()
     getTasks()
+    getTaskStats()
   } catch (error) {
     ElMessage.error('任务创建失败')
     console.error('任务创建失败:', error)
@@ -800,6 +819,7 @@ const updateTask = async () => {
     showCreateDialog.value = false
     resetCreateForm()
     getTasks()
+    getTaskStats()
   } catch (error) {
     ElMessage.error('任务更新失败')
     console.error('任务更新失败:', error)
@@ -872,6 +892,7 @@ const cloneTask = async (task) => {
     await tasksAPI.cloneTask(task.id)
     ElMessage.success('任务克隆成功')
     getTasks()
+    getTaskStats()
   } catch (error) {
     ElMessage.error('任务克隆失败')
     console.error('任务克隆失败:', error)
@@ -894,6 +915,7 @@ const deleteTask = async (task) => {
     await tasksAPI.deleteTask(task.id)
     ElMessage.success('任务删除成功')
     getTasks()
+    getTaskStats()
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error('任务删除失败')
@@ -1014,6 +1036,7 @@ const submitContentGenerationTask = async () => {
     // 关闭弹框并刷新任务列表
     showContentGenerationDialog.value = false
     getTasks()
+    getTaskStats()
     
   } catch (error) {
     ElMessage.error('创建文本生成任务失败')
@@ -1080,12 +1103,14 @@ const exportTasks = async () => {
 
 // 分页处理
 const handleSizeChange = (size) => {
+  console.log('📏 每页数量变更:', size)
   pagination.per_page = size
   pagination.page = 1
   getTasks()
 }
 
 const handleCurrentChange = (page) => {
+  console.log('🔄 分页切换:', page)
   pagination.page = page
   getTasks()
 }
@@ -1208,6 +1233,7 @@ const formatDate = (dateString) => {
 // 生命周期
 onMounted(() => {
   getTasks()
+  getTaskStats()
 })
 </script>
 
