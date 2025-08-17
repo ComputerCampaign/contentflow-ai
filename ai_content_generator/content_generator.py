@@ -97,11 +97,11 @@ class ContentGenerator:
         
         logger.info(f"AI内容生成器初始化完成，数据路径: {base_path}")
     
-    def generate_content(self, task_id: str, custom_prompt: Optional[str] = None, save_to_file: bool = True) -> tuple:
+    def generate_content(self, task_name: str, custom_prompt: Optional[str] = None, save_to_file: bool = True) -> tuple:
         """生成内容
         
         Args:
-            task_id (str): 任务ID
+            task_name (str): 任务名称
             custom_prompt (str, optional): 自定义提示词
             save_to_file (bool): 是否保存到文件
             
@@ -109,7 +109,7 @@ class ContentGenerator:
             tuple: (是否成功, 生成的内容)
         """
         try:
-            content = self.generator.generate_from_crawler_data(task_id, custom_prompt, save_to_file)
+            content = self.generator.generate_from_crawler_data(task_name, custom_prompt, save_to_file)
             if content:
                 return True, content
             else:
@@ -123,7 +123,7 @@ def main():
     # 解析命令行参数
     parser = argparse.ArgumentParser(description="AI内容生成器")
     parser.add_argument("--task-id", required=True, help="内容生成任务ID")
-    parser.add_argument("--crawler-task-id", required=True, help="源爬虫任务ID")
+    parser.add_argument("--crawler-task-name", required=True, help="源爬虫任务名称")
     parser.add_argument("--ai-config-id", help="AI内容配置ID")
     parser.add_argument("--custom-prompt", help="自定义提示词")
     parser.add_argument("--config", help="配置文件路径")
@@ -137,8 +137,8 @@ def main():
         parser.print_help()
         sys.exit(1)
     
-    if not args.crawler_task_id:
-        logger.error("未提供源爬虫任务ID，请使用--crawler-task-id参数指定爬虫任务ID")
+    if not args.crawler_task_name:
+        logger.error("未提供源爬虫任务名称，请使用--crawler-task-name参数指定爬虫任务名称")
         parser.print_help()
         sys.exit(1)
     
@@ -156,10 +156,10 @@ def main():
     
     try:
         # 开始生成内容
-        logger.info(f"🎯 [AI_CONTENT_GENERATOR] 开始生成内容，内容生成任务ID: {args.task_id}, 源爬虫任务ID: {args.crawler_task_id}")
+        logger.info(f"🎯 [AI_CONTENT_GENERATOR] 开始生成内容，内容生成任务ID: {args.task_id}, 源爬虫任务名称: {args.crawler_task_name}")
         if args.ai_config_id:
             logger.info(f"🎯 [AI_CONTENT_GENERATOR] 使用AI配置ID: {args.ai_config_id}")
-        success, content = generator.generate_content(args.crawler_task_id, args.custom_prompt)
+        success, content = generator.generate_content(args.crawler_task_name, args.custom_prompt)
         
         # 打印生成结果信息
         logger.info(f"🎯 [AI_CONTENT_GENERATOR] 生成结果 - 成功: {success}, 内容长度: {len(content) if content else 0}")

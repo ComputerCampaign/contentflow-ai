@@ -103,18 +103,18 @@ class Crawler:
         logger.info(f"爬虫初始化完成，输出目录: {self.crawler_core.output_dir}, 数据目录: {self.crawler_core.data_dir}")
         logger.info(f"邮件通知: {'已启用' if notifier.enabled else '未启用'}")
     
-    def crawl(self, url, rule_ids=None, task_id=None):
+    def crawl(self, url, rule_ids=None, task_name=None):
         """爬取指定URL的图片和标题
         
         Args:
             url (str): 要爬取的URL
             rule_ids (list, optional): XPath规则ID列表，用于指定使用哪些XPath规则
-            task_id (str, optional): 任务ID，如果不提供则自动生成
+            task_name (str, optional): 任务名称，用作数据存储的文件夹名称
             
         Returns:
-            tuple: (是否成功, 任务ID, 任务目录)
+            tuple: (是否成功, 任务名称, 任务目录)
         """
-        result = self.crawler_core.crawl_url(url, task_id, rule_ids=rule_ids)
+        result = self.crawler_core.crawl_url(url, task_name, rule_ids=rule_ids)
         if result.get('success'):
             return True, result.get('task_name'), result.get('task_dir')
         else:
@@ -131,6 +131,7 @@ def main():
     parser = argparse.ArgumentParser(description="网页图片和标题爬虫")
     parser.add_argument("--url", help="要爬取的网页URL")
     parser.add_argument("--task-id", help="任务ID，如果不提供则自动生成")
+    parser.add_argument("--task-name", help="任务名称，用作数据存储的文件夹名称")
     parser.add_argument("--output", help="输出目录，用于临时文件和日志（默认使用配置文件设置）")
     parser.add_argument("--data-dir", help="数据存储目录，用于保存图片和元数据（默认使用配置文件设置）")
     parser.add_argument("--use-selenium", type=lambda x: x.lower() == 'true', help="使用Selenium和ChromeDriver进行爬取，值为true或false")
@@ -211,8 +212,9 @@ def main():
             rule_ids = [rule_id.strip() for rule_id in args.rule_ids.split(',') if rule_id.strip()]
             logger.info(f"指定的XPath规则ID: {rule_ids}")
         
-        # 开始爬取，传入规则ID列表和任务ID
-        success, task_id, task_dir = crawler.crawl(args.url, rule_ids, args.task_id)
+        # 开始爬取，传入规则ID列表、任务ID和任务名称
+        task_name = args.task_name if args.task_name else args.task_id
+        success, task_id, task_dir = crawler.crawl(args.url, rule_ids, task_name)
         
         # 打印爬取结果信息
         logger.info(f"🎯 [CRAWLER] 爬取结果 - 成功: {success}, 任务ID: {task_id}, 任务目录: {task_dir}")

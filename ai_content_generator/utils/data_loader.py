@@ -42,16 +42,16 @@ class DataLoader:
         """
         self.base_path = Path(base_path)
         
-    def load_crawler_data(self, task_id: str) -> Optional[CrawlerData]:
-        """加载指定task_id的爬虫数据
+    def load_crawler_data(self, task_name: str) -> Optional[CrawlerData]:
+        """加载指定task_name的爬虫数据
         
         Args:
-            task_id: 任务ID (如 'task_name_20240115_143022')
+            task_name: 任务名称 (如 'task_name_20240115_143022')
             
         Returns:
             CrawlerData对象，如果加载失败返回None
         """
-        task_path = self.base_path / task_id
+        task_path = self.base_path / task_name
         
         if not task_path.exists():
             return None

@@ -322,7 +322,7 @@ def execute_task_for_airflow(task_id):
                 }), 404
             
             # 生成命令
-            command = generate_crawler_command_from_config(crawler_config, task.url, task_id)
+            command = generate_crawler_command_from_config(crawler_config, task.url, task_id, task.name)
             current_app.logger.info(f"生成的执行命令: {command}")
             current_app.logger.info(f"🔧 [BACKEND] [DEBUG] 爬虫任务命令详情:")
             current_app.logger.info(f"🔧 [BACKEND] [DEBUG] - 任务ID: {task_id}")
@@ -339,11 +339,22 @@ def execute_task_for_airflow(task_id):
                     'error_code': 'VALIDATION_ERROR'
                 }), 400
             
-            command = f'uv run python -m ai_content_generator.content_generator --task-id {task_id} --crawler-task-id {task.crawler_task_id}'
+            # 获取爬虫任务的名称
+            crawler_task = Task.query.get(task.crawler_task_id)
+            if not crawler_task:
+                current_app.logger.error(f"源爬虫任务不存在，任务ID: {task.crawler_task_id}")
+                return jsonify({
+                    'success': False,
+                    'message': '源爬虫任务不存在',
+                    'error_code': 'CRAWLER_TASK_NOT_FOUND'
+                }), 404
+            
+            command = f'uv run python -m ai_content_generator.content_generator --task-id {task_id} --crawler-task-name {crawler_task.name}'
             current_app.logger.info(f"生成的执行命令: {command}")
             current_app.logger.info(f"🔧 [BACKEND] [DEBUG] 内容生成任务命令详情:")
             current_app.logger.info(f"🔧 [BACKEND] [DEBUG] - 内容生成任务ID: {task_id}")
             current_app.logger.info(f"🔧 [BACKEND] [DEBUG] - 源爬虫任务ID: {task.crawler_task_id}")
+            current_app.logger.info(f"🔧 [BACKEND] [DEBUG] - 源爬虫任务名称: {crawler_task.name}")
             current_app.logger.info(f"🔧 [BACKEND] [DEBUG] - 完整命令: {command}")
             
         else:
@@ -522,7 +533,7 @@ def get_task_command(task_id):
             
             # 生成命令
             current_app.logger.info(f"开始生成命令，URL: {task.url}")
-            command = generate_crawler_command_from_config(crawler_config, task.url, task_id)
+            command = generate_crawler_command_from_config(crawler_config, task.url, task_id, task.name)
             current_app.logger.info(f"命令生成成功: {command}")
             
             return jsonify({
@@ -558,10 +569,20 @@ def get_task_command(task_id):
                 except (json.JSONDecodeError, AttributeError):
                     current_app.logger.warning(f"任务配置解析失败，任务ID: {task_id}")
             
+            # 获取爬虫任务的名称
+            crawler_task = Task.query.get(task.crawler_task_id)
+            if not crawler_task:
+                current_app.logger.error(f"源爬虫任务不存在，任务ID: {task.crawler_task_id}")
+                return jsonify({
+                    'success': False,
+                    'message': '源爬虫任务不存在',
+                    'error_code': 'CRAWLER_TASK_NOT_FOUND'
+                }), 404
+            
             # 如果没有AI配置ID，使用默认命令
             if not ai_content_config_id:
                 current_app.logger.warning(f"内容生成任务缺少AI内容配置ID，使用默认命令，任务ID: {task_id}")
-                command = f'uv run python -m ai_content_generator.content_generator --task-id {task_id} --crawler-task-id {task.crawler_task_id}'
+                command = f'uv run python -m ai_content_generator.content_generator --task-id {task_id} --crawler-task-name {crawler_task.name}'
             else:
                 # 验证AI内容配置是否存在
                 ai_config = AIContentConfig.query.get(ai_content_config_id)
@@ -574,7 +595,7 @@ def get_task_command(task_id):
                     }), 404
                 
                 # 生成带AI配置的命令
-                command = f'uv run python -m ai_content_generator.content_generator --task-id {task_id} --crawler-task-id {task.crawler_task_id} --ai-config-id {ai_content_config_id}'
+                command = f'uv run python -m ai_content_generator.content_generator --task-id {task_id} --crawler-task-name {crawler_task.name} --ai-config-id {ai_content_config_id}'
                 current_app.logger.info(f"使用AI配置 {ai_config.name} 生成命令")
             
             current_app.logger.info(f"内容生成命令生成成功: {command}")
@@ -2085,7 +2106,7 @@ def get_task_command_for_airflow(task_id):
             
             # 生成命令
             current_app.logger.info(f"开始生成命令，URL: {task.url}")
-            command = generate_crawler_command_from_config(crawler_config, task.url, task_id)
+            command = generate_crawler_command_from_config(crawler_config, task.url, task_id, task.name)
             current_app.logger.info(f"命令生成成功: {command}")
             
             return jsonify({
@@ -2111,8 +2132,18 @@ def get_task_command_for_airflow(task_id):
                     'error_code': 'VALIDATION_ERROR'
                 }), 400
             
+            # 获取爬虫任务的名称
+            crawler_task = Task.query.get(task.crawler_task_id)
+            if not crawler_task:
+                current_app.logger.error(f"源爬虫任务不存在，任务ID: {task.crawler_task_id}")
+                return jsonify({
+                    'success': False,
+                    'message': '源爬虫任务不存在',
+                    'error_code': 'CRAWLER_TASK_NOT_FOUND'
+                }), 404
+            
             # 生成内容生成任务的命令
-            command = f'uv run python -m ai_content_generator.content_generator --task-id {task_id} --crawler-task-id {task.crawler_task_id}'
+            command = f'uv run python -m ai_content_generator.content_generator --task-id {task_id} --crawler-task-name {crawler_task.name}'
             current_app.logger.info(f"内容生成命令生成成功: {command}")
             
             return jsonify({
@@ -2123,6 +2154,7 @@ def get_task_command_for_airflow(task_id):
                     'task_id': task_id,
                     'task_name': task.name,
                     'crawler_task_id': task.crawler_task_id,
+                    'crawler_task_name': crawler_task.name,
                     'task_type': 'content_generation'
                 }
             })

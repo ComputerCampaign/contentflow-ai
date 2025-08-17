@@ -546,7 +546,23 @@ const createForm = reactive({
 const createFormRules = {
   name: [
     { required: true, message: '请输入任务名称', trigger: 'blur' },
-    { min: 2, max: 100, message: '任务名称长度在 2 到 100 个字符', trigger: 'blur' }
+    { min: 2, max: 100, message: '任务名称长度在 2 到 100 个字符', trigger: 'blur' },
+    {
+      validator: (rule, value, callback) => {
+        if (!value) {
+          callback()
+          return
+        }
+        // 检查是否包含特殊字符和空格
+        const invalidChars = /[\s\\/:*?"<>|]/
+        if (invalidChars.test(value)) {
+          callback(new Error('任务名称不能包含空格和特殊字符（\\/:*?"<>|）'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur'
+    }
   ],
   type: [
     { required: true, message: '请选择任务类型', trigger: 'change' }
@@ -933,7 +949,7 @@ const openContentGenerationDialog = async (crawlerTask) => {
     
     // 重置表单并填充默认值
     resetContentGenerationForm()
-    contentGenerationForm.taskName = `${crawlerTask.name} - 文本生成`
+    contentGenerationForm.taskName = `${crawlerTask.name}_文本生成`
     contentGenerationForm.sourceTaskId = crawlerTask.id
     contentGenerationForm.sourceTaskName = crawlerTask.name
     contentGenerationForm.description = `基于爬虫任务 "${crawlerTask.name}" 生成的文本内容`
@@ -956,6 +972,19 @@ const submitContentGenerationTask = async () => {
       return
     }
     
+    // 验证任务名称格式
+    const taskName = contentGenerationForm.taskName.trim()
+    const invalidChars = /[\s\\/:*?"<>|]/
+    if (invalidChars.test(taskName)) {
+      ElMessage.error('任务名称不能包含空格和特殊字符（\\/:*?"<>|）')
+      return
+    }
+    
+    if (taskName.length < 2 || taskName.length > 100) {
+      ElMessage.error('任务名称长度在 2 到 100 个字符')
+      return
+    }
+    
     if (!contentGenerationForm.aiModelConfigId) {
       ElMessage.error('请选择AI模型配置')
       return
@@ -970,7 +999,7 @@ const submitContentGenerationTask = async () => {
     
     // 准备提交数据
     const submitData = {
-      name: contentGenerationForm.taskName.trim(),
+      name: taskName,
       source_task_id: contentGenerationForm.sourceTaskId,
       ai_model_config_name: selectedModel.name,
       description: contentGenerationForm.description.trim() || `基于爬虫任务 "${contentGenerationForm.sourceTaskName}" 生成的文本内容`

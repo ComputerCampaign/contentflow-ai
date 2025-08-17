@@ -48,13 +48,13 @@ class AIContentGenerator:
         
         logger.info("AI内容生成器初始化完成")
     
-    def generate_from_crawler_data(self, task_id: str, 
+    def generate_from_crawler_data(self, task_name: str, 
                                  custom_prompt: Optional[str] = None,
                                  save_to_file: bool = True) -> Optional[str]:
         """根据爬虫数据生成内容
         
         Args:
-            task_id: 任务ID
+            task_name: 任务名称
             custom_prompt: 自定义提示词
             save_to_file: 是否保存到文件
             
@@ -62,15 +62,15 @@ class AIContentGenerator:
             生成的内容，如果失败返回None
         """
         logger.info(f"=== 开始内容生成流程 ===")
-        logger.info(f"任务ID: {task_id}")
+        logger.info(f"任务名称: {task_name}")
         logger.info(f"自定义提示词: {'是' if custom_prompt else '否'}")
         logger.info(f"保存到文件: {'是' if save_to_file else '否'}")
         
         # 加载爬虫数据
         logger.info("正在加载爬虫数据...")
-        crawler_data = self.data_loader.load_crawler_data(task_id)
+        crawler_data = self.data_loader.load_crawler_data(task_name)
         if not crawler_data:
-            logger.error(f"无法加载爬虫数据: {task_id}")
+            logger.error(f"无法加载爬虫数据: {task_name}")
             return None
             
         # 记录加载的数据信息
@@ -84,7 +84,7 @@ class AIContentGenerator:
             
             # 保存生成的内容到文件
             if save_to_file:
-                saved_path = self._save_generated_content(task_id, result, custom_prompt)
+                saved_path = self._save_generated_content(task_name, result, custom_prompt)
                 if saved_path:
                     logger.info(f"内容已保存到: {saved_path}")
                 else:
@@ -395,18 +395,18 @@ class AIContentGenerator:
              
              logger.info(f"开始批量生成内容，共 {len(task_ids)} 个任务")
              
-             for i, task_id in enumerate(task_ids, 1):
+             for i, task_name in enumerate(task_ids, 1):
                  try:
-                     logger.info(f"处理任务 {i}/{len(task_ids)}: {task_id}")
+                     logger.info(f"处理任务 {i}/{len(task_ids)}: {task_name}")
                      
                      content = self.generate_from_crawler_data(
-                         task_id=task_id,
+                         task_name=task_name,
                          custom_prompt=custom_prompt,
                          save_to_file=save_to_file
                      )
                      
                      results.append({
-                         "task_id": task_id,
+                         "task_id": task_name,
                          "success": content is not None,
                          "content": content,
                          "error": None if content else "生成失败"
@@ -417,9 +417,9 @@ class AIContentGenerator:
                          time.sleep(1)
                          
                  except Exception as e:
-                     logger.error(f"处理任务 {task_id} 失败: {str(e)}")
+                     logger.error(f"处理任务 {task_name} 失败: {str(e)}")
                      results.append({
-                         "task_id": task_id,
+                         "task_id": task_name,
                          "success": False,
                          "content": None,
                          "error": str(e)
@@ -433,11 +433,11 @@ class AIContentGenerator:
              
          return results
     
-    def _save_generated_content(self, task_id: str, content: str, custom_prompt: Optional[str] = None) -> Optional[str]:
+    def _save_generated_content(self, task_name: str, content: str, custom_prompt: Optional[str] = None) -> Optional[str]:
         """保存生成的内容到爬虫任务目录
         
         Args:
-            task_id: 任务ID
+            task_name: 任务名称
             content: 生成的内容
             custom_prompt: 自定义提示词（用于文件命名）
             
@@ -446,7 +446,7 @@ class AIContentGenerator:
         """
         try:
             # 构建保存路径
-            task_path = self.data_loader.base_path / task_id
+            task_path = self.data_loader.base_path / task_name
             if not task_path.exists():
                 logger.error(f"任务目录不存在: {task_path}")
                 return None
@@ -472,7 +472,7 @@ class AIContentGenerator:
             with open(file_path, 'w', encoding='utf-8') as f:
                 # 写入元信息
                 f.write(f"# AI生成内容\n")
-                f.write(f"# 任务ID: {task_id}\n")
+                f.write(f"# 任务ID: {task_name}\n")
                 f.write(f"# 生成时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write(f"# 提示词类型: {'自定义' if custom_prompt else '默认'}\n")
                 if custom_prompt:

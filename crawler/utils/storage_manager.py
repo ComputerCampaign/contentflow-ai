@@ -28,27 +28,27 @@ class StorageManager:
         self.base_dir = base_dir
         os.makedirs(self.base_dir, exist_ok=True)
     
-    def create_task_dir(self, task_id: Optional[str] = None, page_url: Optional[str] = None) -> str:
+    def create_task_dir(self, task_name: Optional[str] = None, page_url: Optional[str] = None) -> str:
         """创建任务目录
         
         Args:
-            task_id: 任务ID，如果不提供则自动生成
+            task_name: 任务名称，如果不提供则自动生成
             page_url: 页面URL
             
         Returns:
             任务目录路径
         """
-        # 如果没有提供任务ID，则自动生成
-        if not task_id:
-            # 使用时间戳或UUID生成任务ID
+        # 如果没有提供任务名称，则自动生成
+        if not task_name:
+            # 使用时间戳或UUID生成任务名称
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             # 可以选择使用UUID增加唯一性
             import uuid
             random_id = str(uuid.uuid4())[:8]  # 使用UUID的前8位
-            task_id = f"task_{timestamp}_{random_id}"
+            task_name = f"task_{timestamp}_{random_id}"
         
         # 创建任务目录
-        task_dir = os.path.join(self.base_dir, task_id)
+        task_dir = os.path.join(self.base_dir, task_name)
         
         # 如果任务目录已存在，先删除再重新创建
         if os.path.exists(task_dir):
@@ -81,8 +81,8 @@ class StorageManager:
         Returns:
             图片保存路径
         """
-        # 获取任务ID（从任务目录路径中提取）
-        task_id = os.path.basename(task_dir)
+        # 获取任务名称（从任务目录路径中提取）
+        task_name = os.path.basename(task_dir)
         
         # 从图片URL中提取扩展名
         img_parsed = urlparse(img_url)
@@ -93,13 +93,13 @@ class StorageManager:
         if not ext:
             ext = '.jpg'
         
-        # 生成图片文件名，使用task_id加索引的形式
+        # 生成图片文件名，使用task_name加索引的形式
         if index is not None:
-            filename = f"{task_id}_{index}{ext}"
+            filename = f"{task_name}_{index}{ext}"
         else:
             # 使用图片URL的哈希值作为索引
             hash_obj = hashlib.md5(img_url.encode('utf-8'))
-            filename = f"{task_id}_{hash_obj.hexdigest()[:8]}{ext}"
+            filename = f"{task_name}_{hash_obj.hexdigest()[:8]}{ext}"
         
         # 返回完整路径
         return os.path.join(task_dir, 'images', filename)
