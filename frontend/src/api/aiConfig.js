@@ -24,6 +24,11 @@ export const aiConfigAPI = {
   // 验证配置格式
   validateConfig(type, data) {
     return request.post(`/ai-config/validate/${type}`, data)
+  },
+
+  // 同步模型配置
+  syncModels(data) {
+    return request.post('/ai-config/models/sync', data)
   }
 }
 

@@ -9,5 +9,6 @@ from backend.models.task import Task, TaskExecution
 from backend.models.crawler import CrawlerConfig, CrawlerResult
 from backend.models.xpath import XPathConfig
 from backend.models.ai_content import AIContentConfig
+from backend.models.ai_model import AIModelConfig
 
-__all__ = ['User', 'Task', 'TaskExecution', 'CrawlerConfig', 'CrawlerResult', 'XPathConfig', 'AIContentConfig']
+__all__ = ['User', 'Task', 'TaskExecution', 'CrawlerConfig', 'CrawlerResult', 'XPathConfig', 'AIContentConfig', 'AIModelConfig']

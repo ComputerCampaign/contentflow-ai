@@ -7,6 +7,25 @@
         <p>管理AI内容生成的提示词和模型配置</p>
       </div>
       <div class="header-right">
+        <el-dropdown @command="handleSyncCommand" style="margin-right: 10px;">
+          <el-button type="info" :loading="syncing">
+            <i class="fas fa-sync-alt"></i>
+            同步配置
+            <i class="el-icon-arrow-down el-icon--right"></i>
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="db_to_file">
+                <i class="fas fa-download"></i>
+                数据库 → 本地文件
+              </el-dropdown-item>
+              <el-dropdown-item command="file_to_db">
+                <i class="fas fa-upload"></i>
+                本地文件 → 数据库
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
         <el-button type="primary" @click="saveCurrentConfig" :loading="saving">
           <i class="fas fa-save"></i>
           保存配置
@@ -231,12 +250,13 @@
 <script setup>
 import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { aiConfigAPI } from '@/api/aiConfig'
+import request from '@/utils/request'
 
 // 响应式数据
 const activeTab = ref('prompts')
 const saving = ref(false)
 const loading = ref(false)
+const syncing = ref(false)
 
 // 配置数据
 const promptsConfig = reactive({
@@ -260,8 +280,10 @@ const loadConfigs = async () => {
   loading.value = true
   try {
     // 加载提示词配置
-    const promptsResponse = await aiConfigAPI.getPrompts()
-    Object.assign(promptsConfig, promptsResponse.data)
+    const promptsResponse = await request.get('/ai-config/prompts')
+    if (promptsResponse.data) {
+      Object.assign(promptsConfig, promptsResponse.data)
+    }
     
     // 初始化提示词键名跟踪
     promptKeys.value = {}
@@ -269,9 +291,25 @@ const loadConfigs = async () => {
       promptKeys.value[key] = key
     })
     
-    // 加载模型配置
-    const modelsResponse = await aiConfigAPI.getModels()
-    Object.assign(modelsConfig, modelsResponse.data)
+    // 加载模型配置 - 从数据库获取
+    const modelsResponse = await request.get('/ai-config/models')
+    if (modelsResponse.data?.models) {
+      // 将数据库模型转换为配置格式
+      const models = {}
+      modelsResponse.data.models.forEach(model => {
+        models[model.name] = {
+          model: model.model,  // 修正字段名
+          api_key_env: model.api_key_env,
+          base_url: model.base_url,
+          generation_config: model.generation_config,
+          max_retries: model.max_retries,
+          timeout: model.timeout
+        }
+      })
+      
+      modelsConfig.models = models
+      modelsConfig.default_model = modelsResponse.data.default_model || ''
+    }
     
     // 初始化模型键名跟踪
     modelKeys.value = {}
@@ -292,10 +330,35 @@ const saveCurrentConfig = async () => {
   saving.value = true
   try {
     if (activeTab.value === 'prompts') {
-      await aiConfigAPI.updatePrompts(promptsConfig)
-      ElMessage.success('提示词配置保存成功')
+      const response = await request.put('/ai-config/prompts', promptsConfig)
+      if (response.data) {
+        ElMessage.success('提示词配置保存成功')
+      } else {
+        throw new Error('保存失败')
+      }
     } else {
-      await aiConfigAPI.updateModels(modelsConfig)
+      // 将配置格式转换为数据库格式并保存
+      const modelUpdates = []
+      Object.entries(modelsConfig.models).forEach(([name, config]) => {
+        modelUpdates.push({
+          name: name,
+          model_key: name.toLowerCase().replace(/[^a-z0-9]/g, '_'),  // 生成model_key
+          model: config.model,
+          api_key_env: config.api_key_env,
+          base_url: config.base_url,
+          generation_config: config.generation_config,
+          max_retries: config.max_retries,
+          timeout: config.timeout,
+          is_active: true,
+          is_default: name === modelsConfig.default_model
+        })
+      })
+      
+      // 批量更新模型配置
+      for (const modelData of modelUpdates) {
+        await request.post('/ai-config/models', modelData)
+      }
+      
       ElMessage.success('模型配置保存成功')
     }
   } catch (error) {
@@ -303,6 +366,44 @@ const saveCurrentConfig = async () => {
     console.error('保存配置失败:', error)
   } finally {
     saving.value = false
+  }
+}
+
+// 处理同步命令
+const handleSyncCommand = async (command) => {
+  syncing.value = true
+  try {
+    let response
+    if (command === 'db_to_file') {
+      response = await request.post('/ai-config/sync/to-json')
+      if (response.data) {
+        ElMessage.success('数据库配置已同步到本地文件')
+      } else {
+        throw new Error('同步失败')
+      }
+    } else if (command === 'file_to_db') {
+      response = await request.post('/ai-config/sync/from-json')
+      if (response.data) {
+        ElMessage.success('本地文件配置已同步到数据库')
+        // 重新加载配置以显示最新数据
+        await loadConfigs()
+      } else {
+        throw new Error('同步失败')
+      }
+    } else if (command === 'bidirectional') {
+      response = await request.post('/ai-config/sync/bidirectional')
+      if (response.data) {
+        ElMessage.success('双向同步完成')
+        await loadConfigs()
+      } else {
+        throw new Error('同步失败')
+      }
+    }
+  } catch (error) {
+    ElMessage.error('同步配置失败')
+    console.error('同步配置失败:', error)
+  } finally {
+    syncing.value = false
   }
 }
 

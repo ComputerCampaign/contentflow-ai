@@ -13,8 +13,8 @@ import requests
 import json
 import logging
 from config import API_CONFIG, get_api_url, get_task_type_param, TASK_STATUS, DAG_CONFIG
-from utils import (get_pending_task, generate_task_command, handle_task_success, 
-                   handle_task_failure, store_task_results)
+from utils import (get_pending_task, handle_task_success, 
+                   handle_task_failure, store_task_results, submit_task_via_api, poll_task_status)
 
 # 默认参数
 default_args = {
@@ -32,7 +32,7 @@ dag = DAG(
     'content_generation_pipeline',
     default_args=default_args,
     description='AI内容生成任务处理流水线',
-    schedule_interval=timedelta(minutes=45),  # 每45分钟执行一次
+    schedule_interval=timedelta(minutes=600),  # 每45分钟执行一次
     catchup=False,
     tags=['content-generation', 'ai', 'pipeline'],
 )
@@ -49,12 +49,6 @@ def get_pending_generation_task(**context):
     获取待执行的内容生成任务
     """
     return get_pending_task('AI_GENERATION', **context)
-
-def generate_content_command(**context):
-    """
-    生成内容生成执行命令
-    """
-    return generate_task_command('AI_GENERATION', **context)
 
 # 任务状态更新功能已移至utils模块中的APIClient类
 
@@ -85,45 +79,42 @@ get_task = PythonOperator(
     dag=dag,
 )
 
-# 2. 生成内容生成执行命令
-generate_command = PythonOperator(
-    task_id='generate_content_command',
-    python_callable=generate_content_command,
+# 2. 提交内容生成任务执行请求
+submit_generation_task = PythonOperator(
+    task_id='submit_generation_task',
+    python_callable=submit_task_via_api,
     dag=dag,
 )
 
-# 3. 执行内容生成任务
-execute_generation = BashOperator(
-    task_id='execute_generation_task',
-    bash_command="{{ task_instance.xcom_pull(key='generation_command') or 'echo \"没有找到内容生成命令，跳过执行\"' }}",
+# 3. 轮询内容生成任务状态
+poll_generation_status = PythonOperator(
+    task_id='poll_generation_status',
+    python_callable=poll_task_status,
     dag=dag,
 )
 
-# 4. 处理成功情况
-handle_success = PythonOperator(
+# 4. 处理内容生成任务成功
+handle_generation_success = PythonOperator(
     task_id='handle_generation_success',
     python_callable=handle_generation_success,
-    trigger_rule='none_failed_or_skipped',
     dag=dag,
 )
 
-# 5. 存储内容生成结果（占位）
-store_results = PythonOperator(
-    task_id='store_generation_results',
-    python_callable=store_generation_results,
-    trigger_rule='none_failed_or_skipped',
-    dag=dag,
-)
-
-# 6. 处理失败情况
-handle_failure = PythonOperator(
+# 5. 处理内容生成任务失败
+handle_generation_failure = PythonOperator(
     task_id='handle_generation_failure',
     python_callable=handle_generation_failure,
-    trigger_rule='one_failed',
+    dag=dag,
+)
+
+# 6. 存储内容生成结果
+store_generation_results = PythonOperator(
+    task_id='store_generation_results',
+    python_callable=store_generation_results,
     dag=dag,
 )
 
 # 任务依赖关系
-get_task >> generate_command >> execute_generation
-execute_generation >> [handle_success, handle_failure]
-handle_success >> store_results
+get_task >> submit_generation_task >> poll_generation_status
+poll_generation_status >> [handle_generation_success, handle_generation_failure]
+handle_generation_success >> store_generation_results

@@ -11,6 +11,7 @@ from backend.models.user import User
 from backend.models.task import Task, TaskExecution
 from backend.models.crawler import CrawlerConfig
 from backend.models.xpath import XPathConfig
+from backend.models.ai_model import AIModelConfig
 from backend.models.ai_content import AIContentConfig
 
 from backend.utils.xpath_manager import xpath_manager
@@ -338,11 +339,11 @@ def execute_task_for_airflow(task_id):
                     'error_code': 'VALIDATION_ERROR'
                 }), 400
             
-            command = f'uv run python -m ai_content_generator.example {task.crawler_task_id}'
+            command = f'uv run python -m ai_content_generator.content_generator --task-id {task_id} --crawler-task-id {task.crawler_task_id}'
             current_app.logger.info(f"生成的执行命令: {command}")
             current_app.logger.info(f"🔧 [BACKEND] [DEBUG] 内容生成任务命令详情:")
-            current_app.logger.info(f"🔧 [BACKEND] [DEBUG] - 任务ID: {task_id}")
-            current_app.logger.info(f"🔧 [BACKEND] [DEBUG] - 爬虫任务ID: {task.crawler_task_id}")
+            current_app.logger.info(f"🔧 [BACKEND] [DEBUG] - 内容生成任务ID: {task_id}")
+            current_app.logger.info(f"🔧 [BACKEND] [DEBUG] - 源爬虫任务ID: {task.crawler_task_id}")
             current_app.logger.info(f"🔧 [BACKEND] [DEBUG] - 完整命令: {command}")
             
         else:
@@ -547,8 +548,35 @@ def get_task_command(task_id):
                     'error_code': 'VALIDATION_ERROR'
                 }), 400
             
-            # 生成内容生成任务的命令
-            command = f'uv run python -m ai_content_generator.example {task.crawler_task_id}'
+            # 获取AI内容配置ID
+            ai_content_config_id = None
+            if hasattr(task, 'config') and task.config:
+                import json
+                try:
+                    config_data = json.loads(task.config) if isinstance(task.config, str) else task.config
+                    ai_content_config_id = config_data.get('ai_content_config_id')
+                except (json.JSONDecodeError, AttributeError):
+                    current_app.logger.warning(f"任务配置解析失败，任务ID: {task_id}")
+            
+            # 如果没有AI配置ID，使用默认命令
+            if not ai_content_config_id:
+                current_app.logger.warning(f"内容生成任务缺少AI内容配置ID，使用默认命令，任务ID: {task_id}")
+                command = f'uv run python -m ai_content_generator.content_generator --task-id {task_id} --crawler-task-id {task.crawler_task_id}'
+            else:
+                # 验证AI内容配置是否存在
+                ai_config = AIContentConfig.query.get(ai_content_config_id)
+                if not ai_config:
+                    current_app.logger.error(f"AI内容配置不存在，配置ID: {ai_content_config_id}")
+                    return jsonify({
+                        'success': False,
+                        'message': 'AI内容配置不存在',
+                        'error_code': 'CONFIG_NOT_FOUND'
+                    }), 404
+                
+                # 生成带AI配置的命令
+                command = f'uv run python -m ai_content_generator.content_generator --task-id {task_id} --crawler-task-id {task.crawler_task_id} --ai-config-id {ai_content_config_id}'
+                current_app.logger.info(f"使用AI配置 {ai_config.name} 生成命令")
+            
             current_app.logger.info(f"内容生成命令生成成功: {command}")
             
             return jsonify({
@@ -559,6 +587,7 @@ def get_task_command(task_id):
                     'task_id': task_id,
                     'task_name': task.name,
                     'crawler_task_id': task.crawler_task_id,
+                    'ai_content_config_id': ai_content_config_id,
                     'task_type': 'content_generation'
                 }
             })
@@ -597,12 +626,12 @@ def create_content_generation_task():
         # 获取必需字段
         name = data.get('name', '').strip()
         source_task_id = data.get('source_task_id', '').strip()
-        ai_content_config_id = data.get('ai_content_config_id', '').strip()
+        ai_model_config_name = data.get('ai_model_config_name', '').strip()
         
-        if not all([name, source_task_id, ai_content_config_id]):
+        if not all([name, source_task_id, ai_model_config_name]):
             return jsonify({
                 'success': False,
-                'message': '任务名称、源任务ID和AI内容配置ID不能为空',
+                'message': '任务名称、源任务ID和AI模型配置名称不能为空',
                 'error_code': 'VALIDATION_ERROR'
             }), 400
         
@@ -622,18 +651,18 @@ def create_content_generation_task():
                 'error_code': 'SOURCE_TASK_NOT_COMPLETED'
             }), 409
         
-        # 验证AI内容配置是否存在
-        ai_config = AIContentConfig.query.get(ai_content_config_id)
+        # 验证AI模型配置是否存在
+        ai_config = AIModelConfig.query.filter_by(name=ai_model_config_name).first()
         if not ai_config:
             return jsonify({
                 'success': False,
-                'message': '指定的AI内容配置不存在',
+                'message': '指定的AI模型配置不存在',
                 'error_code': 'CONFIG_NOT_FOUND'
             }), 404
         
         # 构建任务配置
         config = {
-            'ai_content_config_id': ai_content_config_id,
+            'ai_model_config_name': ai_model_config_name,
             'source_task_id': source_task_id
         }
         if data.get('config'):
@@ -646,7 +675,7 @@ def create_content_generation_task():
             config=config,
             source_task_id=source_task_id,
             crawler_task_id=source_task_id,
-            ai_content_config_id=ai_content_config_id,
+            ai_content_config_id=ai_config.id,
             user_id=current_user.id,
             description=data.get('description', ''),
             priority=data.get('priority', 5)
@@ -2083,7 +2112,7 @@ def get_task_command_for_airflow(task_id):
                 }), 400
             
             # 生成内容生成任务的命令
-            command = f'uv run python -m ai_content_generator.example {task.crawler_task_id}'
+            command = f'uv run python -m ai_content_generator.content_generator --task-id {task_id} --crawler-task-id {task.crawler_task_id}'
             current_app.logger.info(f"内容生成命令生成成功: {command}")
             
             return jsonify({
