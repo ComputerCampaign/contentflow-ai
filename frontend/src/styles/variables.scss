@@ -1,142 +1,105 @@
-// 主色调
-$primary-color: #409EFF;
-$primary-light: #79bbff;
-$primary-dark: #337ecc;
+// 侧边栏
+$sideBarWidth: 210px;
+$hideSideBarWidth: 54px;
+$sideBarDuration: 0.28s;
 
-// 辅助色
-$success-color: #67C23A;
-$warning-color: #E6A23C;
-$danger-color: #F56C6C;
-$info-color: #909399;
+// 顶部导航栏
+$navBarHeight: 50px;
 
-// 文字颜色
-$text-primary: #303133;
-$text-regular: #606266;
-$text-secondary: #909399;
-$text-placeholder: #C0C4CC;
+// 标签页
+$tagsViewHeight: 34px;
+
+// 颜色变量
+$menuText: #bfcbd9;
+$menuActiveText: #409eff;
+$subMenuActiveText: #f4f4f5;
+
+$menuBg: #304156;
+$menuHover: #263445;
+
+$subMenuBg: #1f2d3d;
+$subMenuHover: #001528;
+
+$sideBarTextColor: #fff;
+
+// 主题色
+$primaryColor: #409eff;
+$successColor: #67c23a;
+$warningColor: #e6a23c;
+$dangerColor: #f56c6c;
+$infoColor: #909399;
 
 // 背景色
-$bg-primary: #ffffff;
-$bg-secondary: #f5f7fa;
-$bg-light: #fafafa;
-$bg-dark: #1d1e1f;
+$bgColor: #f0f2f5;
+$contentBgColor: #ffffff;
 
 // 边框色
-$border-base: #dcdfe6;
-$border-light: #e4e7ed;
-$border-lighter: #ebeef5;
-$border-extra-light: #f2f6fc;
+$borderColor: #dcdfe6;
+$borderColorLight: #e4e7ed;
+$borderColorLighter: #ebeef5;
+$borderColorExtraLight: #f2f6fc;
+
+// 文字色
+$textColorPrimary: #303133;
+$textColorRegular: #606266;
+$textColorSecondary: #909399;
+$textColorPlaceholder: #c0c4cc;
 
 // 阴影
-$shadow-base: 0 2px 4px rgba(0, 0, 0, 0.12), 0 0 6px rgba(0, 0, 0, 0.04);
-$shadow-light: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-$shadow-dark: 0 4px 8px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.08);
+$boxShadow: 0 2px 4px rgba(0, 0, 0, 0.12), 0 0 6px rgba(0, 0, 0, 0.04);
+$boxShadowLight: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+$boxShadowBase: 0 2px 4px rgba(0, 0, 0, 0.12), 0 0 6px rgba(0, 0, 0, 0.04);
+$boxShadowDark: 0 2px 4px rgba(0, 0, 0, 0.12), 0 0 6px rgba(0, 0, 0, 0.12);
 
 // 圆角
-$border-radius-base: 4px;
-$border-radius-small: 2px;
-$border-radius-large: 8px;
-$border-radius-round: 20px;
+$borderRadius: 4px;
+$borderRadiusSmall: 2px;
+$borderRadiusBase: 4px;
+$borderRadiusLarge: 6px;
 
 // 间距
-$spacing-xs: 4px;
-$spacing-sm: 8px;
-$spacing-md: 16px;
-$spacing-lg: 24px;
-$spacing-xl: 32px;
+$spacingXs: 4px;
+$spacingSm: 8px;
+$spacingMd: 16px;
+$spacingLg: 24px;
+$spacingXl: 32px;
 
 // 字体大小
-$font-size-xs: 12px;
-$font-size-sm: 14px;
-$font-size-base: 16px;
-$font-size-lg: 18px;
-$font-size-xl: 20px;
-$font-size-xxl: 24px;
+$fontSizeXs: 10px;
+$fontSizeSm: 12px;
+$fontSizeBase: 14px;
+$fontSizeLg: 16px;
+$fontSizeXl: 18px;
+$fontSizeXxl: 20px;
 
 // 字体粗细
-$font-weight-light: 300;
-$font-weight-normal: 400;
-$font-weight-medium: 500;
-$font-weight-bold: 600;
+$fontWeightLight: 300;
+$fontWeightNormal: 400;
+$fontWeightBold: 500;
+$fontWeightBolder: 600;
 
 // 行高
-$line-height-base: 1.5;
-$line-height-small: 1.2;
-$line-height-large: 1.8;
+$lineHeightBase: 1.5;
+$lineHeightLg: 1.8;
+$lineHeightSm: 1.2;
 
-// 过渡动画
-$transition-base: all 0.3s ease;
-$transition-fast: all 0.2s ease;
-$transition-slow: all 0.5s ease;
+// z-index
+$zIndexNormal: 1;
+$zIndexTop: 1000;
+$zIndexPopper: 2000;
 
 // 响应式断点
-$breakpoint-xs: 480px;
-$breakpoint-sm: 768px;
-$breakpoint-md: 992px;
-$breakpoint-lg: 1200px;
-$breakpoint-xl: 1920px;
-
-// Z-index层级
-$z-index-dropdown: 1000;
-$z-index-sticky: 1020;
-$z-index-fixed: 1030;
-$z-index-modal-backdrop: 1040;
-$z-index-modal: 1050;
-$z-index-popover: 1060;
-$z-index-tooltip: 1070;
-$z-index-toast: 1080;
+$--sm: 768px;
+$--md: 992px;
+$--lg: 1200px;
+$--xl: 1920px;
 
 // 暗色主题变量
-$dark-bg-primary: #1d1e1f;
-$dark-bg-secondary: #25262b;
-$dark-text-primary: #ffffff;
-$dark-text-secondary: #a6a7ab;
-$dark-border-base: #373a40;
-
-// CSS变量定义（用于主题切换）
-:root {
-  --primary-color: #{$primary-color};
-  --primary-light: #{$primary-light};
-  --primary-dark: #{$primary-dark};
-  
-  --success-color: #{$success-color};
-  --warning-color: #{$warning-color};
-  --danger-color: #{$danger-color};
-  --info-color: #{$info-color};
-  
-  --text-primary: #{$text-primary};
-  --text-regular: #{$text-regular};
-  --text-secondary: #{$text-secondary};
-  --text-placeholder: #{$text-placeholder};
-  
-  --bg-primary: #{$bg-primary};
-  --bg-secondary: #{$bg-secondary};
-  --bg-light: #{$bg-light};
-  
-  --border-base: #{$border-base};
-  --border-light: #{$border-light};
-  --border-lighter: #{$border-lighter};
-  --border-extra-light: #{$border-extra-light};
-  
-  --shadow-base: #{$shadow-base};
-  --shadow-light: #{$shadow-light};
-  --shadow-dark: #{$shadow-dark};
-  
-  --border-radius-base: #{$border-radius-base};
-  --border-radius-small: #{$border-radius-small};
-  --border-radius-large: #{$border-radius-large};
-  --border-radius-round: #{$border-radius-round};
-  
-  --transition-base: #{$transition-base};
-  --transition-fast: #{$transition-fast};
-  --transition-slow: #{$transition-slow};
-}
-
-// 暗色主题
-[data-theme="dark"] {
-  --text-primary: #{$dark-text-primary};
-  --text-secondary: #{$dark-text-secondary};
-  --bg-primary: #{$dark-bg-primary};
-  --bg-secondary: #{$dark-bg-secondary};
-  --border-base: #{$dark-border-base};
-}
+$darkBgColor: #141414;
+$darkContentBgColor: #1f1f1f;
+$darkBorderColor: #303030;
+$darkTextColorPrimary: #ffffff;
+$darkTextColorRegular: #ffffffa6;
+$darkTextColorSecondary: #ffffff73;
+$darkMenuBg: #001529;
+$darkMenuHover: #1890ff;

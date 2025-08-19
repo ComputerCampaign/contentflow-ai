@@ -90,14 +90,40 @@ test/*
 .DS_Store
 Thumbs.db
 
-# 前端相关
-node_modules/
+# Frontend项目忽略文件
+frontend/logs/
+frontend/*.log
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+frontend/lerna-debug.log*
 frontend/node_modules/
+frontend/.DS_Store
 frontend/dist/
 frontend/dist-ssr/
-frontend/.env
-frontend/.env.local
-frontend/.env.*.local
+frontend/coverage/
+frontend/*.local
+frontend/cypress/videos/
+frontend/cypress/screenshots/
+frontend/.vscode/*
+!frontend/.vscode/extensions.json
+frontend/.idea/
+frontend/*.suo
+frontend/*.ntvs*
+frontend/*.njsproj
+frontend/*.sln
+frontend/*.sw?
+frontend/*.tsbuildinfo
+
+# 原始前端相关（保留兼容性）
+node_modules/
+frontend_old/node_modules/
+frontend_old/dist/
+frontend_old/dist-ssr/
+frontend_old/.env
+frontend_old/.env.local
+frontend_old/.env.*.local
 
 # SQLite数据库 - 数据库文件需要加入版本管理
 # 保留.gitkeep文件

@@ -1,0 +1,240 @@
+@import './variables.scss';
+
+// 清除浮动
+@mixin clearfix {
+  &:after {
+    content: "";
+    display: table;
+    clear: both;
+  }
+}
+
+// 省略号
+@mixin ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// 多行省略号
+@mixin ellipsis-multiline($lines: 2) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: $lines;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+// 绝对居中
+@mixin absolute-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+// flex 居中
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// flex 垂直居中
+@mixin flex-align-center {
+  display: flex;
+  align-items: center;
+}
+
+// flex 水平居中
+@mixin flex-justify-center {
+  display: flex;
+  justify-content: center;
+}
+
+// flex 两端对齐
+@mixin flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+// flex 环绕对齐
+@mixin flex-around {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+}
+
+// 滚动条样式
+@mixin scrollbar {
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+    
+    &:hover {
+      background: #a8a8a8;
+    }
+  }
+}
+
+// 隐藏滚动条
+@mixin hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+// 响应式
+@mixin respond-to($breakpoint) {
+  @if $breakpoint == 'sm' {
+    @media (max-width: #{$--sm - 1px}) {
+      @content;
+    }
+  }
+  @if $breakpoint == 'md' {
+    @media (min-width: #{$--sm}) and (max-width: #{$--md - 1px}) {
+      @content;
+    }
+  }
+  @if $breakpoint == 'lg' {
+    @media (min-width: #{$--md}) and (max-width: #{$--lg - 1px}) {
+      @content;
+    }
+  }
+  @if $breakpoint == 'xl' {
+    @media (min-width: #{$--lg}) {
+      @content;
+    }
+  }
+}
+
+// 移动端
+@mixin mobile {
+  @media (max-width: #{$--sm - 1px}) {
+    @content;
+  }
+}
+
+// 平板
+@mixin tablet {
+  @media (min-width: #{$--sm}) and (max-width: #{$--md - 1px}) {
+    @content;
+  }
+}
+
+// 桌面端
+@mixin desktop {
+  @media (min-width: #{$--md}) {
+    @content;
+  }
+}
+
+// 按钮样式
+@mixin button-variant($color, $background, $border) {
+  color: $color;
+  background-color: $background;
+  border-color: $border;
+  
+  &:hover,
+  &:focus {
+    color: $color;
+    background-color: lighten($background, 10%);
+    border-color: lighten($border, 10%);
+  }
+  
+  &:active {
+    color: $color;
+    background-color: darken($background, 10%);
+    border-color: darken($border, 10%);
+  }
+  
+  &.is-disabled,
+  &.is-disabled:hover,
+  &.is-disabled:focus,
+  &.is-disabled:active {
+    color: #c0c4cc;
+    background-color: #ffffff;
+    border-color: #ebeef5;
+  }
+}
+
+// 卡片样式
+@mixin card {
+  background: $contentBgColor;
+  border-radius: $borderRadius;
+  box-shadow: $boxShadow;
+  padding: $spacingMd;
+}
+
+// 输入框样式
+@mixin input-focus {
+  outline: none;
+  border-color: $primaryColor;
+  box-shadow: 0 0 0 2px rgba($primaryColor, 0.2);
+}
+
+// 过渡动画
+@mixin transition($property: all, $duration: 0.3s, $timing-function: ease) {
+  transition: $property $duration $timing-function;
+}
+
+// 阴影层级
+@mixin elevation($level) {
+  @if $level == 1 {
+    box-shadow: 0 2px 1px -1px rgba(0, 0, 0, 0.2),
+                0 1px 1px 0 rgba(0, 0, 0, 0.14),
+                0 1px 3px 0 rgba(0, 0, 0, 0.12);
+  } @else if $level == 2 {
+    box-shadow: 0 3px 1px -2px rgba(0, 0, 0, 0.2),
+                0 2px 2px 0 rgba(0, 0, 0, 0.14),
+                0 1px 5px 0 rgba(0, 0, 0, 0.12);
+  } @else if $level == 3 {
+    box-shadow: 0 3px 3px -2px rgba(0, 0, 0, 0.2),
+                0 3px 4px 0 rgba(0, 0, 0, 0.14),
+                0 1px 8px 0 rgba(0, 0, 0, 0.12);
+  } @else if $level == 4 {
+    box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.2),
+                0 4px 5px 0 rgba(0, 0, 0, 0.14),
+                0 1px 10px 0 rgba(0, 0, 0, 0.12);
+  } @else if $level == 5 {
+    box-shadow: 0 3px 5px -1px rgba(0, 0, 0, 0.2),
+                0 5px 8px 0 rgba(0, 0, 0, 0.14),
+                0 1px 14px 0 rgba(0, 0, 0, 0.12);
+  }
+}
+
+// 文字渐变
+@mixin text-gradient($start-color, $end-color, $direction: to right) {
+  background: linear-gradient($direction, $start-color, $end-color);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+// 毛玻璃效果
+@mixin glass-morphism($blur: 10px, $opacity: 0.1) {
+  backdrop-filter: blur($blur);
+  background: rgba(255, 255, 255, $opacity);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+// 暗色主题
+@mixin dark-theme {
+  .dark & {
+    @content;
+  }
+}
