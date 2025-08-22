@@ -359,7 +359,8 @@ const routes: RouteRecordRaw[] = [
     redirect: '/settings/system',
     meta: {
       title: '系统设置',
-      icon: 'settings'
+      icon: 'settings',
+      permissions: ['admin']
     },
     children: [
       {
@@ -378,6 +379,16 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: '用户设置',
           icon: 'user'
+        }
+      },
+      {
+        path: 'user-management',
+        name: 'UserManagement',
+        component: () => import('@/views/settings/UserManagement.vue'),
+        meta: {
+          title: '用户管理',
+          icon: 'users',
+          permissions: ['user:manage']
         }
       }
     ]
@@ -449,4 +460,5 @@ const router = createRouter({
 // 设置路由守卫
 setupRouterGuard(router)
 
+export { routes }
 export default router

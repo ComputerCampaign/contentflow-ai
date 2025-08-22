@@ -14,12 +14,6 @@
         <!-- 全屏切换 -->
         <screenfull id="screenfull" class="right-menu-item hover-effect" />
         
-        <!-- 主题切换 -->
-        <theme-picker class="right-menu-item hover-effect" />
-        
-        <!-- 语言切换 -->
-        <lang-select class="right-menu-item hover-effect" />
-        
         <!-- 消息通知 -->
         <el-badge :value="unreadCount" :hidden="unreadCount === 0" class="right-menu-item hover-effect">
           <el-icon :size="18">
@@ -64,8 +58,6 @@ import { useUserStore } from '@/stores/user'
 import Breadcrumb from './Breadcrumb.vue'
 import Hamburger from './Hamburger.vue'
 import Screenfull from './Screenfull.vue'
-import ThemePicker from './ThemePicker.vue'
-import LangSelect from './LangSelect.vue'
 
 const router = useRouter()
 const appStore = useAppStore()

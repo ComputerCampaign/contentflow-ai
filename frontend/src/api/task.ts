@@ -131,7 +131,7 @@ export interface TaskResult {
  */
 class TaskApiService extends BaseApiService {
   constructor() {
-    super('/api/tasks')
+    super('/tasks')
   }
 
   /**

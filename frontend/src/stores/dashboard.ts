@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { dashboardApi, type DashboardStats, type TaskTrendData, type CrawlerStatusData, type SystemResourceData, type ResourceHistoryData, type RecentActivity, type QuickAction } from '@/api/dashboard'
+import { DashboardDataConverter } from '@/utils/data-converter'
 import { ElMessage } from 'element-plus'
 
 export const useDashboardStore = defineStore('dashboard', () => {
@@ -38,7 +39,8 @@ export const useDashboardStore = defineStore('dashboard', () => {
     try {
       loading.value.stats = true
       const response = await dashboardApi.getStats()
-      stats.value = response
+      // 使用数据转换器处理后端返回的数据格式
+      stats.value = DashboardDataConverter.convertStats(response)
     } catch (error) {
       console.error('获取统计数据失败:', error)
       ElMessage.error('获取统计数据失败')
@@ -52,10 +54,17 @@ export const useDashboardStore = defineStore('dashboard', () => {
     try {
       loading.value.taskTrend = true
       const response = await dashboardApi.getTaskTrend(period)
-      taskTrend.value = response
+      // 使用数据转换器处理任务趋势数据
+      taskTrend.value = DashboardDataConverter.convertTaskTrend(response)
     } catch (error) {
       console.error('获取任务趋势数据失败:', error)
       ElMessage.error('获取任务趋势数据失败')
+      // 提供默认数据以防止页面崩溃
+      taskTrend.value = {
+        labels: [],
+        completedTasks: [],
+        failedTasks: []
+      }
     } finally {
       loading.value.taskTrend = false
     }
@@ -66,10 +75,18 @@ export const useDashboardStore = defineStore('dashboard', () => {
     try {
       loading.value.crawlerStatus = true
       const response = await dashboardApi.getCrawlerStatus()
-      crawlerStatus.value = response
+      // 使用数据转换器处理爬虫状态数据
+      crawlerStatus.value = DashboardDataConverter.convertCrawlerStatus(response)
     } catch (error) {
       console.error('获取爬虫状态数据失败:', error)
       ElMessage.error('获取爬虫状态数据失败')
+      // 提供默认数据以防止页面崩溃
+      crawlerStatus.value = {
+        running: 0,
+        idle: 0,
+        error: 0,
+        maintenance: 0
+      }
     } finally {
       loading.value.crawlerStatus = false
     }
@@ -80,10 +97,18 @@ export const useDashboardStore = defineStore('dashboard', () => {
     try {
       loading.value.systemResources = true
       const response = await dashboardApi.getSystemResources()
-      systemResources.value = response
+      // 使用数据转换器处理系统资源数据
+      systemResources.value = DashboardDataConverter.convertSystemResources(response)
     } catch (error) {
       console.error('获取系统资源数据失败:', error)
       ElMessage.error('获取系统资源数据失败')
+      // 提供默认数据以防止页面崩溃
+      systemResources.value = {
+        cpu: 0,
+        memory: 0,
+        disk: 0,
+        network: 0
+      }
     } finally {
       loading.value.systemResources = false
     }
@@ -94,10 +119,19 @@ export const useDashboardStore = defineStore('dashboard', () => {
     try {
       loading.value.resourceHistory = true
       const response = await dashboardApi.getResourceHistory(period)
-      resourceHistory.value = response
+      // 使用数据转换器处理资源历史数据
+      resourceHistory.value = DashboardDataConverter.convertResourceHistory(response)
     } catch (error) {
       console.error('获取资源历史数据失败:', error)
       ElMessage.error('获取资源历史数据失败')
+      // 提供默认数据以防止页面崩溃
+      resourceHistory.value = {
+        timestamps: [],
+        cpu: [],
+        memory: [],
+        disk: [],
+        network: []
+      }
     } finally {
       loading.value.resourceHistory = false
     }
@@ -108,10 +142,13 @@ export const useDashboardStore = defineStore('dashboard', () => {
     try {
       loading.value.activities = true
       const response = await dashboardApi.getRecentActivities(limit)
-      recentActivities.value = response
+      // 使用数据转换器处理最近活动数据
+      recentActivities.value = DashboardDataConverter.convertRecentActivities(response)
     } catch (error) {
       console.error('获取最近活动数据失败:', error)
       ElMessage.error('获取最近活动数据失败')
+      // 提供默认数据以防止页面崩溃
+      recentActivities.value = []
     } finally {
       loading.value.activities = false
     }
@@ -122,10 +159,13 @@ export const useDashboardStore = defineStore('dashboard', () => {
     try {
       loading.value.quickActions = true
       const response = await dashboardApi.getQuickActions()
-      quickActions.value = response
+      // 使用数据转换器处理快速操作数据
+      quickActions.value = DashboardDataConverter.convertQuickActions(response)
     } catch (error) {
       console.error('获取快速操作配置失败:', error)
       ElMessage.error('获取快速操作配置失败')
+      // 提供默认数据以防止页面崩溃
+      quickActions.value = []
     } finally {
       loading.value.quickActions = false
     }

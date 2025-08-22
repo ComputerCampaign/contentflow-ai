@@ -13,6 +13,7 @@ from backend.api import register_blueprints
 from backend.models.user import User
 from backend.models.task import Task, TaskExecution
 from backend.models.crawler import CrawlerConfig, CrawlerResult
+from backend.models.dashboard import Dashboard
 import logging
 from logging.handlers import RotatingFileHandler
 import os

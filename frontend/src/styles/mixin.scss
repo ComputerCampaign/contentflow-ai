@@ -1,4 +1,4 @@
-@import './variables.scss';
+@use './variables' as *;
 
 // 清除浮动
 @mixin clearfix {
@@ -101,22 +101,22 @@
 // 响应式
 @mixin respond-to($breakpoint) {
   @if $breakpoint == 'sm' {
-    @media (max-width: #{$--sm - 1px}) {
+    @media (max-width: 767px) {
       @content;
     }
   }
   @if $breakpoint == 'md' {
-    @media (min-width: #{$--sm}) and (max-width: #{$--md - 1px}) {
+    @media (min-width: 768px) and (max-width: 991px) {
       @content;
     }
   }
   @if $breakpoint == 'lg' {
-    @media (min-width: #{$--md}) and (max-width: #{$--lg - 1px}) {
+    @media (min-width: 992px) and (max-width: 1199px) {
       @content;
     }
   }
   @if $breakpoint == 'xl' {
-    @media (min-width: #{$--lg}) {
+    @media (min-width: 1200px) {
       @content;
     }
   }
@@ -124,21 +124,21 @@
 
 // 移动端
 @mixin mobile {
-  @media (max-width: #{$--sm - 1px}) {
+  @media (max-width: 767px) {
     @content;
   }
 }
 
 // 平板
 @mixin tablet {
-  @media (min-width: #{$--sm}) and (max-width: #{$--md - 1px}) {
+  @media (min-width: 768px) and (max-width: 991px) {
     @content;
   }
 }
 
 // 桌面端
 @mixin desktop {
-  @media (min-width: #{$--md}) {
+  @media (min-width: 992px) {
     @content;
   }
 }
@@ -152,14 +152,14 @@
   &:hover,
   &:focus {
     color: $color;
-    background-color: lighten($background, 10%);
-    border-color: lighten($border, 10%);
+    background-color: rgba($background, 0.8);
+    border-color: rgba($border, 0.8);
   }
   
   &:active {
     color: $color;
-    background-color: darken($background, 10%);
-    border-color: darken($border, 10%);
+    background-color: rgba($background, 1.2);
+    border-color: rgba($border, 1.2);
   }
   
   &.is-disabled,
@@ -174,17 +174,17 @@
 
 // 卡片样式
 @mixin card {
-  background: $contentBgColor;
-  border-radius: $borderRadius;
-  box-shadow: $boxShadow;
-  padding: $spacingMd;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 16px;
 }
 
 // 输入框样式
 @mixin input-focus {
   outline: none;
-  border-color: $primaryColor;
-  box-shadow: 0 0 0 2px rgba($primaryColor, 0.2);
+  border-color: #409eff;
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
 }
 
 // 过渡动画

@@ -27,9 +27,10 @@ export interface LoginParams {
 // 登录响应数据
 export interface LoginResponse {
   user: User
-  token: string
-  refreshToken: string
-  expiresIn: number
+  access_token: string
+  refresh_token: string
+  token_type: string
+  expires_in: number
 }
 
 // 注册请求参数
@@ -70,7 +71,7 @@ export interface UpdateUserParams {
  */
 class AuthApiService extends BaseApiService {
   constructor() {
-    super('/api/auth')
+    super('/auth')
   }
 
   /**

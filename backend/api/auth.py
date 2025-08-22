@@ -208,6 +208,41 @@ def login():
         }), 500
 
 
+@auth_bp.route('/permissions', methods=['GET'])
+@jwt_required()
+def get_user_permissions():
+    """获取当前登录用户的权限列表"""
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': '用户未找到'
+            }), 404
+
+        # 这里可以根据用户角色或更细粒度的权限系统返回权限列表
+        # 示例：硬编码权限列表
+        permissions = []
+        if user.role == 'admin':
+            permissions = ['admin:*', 'user:view', 'user:edit', 'crawler:run', 'ai:generate']
+        else:
+            permissions = ['user:view', 'crawler:view']
+
+        return jsonify({
+            'success': True,
+            'message': '权限获取成功',
+            'data': permissions
+        }), 200
+    except Exception as e:
+        current_app.logger.error(f"获取用户权限失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '获取用户权限失败，请稍后重试'
+        }), 500
+    
+
 @auth_bp.route('/refresh', methods=['POST'])
 @jwt_required()
 def refresh():

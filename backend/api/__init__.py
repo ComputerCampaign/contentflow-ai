@@ -12,6 +12,7 @@ from backend.api.monitoring import monitoring_bp
 from backend.api.xpath import xpath_bp
 # ai_config和ai_content_config已合并到ai_model中
 from backend.api.ai_model import ai_model_bp
+from backend.api.dashboard import dashboard_bp
 
 
 def register_blueprints(app):
@@ -43,6 +44,9 @@ def register_blueprints(app):
     
     # 注册监控API
     app.register_blueprint(monitoring_bp, url_prefix=f'{api_prefix}/monitor')
+    
+    # 注册仪表板API
+    app.register_blueprint(dashboard_bp, url_prefix=f'{api_prefix}/dashboard')
 
 
 __all__ = [
@@ -54,5 +58,6 @@ __all__ = [
     'ai_config_bp',
     'ai_content_config_bp',
     'ai_model_bp',
-    'monitoring_bp'
+    'monitoring_bp',
+    'dashboard_bp'
 ]

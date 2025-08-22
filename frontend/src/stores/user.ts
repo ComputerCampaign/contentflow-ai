@@ -50,9 +50,16 @@ export const useUserStore = defineStore('user', () => {
       const response = await authApi.login(loginData)
       
       if (response.success && response.data) {
-        // 保存token
-        token.value = response.data.token
-        setToken(response.data.token)
+        console.log('Login response.data.access_token:', response.data.access_token)
+        console.log('Login response.data.user:', response.data.user)
+        
+        // 保存token (后端返回的是 access_token 字段)
+        token.value = response.data.access_token
+        setToken(response.data.access_token)
+        
+        // 验证token是否保存成功
+        console.log('After setToken - token.value:', token.value)
+        console.log('After setToken - localStorage:', localStorage.getItem('access_token'))
         
         // 保存用户信息
         userInfo.value = response.data.user
@@ -61,6 +68,7 @@ export const useUserStore = defineStore('user', () => {
         ElMessage.success('登录成功')
         return true
       } else {
+        console.log('Login failed - response:', response)
         ElMessage.error(response.message || '登录失败')
         return false
       }
@@ -262,7 +270,25 @@ export const useUserStore = defineStore('user', () => {
     if (isAdmin.value) {
       return true
     }
-    return permissions.value.includes(permission)
+    
+    // 检查是否有完全匹配的权限
+    if (permissions.value.includes(permission)) {
+      return true
+    }
+    
+    // 检查通配符权限，如 admin:* 包含所有权限
+    if (permissions.value.includes('*') || permissions.value.includes('admin:*')) {
+      return true
+    }
+    
+    // 检查模块级通配符权限，如 task:* 包含 task:view, task:create 等
+    return permissions.value.some(userPerm => {
+      if (userPerm.endsWith(':*')) {
+        const prefix = userPerm.slice(0, -1)
+        return permission.startsWith(prefix)
+      }
+      return false
+    })
   }
 
   // 检查多个权限（需要全部拥有）
@@ -270,7 +296,7 @@ export const useUserStore = defineStore('user', () => {
     if (isAdmin.value) {
       return true
     }
-    return permissionList.every(permission => permissions.value.includes(permission))
+    return permissionList.every(permission => hasPermission(permission))
   }
 
   // 检查多个权限（拥有其中一个即可）
@@ -278,7 +304,7 @@ export const useUserStore = defineStore('user', () => {
     if (isAdmin.value) {
       return true
     }
-    return permissionList.some(permission => permissions.value.includes(permission))
+    return permissionList.some(permission => hasPermission(permission))
   }
 
   // 检查角色

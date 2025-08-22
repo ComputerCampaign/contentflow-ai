@@ -11,7 +11,7 @@
     <Sidebar class="sidebar-container" />
     
     <!-- 主内容区域 -->
-    <div class="main-container">
+    <div class="main-container" :class="{ 'sidebar-collapsed': !sidebar.opened }">
       <!-- 顶部导航栏 -->
       <div :class="{ 'fixed-header': fixedHeader }">
         <Navbar />
@@ -75,16 +75,21 @@ watchEffect(() => {
 </script>
 
 <style lang="scss" scoped>
-@import '@/styles/mixin.scss';
-@import '@/styles/variables.scss';
+@use '@/styles/mixin' as *;
+@use '@/styles/variables' as *;
 
 .app-wrapper {
   @include clearfix;
   position: relative;
   height: 100vh;
   width: 100%;
-  max-width: 1280px;
-  margin: 0 auto;
+  min-width: 1024px; // 设置最小宽度，小于此宽度时出现横向滚动条
+  
+  // 小屏幕时的处理
+  @include mobile {
+    min-width: 768px;
+    overflow-x: auto; // 添加横向滚动条
+  }
   
   &.mobile.openSidebar {
     position: fixed;
@@ -107,7 +112,7 @@ watchEffect(() => {
   top: 0;
   right: 0;
   z-index: 9;
-  width: calc(100% - #{$sideBarWidth});
+  width: calc(100% - 210px);
   transition: width 0.28s;
 }
 
@@ -117,5 +122,38 @@ watchEffect(() => {
 
 .mobile .fixed-header {
   width: 100%;
+}
+
+.main-container {
+  margin-left: 210px;
+  transition: margin-left 0.28s;
+  min-height: 100vh;
+  position: relative;
+  
+  &.sidebar-collapsed {
+    margin-left: 54px;
+  }
+  
+  @include mobile {
+    margin-left: 0;
+    
+    &.sidebar-collapsed {
+      margin-left: 0;
+    }
+  }
+}
+
+// 确保内容不被侧边栏遮挡
+.sidebar-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1001;
+  height: 100vh;
+  transition: width 0.28s;
+  
+  @include mobile {
+    z-index: 1002; // 移动端时提高层级
+  }
 }
 </style>

@@ -342,13 +342,34 @@ export const useAppStore = defineStore('app', () => {
     // 监听窗口大小变化
     const handleResize = () => {
       const width = window.innerWidth
+      const prevDevice = state.device
+      
       if (width < 768) {
         setDevice('mobile')
-        closeSidebar(true)
+        // 移动端自动关闭侧边栏
+        if (prevDevice !== 'mobile') {
+          closeSidebar(true)
+        }
       } else if (width < 1024) {
         setDevice('tablet')
+        // 从移动端切换到平板时，恢复侧边栏状态
+        if (prevDevice === 'mobile') {
+          const savedState = localStorage.getItem('app-sidebar-opened')
+          if (savedState !== 'false') {
+            state.sidebar.opened = true
+            state.sidebar.withoutAnimation = true
+          }
+        }
       } else {
         setDevice('desktop')
+        // 从移动端切换到桌面时，恢复侧边栏状态
+        if (prevDevice === 'mobile') {
+          const savedState = localStorage.getItem('app-sidebar-opened')
+          if (savedState !== 'false') {
+            state.sidebar.opened = true
+            state.sidebar.withoutAnimation = true
+          }
+        }
       }
     }
     

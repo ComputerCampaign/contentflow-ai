@@ -4,6 +4,7 @@ import { useAppStore } from '@/stores/app'
 import { ElMessage } from 'element-plus'
 import NProgress from 'nprogress'
 import 'nprogress/nprogress.css'
+import { routes } from './index'
 
 // 配置 NProgress
 NProgress.configure({ 
@@ -32,6 +33,7 @@ const permissionMap: Record<string, string[]> = {
   '/settings': ['settings:view'],
   '/settings/system': ['settings:system'],
   '/settings/user': ['settings:user'],
+  '/settings/user-management': ['user:manage'],
   '/profile': ['profile:view']
 }
 
@@ -42,22 +44,31 @@ function hasPermission(userPermissions: string[], requiredPermissions: string[])
   }
   
   // 超级管理员拥有所有权限
-  if (userPermissions.includes('*') || userPermissions.includes('admin:*')) {
+  if (userPermissions.includes('*')) {
+    return true
+  }
+  
+  // 特殊处理：admin:* 权限可以访问所有页面
+  if (userPermissions.includes('admin:*')) {
     return true
   }
   
   // 检查是否有任一所需权限
-  return requiredPermissions.some(permission => 
-    userPermissions.includes(permission) ||
-    userPermissions.some(userPerm => {
-      // 支持通配符权限，如 task:* 包含 task:view, task:create 等
+  return requiredPermissions.some(permission => {
+    // 直接匹配权限
+    if (userPermissions.includes(permission)) {
+      return true
+    }
+    
+    // 检查通配符权限
+    return userPermissions.some(userPerm => {
       if (userPerm.endsWith(':*')) {
-        const prefix = userPerm.slice(0, -1)
+        const prefix = userPerm.slice(0, -1) // 移除 '*'
         return permission.startsWith(prefix)
       }
       return false
     })
-  )
+  })
 }
 
 // 获取页面标题
@@ -91,14 +102,65 @@ export function setupRouterGuard(router: Router): void {
       
       if (hasToken) {
         if (to.path === '/login') {
-          // 已登录用户访问登录页，重定向到首页
-          next({ path: '/dashboard' })
+          // 已登录用户访问登录页，需要找到一个有权限的页面进行重定向
+          // 检查用户信息是否存在
+          if (!userStore.userInfo?.id) {
+            try {
+              // 获取用户信息
+              await userStore.getUserInfo()
+              // 初始化路由数据
+              appStore.setRoutes(routes)
+            } catch (error) {
+              console.error('获取用户信息失败:', error)
+              // token 可能已过期，清除用户信息并重定向到登录页
+              await userStore.logout()
+              ElMessage.error('登录状态已过期，请重新登录')
+              next({ path: '/login', query: { redirect: to.fullPath } })
+              return
+            }
+          }
+          
+          // 查找用户有权限访问的第一个页面
+          const userPermissions = userStore.permissions
+          let redirectPath = '/dashboard' // 默认重定向到dashboard
+          
+          // 检查用户是否有dashboard权限
+          if (!hasPermission(userPermissions, ['dashboard:view'])) {
+            // 没有dashboard权限，查找其他有权限的页面
+            const availableRoutes = [
+              { path: '/profile', permissions: ['profile:view'] },
+              { path: '/tasks', permissions: ['task:view'] },
+              { path: '/crawler', permissions: ['crawler:view'] },
+              { path: '/xpath', permissions: ['xpath:view'] },
+              { path: '/ai-config', permissions: ['ai:config'] },
+              { path: '/monitoring', permissions: ['monitoring:view'] },
+              { path: '/settings', permissions: ['settings:view'] }
+            ]
+            
+            for (const route of availableRoutes) {
+              if (hasPermission(userPermissions, route.permissions)) {
+                redirectPath = route.path
+                break
+              }
+            }
+            
+            // 如果没有找到任何有权限的页面，重定向到403
+            if (redirectPath === '/dashboard' && !hasPermission(userPermissions, ['dashboard:view'])) {
+              ElMessage.error('您没有访问任何页面的权限，请联系管理员')
+              next({ path: '/403' })
+              return
+            }
+          }
+          
+          next({ path: redirectPath })
         } else {
           // 检查用户信息是否存在
           if (!userStore.userInfo?.id) {
             try {
               // 获取用户信息
               await userStore.getUserInfo()
+              // 初始化路由数据
+              appStore.setRoutes(routes)
             } catch (error) {
               console.error('获取用户信息失败:', error)
               // token 可能已过期，清除用户信息并重定向到登录页

@@ -190,7 +190,7 @@ export interface CrawlerRunResult {
  */
 class CrawlerApiService extends BaseApiService {
   constructor() {
-    super('/api/crawler-configs')
+    super('/crawler-configs')
   }
 
   /**

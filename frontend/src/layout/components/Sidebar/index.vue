@@ -66,7 +66,7 @@ const filterRoutes = (routes: any[]) => {
     const tmp = { ...route }
     
     // 检查路由权限
-    if (hasPermission([userStore.$state.userInfo?.role || 'normal'], tmp)) {
+    if (hasPermission(tmp)) {
       if (tmp.children) {
         tmp.children = filterRoutes(tmp.children)
       }
@@ -78,21 +78,70 @@ const filterRoutes = (routes: any[]) => {
 }
 
 // 检查权限
-const hasPermission = (roles: string[], route: any) => {
-  if (route.meta && route.meta.roles) {
-    return roles.some(role => route.meta.roles.includes(role))
+const hasPermission = (route: any) => {
+  const { meta } = route
+  if (!meta) return true
+  
+  // 检查是否隐藏 - 隐藏的路由不在侧边栏显示
+  if (meta.hidden) {
+    return false
   }
+  
+  // 检查是否需要认证
+  if (meta.requiresAuth && !userStore.isAuthenticated) {
+    return false
+  }
+  
+  // 如果用户未登录，只显示不需要权限的路由
+  if (!userStore.isAuthenticated) {
+    return !meta.permissions && !meta.roles
+  }
+  
+  // 获取用户权限和角色
+  const userPermissions = userStore.permissions || []
+  const userRoles = userStore.roles || []
+  
+  // admin用户可以访问所有页面
+  if (userRoles.includes('admin') || userPermissions.includes('admin:*') || userPermissions.includes('*')) {
+    return true
+  }
+  
+  // 检查权限要求
+  if (meta.permissions && meta.permissions.length > 0) {
+    // 特殊处理：只有系统设置需要admin权限，其他页面普通用户都可以访问
+    if (meta.permissions.includes('admin')) {
+      // 只有系统设置模块需要admin权限
+      return userRoles.includes('admin')
+    }
+    
+    // 其他权限检查（如user:manage等）
+    return meta.permissions.some(permission => {
+      // 支持通配符权限，如 task:* 可以匹配 task:view, task:create 等
+      if (permission.includes('*')) {
+        const prefix = permission.replace('*', '')
+        return userPermissions.some(userPerm => userPerm.startsWith(prefix))
+      }
+      return userPermissions.includes(permission)
+    })
+  }
+  
+  // 检查角色要求
+  if (meta.roles && meta.roles.length > 0) {
+    return meta.roles.some(role => userRoles.includes(role))
+  }
+  
+  // 默认情况下，已登录用户可以访问没有特殊权限要求的页面
   return true
 }
 </script>
 
 <style lang="scss">
-@import '@/styles/variables.scss';
+@use '@/styles/variables' as *;
 
 .sidebar-container {
   transition: width 0.28s;
-  width: $sideBarWidth !important;
-  background-color: $menuBg;
+  width: 210px !important;
+  background-color: #304156;
   height: 100%;
   position: fixed;
   font-size: 0px;
@@ -154,21 +203,21 @@ const hasPermission = (roles: string[], route: any) => {
   .submenu-title-noDropdown,
   .el-submenu__title {
     &:hover {
-      background-color: $menuHover !important;
+      background-color: #263445 !important;
     }
   }
 
   .is-active > .el-submenu__title {
-    color: $subMenuActiveText !important;
+    color: #f4f4f5 !important;
   }
 
   & .nest-menu .el-submenu > .el-submenu__title,
   & .el-submenu .el-menu-item {
     min-height: 50px !important;
-    background-color: $subMenuBg !important;
+    background-color: #1f2d3d !important;
 
     &:hover {
-      background-color: $subMenuHover !important;
+      background-color: #001528 !important;
     }
   }
 }
@@ -235,7 +284,7 @@ const hasPermission = (roles: string[], route: any) => {
 }
 
 .el-menu--collapse .el-menu .el-submenu {
-  min-width: $sideBarWidth !important;
+  min-width: 210px !important;
 }
 
 // mobile responsive
@@ -246,14 +295,14 @@ const hasPermission = (roles: string[], route: any) => {
 
   .sidebar-container {
     transition: transform 0.28s;
-    width: $sideBarWidth !important;
+    width: 210px !important;
   }
 
   &.hideSidebar {
     .sidebar-container {
       pointer-events: none;
       transition-duration: 0.3s;
-      transform: translate3d(-$sideBarWidth, 0, 0);
+      transform: translate3d(-210px, 0, 0);
     }
   }
 }

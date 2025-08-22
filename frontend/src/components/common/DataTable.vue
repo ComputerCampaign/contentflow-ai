@@ -192,7 +192,7 @@
     <div v-if="pagination && total > 0" class="table-pagination">
       <el-pagination
         v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
+        v-model:page-size="internalPageSize"
         :total="total"
         :page-sizes="pageSizes"
         :layout="paginationLayout"
