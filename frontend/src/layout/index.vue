@@ -15,8 +15,6 @@
       <!-- 顶部导航栏 -->
       <div :class="{ 'fixed-header': fixedHeader }">
         <Navbar />
-        <!-- 标签页导航 -->
-        <TagsView v-if="needTagsView" />
       </div>
       
       <!-- 页面内容 -->
@@ -38,7 +36,6 @@ import { useUserStore } from '@/stores/user'
 import Sidebar from './components/Sidebar/index.vue'
 import Navbar from './components/Navbar.vue'
 import AppMain from './components/AppMain.vue'
-import TagsView from './components/TagsView/index.vue'
 // import RightPanel from './components/RightPanel.vue' // 暂时移除
 import Settings from './components/Settings/index.vue'
 
@@ -50,7 +47,6 @@ const userStore = useUserStore()
 const sidebar = computed(() => appStore.state.sidebar)
 const device = computed(() => appStore.state.device)
 const showSettings = computed(() => false) // 暂时禁用设置面板
-const needTagsView = computed(() => appStore.state.tagsView)
 const fixedHeader = computed(() => appStore.state.fixedHeader)
 
 // 样式类

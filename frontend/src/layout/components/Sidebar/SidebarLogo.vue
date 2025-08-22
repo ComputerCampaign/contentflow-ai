@@ -29,7 +29,7 @@ withDefaults(defineProps<Props>(), {
 
 // 可以从配置文件或环境变量中获取
 const title = 'ContentFlow AI'
-const logo = '/logo.png' // 可以放在public目录下
+const logo = '/logo.svg' // 可以放在public目录下
 </script>
 
 <style lang="scss" scoped>

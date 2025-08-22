@@ -45,7 +45,7 @@
         <!-- 品牌标题 -->
         <div class="brand-header">
           <div class="brand-icon">
-            <img src="@/assets/logo.png" alt="ContentFlow AI Logo" class="brand-logo" />
+            <img src="@/assets/logo.svg" alt="ContentFlow AI Logo" class="brand-logo" />
           </div>
           <h1 class="brand-title">ContentFlow AI</h1>
           <p class="brand-subtitle">智能内容生成平台</p>
