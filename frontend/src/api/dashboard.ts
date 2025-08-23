@@ -1,63 +1,55 @@
 import request from '@/utils/request'
 
-// 仪表板统计数据接口
+// 仪表板统计数据接口（匹配后端返回格式）
 export interface DashboardStats {
-  totalTasks: number
-  activeCrawlers: number
-  todayGenerated: number
-  systemLoad: number
-  taskTrend: {
-    period: string
-    change: string
-    trend: 'up' | 'down'
-  }
-  crawlerTrend: {
-    period: string
-    change: string
-    trend: 'up' | 'down'
-  }
-  contentTrend: {
-    period: string
-    change: string
-    trend: 'up' | 'down'
-  }
-  systemTrend: {
-    period: string
-    change: string
-    trend: 'up' | 'down'
-  }
+  total_tasks: number
+  active_crawlers: number
+  completed_tasks: number
+  failed_tasks: number
+  success_rate: number
+  avg_duration: number
 }
 
-// 任务执行趋势数据
+// 任务执行趋势数据接口（匹配后端返回格式）
 export interface TaskTrendData {
-  labels: string[]
-  completedTasks: number[]
-  failedTasks: number[]
+  dates: string[]
+  success: number[]
+  failed: number[]
 }
 
-// 爬虫状态分布数据
+// 爬虫状态数据接口（匹配后端返回格式）
+export interface CrawlerInfo {
+  id: string
+  name: string
+  status: string
+  last_run: string
+  success_rate: number
+  total_requests: number
+}
+
 export interface CrawlerStatusData {
-  running: number
-  idle: number
-  error: number
-  maintenance: number
+  crawlers: CrawlerInfo[]
 }
 
-// 系统资源监控数据
+// 系统资源监控数据接口（匹配后端返回格式）
 export interface SystemResourceData {
-  cpu: number
-  memory: number
-  disk: number
-  network: number
+  cpu_usage: number
+  memory_usage: number
+  disk_usage: number
+  network_io: {
+    bytes_recv: number
+    bytes_sent: number
+  }
+  active_connections: number
 }
 
-// 系统资源历史数据
+// 系统资源历史数据（前端使用格式）
 export interface ResourceHistoryData {
   timestamps: string[]
   cpu: number[]
   memory: number[]
   disk: number[]
-  network: number[]
+  network_io: number[]
 }
 
 // 最近活动数据
@@ -96,7 +88,7 @@ export const dashboardApi = {
   },
 
   // 获取爬虫状态分布数据
-  async getCrawlerStatus(): Promise<CrawlerStatusData> {
+  async getCrawlerStatus(): Promise<CrawlerInfo[]> {
     const response = await request.get('/dashboard/crawler-status')
     return response.data
   },

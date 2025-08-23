@@ -34,6 +34,7 @@ export const useUserStore = defineStore('user', () => {
 
   // 计算属性
   const isLoggedIn = computed(() => !!token.value && !!userInfo.value)
+  const isAuthenticated = computed(() => !!token.value && !!userInfo.value)
   const isAdmin = computed(() => userInfo.value?.role === UserRole.ADMIN)
   const isAdvanced = computed(() => 
     userInfo.value?.role === UserRole.ADVANCED || userInfo.value?.role === UserRole.ADMIN
@@ -42,6 +43,7 @@ export const useUserStore = defineStore('user', () => {
   const userEmail = computed(() => userInfo.value?.email || '')
   const userAvatar = computed(() => userInfo.value?.avatar || '')
   const userRole = computed(() => userInfo.value?.role || UserRole.NORMAL)
+  const roles = computed(() => userInfo.value?.role ? [userInfo.value.role] : [])
 
   // 登录
   const login = async (loginData: LoginParams): Promise<boolean> => {
@@ -356,12 +358,14 @@ export const useUserStore = defineStore('user', () => {
     
     // 计算属性
     isLoggedIn,
+    isAuthenticated,
     isAdmin,
     isAdvanced,
     userName,
     userEmail,
     userAvatar,
     userRole,
+    roles,
     
     // 方法
     login,

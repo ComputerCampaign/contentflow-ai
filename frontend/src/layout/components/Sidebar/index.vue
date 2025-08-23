@@ -115,7 +115,7 @@ const hasPermission = (route: any) => {
     }
     
     // 其他权限检查（如user:manage等）
-    return meta.permissions.some(permission => {
+    return meta.permissions.some((permission: string) => {
       // 支持通配符权限，如 task:* 可以匹配 task:view, task:create 等
       if (permission.includes('*')) {
         const prefix = permission.replace('*', '')
@@ -127,7 +127,7 @@ const hasPermission = (route: any) => {
   
   // 检查角色要求
   if (meta.roles && meta.roles.length > 0) {
-    return meta.roles.some(role => userRoles.includes(role))
+    return meta.roles.some((role: string) => userRoles.includes(role as any))
   }
   
   // 默认情况下，已登录用户可以访问没有特殊权限要求的页面

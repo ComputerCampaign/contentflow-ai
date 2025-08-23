@@ -34,6 +34,40 @@ export const useDashboardStore = defineStore('dashboard', () => {
     return stats.value !== null
   })
 
+  // 默认统计数据
+  const defaultStats: DashboardStats = {
+    total_tasks: 0,
+    active_crawlers: 0,
+    completed_tasks: 0,
+    failed_tasks: 0,
+    success_rate: 0,
+    avg_duration: 0
+  }
+
+  // 默认任务趋势数据
+  const defaultTaskTrend: TaskTrendData = {
+    dates: [],
+    success: [],
+    failed: []
+  }
+
+  // 默认爬虫状态数据
+  const defaultCrawlerStatus: CrawlerStatusData = {
+    crawlers: []
+  }
+
+  // 默认系统资源数据
+  const defaultSystemResources: SystemResourceData = {
+    cpu_usage: 0,
+    memory_usage: 0,
+    disk_usage: 0,
+    network_io: {
+      bytes_recv: 0,
+      bytes_sent: 0
+    },
+    active_connections: 0
+  }
+
   // 获取仪表板统计数据
   const fetchStats = async () => {
     try {
@@ -44,6 +78,8 @@ export const useDashboardStore = defineStore('dashboard', () => {
     } catch (error) {
       console.error('获取统计数据失败:', error)
       ElMessage.error('获取统计数据失败')
+      // 提供默认数据以防止页面崩溃
+      stats.value = defaultStats
     } finally {
       loading.value.stats = false
     }
@@ -53,18 +89,20 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const fetchTaskTrend = async (period: '7d' | '30d' | '90d' = '7d') => {
     try {
       loading.value.taskTrend = true
+      console.log('开始获取任务趋势数据，period:', period)
       const response = await dashboardApi.getTaskTrend(period)
+      console.log('API返回的原始任务趋势数据:', response)
       // 使用数据转换器处理任务趋势数据
-      taskTrend.value = DashboardDataConverter.convertTaskTrend(response)
+      const convertedData = DashboardDataConverter.convertTaskTrend(response)
+      console.log('转换后的任务趋势数据:', convertedData)
+      taskTrend.value = convertedData
+      console.log('设置到store后的任务趋势数据:', taskTrend.value)
     } catch (error) {
       console.error('获取任务趋势数据失败:', error)
       ElMessage.error('获取任务趋势数据失败')
       // 提供默认数据以防止页面崩溃
-      taskTrend.value = {
-        labels: [],
-        completedTasks: [],
-        failedTasks: []
-      }
+      taskTrend.value = defaultTaskTrend
+      console.log('使用默认任务趋势数据:', taskTrend.value)
     } finally {
       loading.value.taskTrend = false
     }
@@ -81,12 +119,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
       console.error('获取爬虫状态数据失败:', error)
       ElMessage.error('获取爬虫状态数据失败')
       // 提供默认数据以防止页面崩溃
-      crawlerStatus.value = {
-        running: 0,
-        idle: 0,
-        error: 0,
-        maintenance: 0
-      }
+      crawlerStatus.value = defaultCrawlerStatus
     } finally {
       loading.value.crawlerStatus = false
     }
@@ -103,12 +136,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
       console.error('获取系统资源数据失败:', error)
       ElMessage.error('获取系统资源数据失败')
       // 提供默认数据以防止页面崩溃
-      systemResources.value = {
-        cpu: 0,
-        memory: 0,
-        disk: 0,
-        network: 0
-      }
+      systemResources.value = defaultSystemResources
     } finally {
       loading.value.systemResources = false
     }
@@ -130,7 +158,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
         cpu: [],
         memory: [],
         disk: [],
-        network: []
+        network_io: []
       }
     } finally {
       loading.value.resourceHistory = false

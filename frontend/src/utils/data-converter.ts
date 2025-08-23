@@ -15,152 +15,117 @@ import type {
 
 export class DashboardDataConverter {
   /**
-   * 转换统计数据
-   * 后端返回: { active_crawlers, completed_tasks, failed_tasks, success_rate, avg_duration }
-   * 前端期望: { totalTasks, activeCrawlers, todayGenerated, systemLoad, ...trends }
+   * 转换仪表板统计数据 - 确保包含所有必需字段
    */
   static convertStats(backendData: any): DashboardStats {
-    // 添加空值检查
-    if (!backendData) {
-      return {
-        totalTasks: 0,
-        activeCrawlers: 0,
-        todayGenerated: 0,
-        systemLoad: 0,
-        taskTrend: {
-          period: '7天',
-          change: '0%',
-          trend: 'up' as const
-        },
-        crawlerTrend: {
-          period: '7天',
-          change: '0%',
-          trend: 'up' as const
-        },
-        contentTrend: {
-          period: '7天',
-          change: '0%',
-          trend: 'up' as const
-        },
-        systemTrend: {
-          period: '7天',
-          change: '0%',
-          trend: 'up' as const
-        }
-      }
+    const defaultStats: DashboardStats = {
+      total_tasks: 0,
+      active_crawlers: 0,
+      completed_tasks: 0,
+      failed_tasks: 0,
+      success_rate: 0,
+      avg_duration: 0
     }
 
-    // 根据后端实际返回的数据格式进行转换
-    const totalTasks = (backendData.total_tasks || 0)
-    const completedTasks = (backendData.completed_tasks || 0)
-    const failedTasks = (backendData.failed_tasks || 0)
-    const activeCrawlers = (backendData.active_crawlers || 0)
-    const successRate = (backendData.success_rate || 0)
-    const avgDuration = (backendData.avg_duration || 0)
-    
-    const systemLoad = Math.round(successRate) // 直接使用成功率作为系统负载
-    const todayGenerated = Math.round(completedTasks * 0.8) // 假设今日生成内容为完成任务的80%
-    
-    // 计算趋势数据
-    const taskTrendValue = DashboardDataConverter.calculateTrend(completedTasks, failedTasks)
-    const crawlerTrendValue = DashboardDataConverter.calculateTrend(activeCrawlers, 0)
-    const contentTrendValue = DashboardDataConverter.calculateTrend(todayGenerated, 0)
-    const systemTrendValue = DashboardDataConverter.calculateTrend(systemLoad, 0)
-    
+    if (!backendData || typeof backendData !== 'object') {
+      return defaultStats
+    }
+
+    // 合并数据，确保所有字段都存在且为数字
     return {
-      totalTasks,
-      activeCrawlers,
-      todayGenerated,
-      systemLoad,
-      taskTrend: {
-        period: '7天',
-        change: `${taskTrendValue}%`,
-        trend: taskTrendValue >= 0 ? 'up' : 'down'
-      },
-      crawlerTrend: {
-        period: '7天',
-        change: `${crawlerTrendValue}%`,
-        trend: crawlerTrendValue >= 0 ? 'up' : 'down'
-      },
-      contentTrend: {
-        period: '7天',
-        change: `${contentTrendValue}%`,
-        trend: contentTrendValue >= 0 ? 'up' : 'down'
-      },
-      systemTrend: {
-        period: '7天',
-        change: `${systemTrendValue}%`,
-        trend: systemTrendValue >= 0 ? 'up' : 'down'
-      }
+      total_tasks: backendData.total_tasks ?? defaultStats.total_tasks,
+      active_crawlers: backendData.active_crawlers ?? defaultStats.active_crawlers,
+      completed_tasks: backendData.completed_tasks ?? defaultStats.completed_tasks,
+      failed_tasks: backendData.failed_tasks ?? defaultStats.failed_tasks,
+      success_rate: backendData.success_rate ?? defaultStats.success_rate,
+      avg_duration: backendData.avg_duration ?? defaultStats.avg_duration
     }
   }
 
   /**
-   * 转换爬虫状态数据
+   * 转换爬虫状态数据 - 确保包含所有必需字段
    */
   static convertCrawlerStatus(backendData: any): CrawlerStatusData {
+    const defaultData: CrawlerStatusData = {
+      crawlers: []
+    }
+
     if (!backendData) {
+      return defaultData
+    }
+
+    // 如果后端直接返回数组，包装成对象
+    if (Array.isArray(backendData)) {
       return {
-        running: 0,
-        idle: 0,
-        error: 0,
-        maintenance: 0
+        crawlers: backendData
       }
     }
 
-    // 根据后端实际返回的数据格式进行转换
-    return {
-      running: backendData.running || 0,
-      idle: backendData.idle || 0,
-      error: backendData.error || 0,
-      maintenance: backendData.maintenance || 0
+    // 如果后端返回对象，提取crawlers字段
+    if (typeof backendData === 'object') {
+      return {
+        crawlers: Array.isArray(backendData.crawlers) ? backendData.crawlers : defaultData.crawlers
+      }
     }
+
+    return defaultData
   }
 
   /**
-   * 转换任务趋势数据
+   * 转换任务执行趋势数据 - 确保包含所有必需字段
    */
   static convertTaskTrend(backendData: any): TaskTrendData {
-    if (!backendData) {
-      return {
-        labels: [],
-        completedTasks: [],
-        failedTasks: []
-      }
+    const defaultData: TaskTrendData = {
+      dates: [],
+      success: [],
+      failed: []
     }
 
-    // 根据后端实际返回的数据格式进行转换
+    if (!backendData || typeof backendData !== 'object') {
+      return defaultData
+    }
+
     return {
-      labels: backendData.labels || [],
-      completedTasks: backendData.completed_tasks || [],
-      failedTasks: backendData.failed_tasks || []
+      dates: Array.isArray(backendData.dates) ? backendData.dates : defaultData.dates,
+      success: Array.isArray(backendData.success) ? backendData.success : defaultData.success,
+      failed: Array.isArray(backendData.failed) ? backendData.failed : defaultData.failed
     }
   }
 
   /**
-   * 转换系统资源数据
+   * 转换系统资源数据 - 确保包含所有必需字段
    */
   static convertSystemResources(backendData: any): SystemResourceData {
-    if (!backendData) {
-      return {
-        cpu: 0,
-        memory: 0,
-        disk: 0,
-        network: 0
-      }
+    const defaultData: SystemResourceData = {
+      cpu_usage: 0,
+      memory_usage: 0,
+      disk_usage: 0,
+      network_io: {
+        bytes_recv: 0,
+        bytes_sent: 0
+      },
+      active_connections: 0
     }
 
-    // 根据后端实际返回的数据格式进行转换
+    if (!backendData) {
+      return defaultData
+    }
+
+    // 合并数据，确保所有字段都存在且为数字
     return {
-      cpu: Math.round(backendData.cpu || 0),
-      memory: Math.round(backendData.memory || 0),
-      disk: Math.round(backendData.disk || 0),
-      network: Math.round(backendData.network || 0)
+      cpu_usage: typeof backendData.cpu_usage === 'number' ? backendData.cpu_usage : defaultData.cpu_usage,
+      memory_usage: typeof backendData.memory_usage === 'number' ? backendData.memory_usage : defaultData.memory_usage,
+      disk_usage: typeof backendData.disk_usage === 'number' ? backendData.disk_usage : defaultData.disk_usage,
+      network_io: {
+        bytes_recv: backendData.network_io?.bytes_recv || defaultData.network_io.bytes_recv,
+        bytes_sent: backendData.network_io?.bytes_sent || defaultData.network_io.bytes_sent
+      },
+      active_connections: typeof backendData.active_connections === 'number' ? backendData.active_connections : defaultData.active_connections
     }
   }
 
   /**
-   * 转换系统资源历史数据
+   * 转换系统资源历史数据 - 简化版本
    */
   static convertResourceHistory(backendData: any): ResourceHistoryData {
     if (!backendData || typeof backendData !== 'object') {
@@ -169,53 +134,67 @@ export class DashboardDataConverter {
         cpu: [],
         memory: [],
         disk: [],
-        network: []
+        network_io: []
       }
     }
 
-    // 根据后端实际返回的数据格式进行转换
+    // 后端返回的是对象数组格式，需要转换为分别的数组
+    if (Array.isArray(backendData)) {
+      const timestamps: string[] = []
+      const cpu: number[] = []
+      const memory: number[] = []
+      const disk: number[] = []
+      const network_io: number[] = []
+      
+      backendData.forEach((item: any) => {
+        timestamps.push(item.timestamp || '')
+        cpu.push(item.cpu || 0)
+        memory.push(item.memory || 0)
+        disk.push(item.disk || 0)
+        network_io.push(item.network_io || 0)
+      })
+      
+      return {
+        timestamps,
+        cpu,
+        memory,
+        disk,
+        network_io
+      }
+    }
+    
+    // 兼容旧格式
     return {
       timestamps: backendData.timestamps || [],
-      cpu: backendData.cpu || [],
-      memory: backendData.memory || [],
-      disk: backendData.disk || [],
-      network: backendData.network || []
+      cpu: backendData.cpu_usage || backendData.cpu || [],
+      memory: backendData.memory_usage || backendData.memory || [],
+      disk: backendData.disk_usage || backendData.disk || [],
+      network_io: backendData.network_io || []
     }
   }
 
   /**
-   * 转换最近活动数据
+   * 转换最近活动数据 - 简化版本
    */
   static convertRecentActivities(backendData: any): RecentActivity[] {
     if (!Array.isArray(backendData)) {
       return []
     }
 
-    return backendData.map((activity: any) => ({
-      id: activity.id || String(Math.random()),
-      type: activity.type || 'info',
-      title: activity.title || '未知活动',
-      description: activity.description || '',
-      time: activity.time || new Date().toISOString(),
-      status: activity.status || 'info'
-    }))
+    // 直接返回后端数据
+    return backendData
   }
 
   /**
-   * 转换快速操作数据
+   * 转换快速操作数据 - 简化版本
    */
   static convertQuickActions(backendData: any): QuickAction[] {
     if (!Array.isArray(backendData)) {
       return []
     }
 
-    return backendData.map((action: any) => ({
-      name: action.name || '',
-      title: action.title || '',
-      description: action.description || '',
-      icon: action.icon || 'default',
-      route: action.route
-    }))
+    // 直接返回后端数据
+    return backendData
   }
 
   // 辅助方法

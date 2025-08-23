@@ -160,7 +160,11 @@ def get_task_trends():
     """获取任务趋势数据"""
     try:
         if not require_auth():
-            return jsonify({'error': '未授权访问'}), 401
+            return jsonify({
+                'success': False,
+                'message': '未授权访问',
+                'error_code': 401
+            }), 401
         
         # 获取或创建dashboard数据
         dashboard = Dashboard.get_dashboard_data('main')
@@ -168,12 +172,24 @@ def get_task_trends():
             # 生成并保存模拟数据
             mock_data = generate_mock_task_trend()
             Dashboard.create_or_update_dashboard('main', task_trend=mock_data)
-            return jsonify(mock_data)
+            return jsonify({
+                'success': True,
+                'message': '获取任务趋势数据成功',
+                'data': mock_data
+            })
         
-        return jsonify(dashboard['task_trend'])
+        return jsonify({
+            'success': True,
+            'message': '获取任务趋势数据成功',
+            'data': dashboard['task_trend']
+        })
     
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'success': False,
+            'message': f'获取任务趋势数据失败: {str(e)}',
+            'error_code': 500
+        }), 500
 
 
 @dashboard_bp.route('/stats', methods=['GET'])
@@ -182,18 +198,34 @@ def get_stats():
     """获取统计信息"""
     try:
         if not require_auth():
-            return jsonify({'error': '未授权访问'}), 401
+            return jsonify({
+                'success': False,
+                'message': '未授权访问',
+                'error_code': 401
+            }), 401
         
         dashboard = Dashboard.get_dashboard_data('main')
         if not dashboard or not dashboard.get('stats'):
             mock_data = generate_mock_stats()
             Dashboard.create_or_update_dashboard('main', stats=mock_data)
-            return jsonify(mock_data)
+            return jsonify({
+                'success': True,
+                'message': '获取统计信息成功',
+                'data': mock_data
+            })
         
-        return jsonify(dashboard['stats'])
+        return jsonify({
+            'success': True,
+            'message': '获取统计信息成功',
+            'data': dashboard['stats']
+        })
     
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'success': False,
+            'message': f'获取统计信息失败: {str(e)}',
+            'error_code': 500
+        }), 500
 
 
 @dashboard_bp.route('/crawler-status', methods=['GET'])
@@ -202,18 +234,34 @@ def get_crawler_status():
     """获取爬虫状态"""
     try:
         if not require_auth():
-            return jsonify({'error': '未授权访问'}), 401
+            return jsonify({
+                'success': False,
+                'message': '未授权访问',
+                'error_code': 401
+            }), 401
         
         dashboard = Dashboard.get_dashboard_data('main')
         if not dashboard or not dashboard.get('crawler_status'):
             mock_data = generate_mock_crawler_status()
             Dashboard.create_or_update_dashboard('main', crawler_status=mock_data)
-            return jsonify(mock_data)
+            return jsonify({
+                'success': True,
+                'message': '获取爬虫状态成功',
+                'data': mock_data
+            })
         
-        return jsonify(dashboard['crawler_status'])
+        return jsonify({
+            'success': True,
+            'message': '获取爬虫状态成功',
+            'data': dashboard['crawler_status']
+        })
     
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'success': False,
+            'message': f'获取爬虫状态失败: {str(e)}',
+            'error_code': 500
+        }), 500
 
 
 @dashboard_bp.route('/system-resources', methods=['GET'])
@@ -222,18 +270,34 @@ def get_system_resources():
     """获取系统资源"""
     try:
         if not require_auth():
-            return jsonify({'error': '未授权访问'}), 401
+            return jsonify({
+                'success': False,
+                'message': '未授权访问',
+                'error_code': 401
+            }), 401
         
         dashboard = Dashboard.get_dashboard_data('main')
         if not dashboard or not dashboard.get('system_resources'):
             mock_data = generate_mock_system_resources()
             Dashboard.create_or_update_dashboard('main', system_resources=mock_data)
-            return jsonify(mock_data)
+            return jsonify({
+                'success': True,
+                'message': '获取系统资源成功',
+                'data': mock_data
+            })
         
-        return jsonify(dashboard['system_resources'])
+        return jsonify({
+            'success': True,
+            'message': '获取系统资源成功',
+            'data': dashboard['system_resources']
+        })
     
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'success': False,
+            'message': f'获取系统资源失败: {str(e)}',
+            'error_code': 500
+        }), 500
 
 
 @dashboard_bp.route('/resource-history', methods=['GET'])
@@ -242,18 +306,34 @@ def get_resource_history():
     """获取资源历史"""
     try:
         if not require_auth():
-            return jsonify({'error': '未授权访问'}), 401
+            return jsonify({
+                'success': False,
+                'message': '未授权访问',
+                'error_code': 401
+            }), 401
         
         dashboard = Dashboard.get_dashboard_data('main')
         if not dashboard or not dashboard.get('resource_history'):
             mock_data = generate_mock_resource_history()
             Dashboard.create_or_update_dashboard('main', resource_history=mock_data)
-            return jsonify(mock_data)
+            return jsonify({
+                'success': True,
+                'message': '获取资源历史成功',
+                'data': mock_data
+            })
         
-        return jsonify(dashboard['resource_history'])
+        return jsonify({
+            'success': True,
+            'message': '获取资源历史成功',
+            'data': dashboard['resource_history']
+        })
     
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'success': False,
+            'message': f'获取资源历史失败: {str(e)}',
+            'error_code': 500
+        }), 500
 
 
 @dashboard_bp.route('/recent-activities', methods=['GET'])
@@ -262,18 +342,34 @@ def get_recent_activities():
     """获取最近活动"""
     try:
         if not require_auth():
-            return jsonify({'error': '未授权访问'}), 401
+            return jsonify({
+                'success': False,
+                'message': '未授权访问',
+                'error_code': 401
+            }), 401
         
         dashboard = Dashboard.get_dashboard_data('main')
         if not dashboard or not dashboard.get('recent_activities'):
             mock_data = generate_mock_recent_activities()
             Dashboard.create_or_update_dashboard('main', recent_activities=mock_data)
-            return jsonify(mock_data)
+            return jsonify({
+                'success': True,
+                'message': '获取最近活动成功',
+                'data': mock_data
+            })
         
-        return jsonify(dashboard['recent_activities'])
+        return jsonify({
+            'success': True,
+            'message': '获取最近活动成功',
+            'data': dashboard['recent_activities']
+        })
     
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'success': False,
+            'message': f'获取最近活动失败: {str(e)}',
+            'error_code': 500
+        }), 500
 
 
 @dashboard_bp.route('/quick-actions', methods=['GET'])
@@ -282,18 +378,34 @@ def get_quick_actions():
     """获取快速操作"""
     try:
         if not require_auth():
-            return jsonify({'error': '未授权访问'}), 401
+            return jsonify({
+                'success': False,
+                'message': '未授权访问',
+                'error_code': 401
+            }), 401
         
         dashboard = Dashboard.get_dashboard_data('main')
         if not dashboard or not dashboard.get('quick_actions'):
             mock_data = generate_mock_quick_actions()
             Dashboard.create_or_update_dashboard('main', quick_actions=mock_data)
-            return jsonify(mock_data)
+            return jsonify({
+                'success': True,
+                'message': '获取快速操作成功',
+                'data': mock_data
+            })
         
-        return jsonify(dashboard['quick_actions'])
+        return jsonify({
+            'success': True,
+            'message': '获取快速操作成功',
+            'data': dashboard['quick_actions']
+        })
     
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'success': False,
+            'message': f'获取快速操作失败: {str(e)}',
+            'error_code': 500
+        }), 500
 
 
 @dashboard_bp.route('/refresh', methods=['POST'])
@@ -302,7 +414,11 @@ def refresh_dashboard():
     """刷新仪表板数据"""
     try:
         if not require_auth():
-            return jsonify({'error': '未授权访问'}), 401
+            return jsonify({
+                'success': False,
+                'message': '未授权访问',
+                'error_code': 401
+            }), 401
         
         # 重新生成所有模拟数据
         dashboard_data = {
@@ -318,9 +434,16 @@ def refresh_dashboard():
         Dashboard.create_or_update_dashboard('main', **dashboard_data)
         
         return jsonify({
+            'success': True,
             'message': '仪表板数据已刷新',
-            'timestamp': datetime.now().isoformat()
+            'data': {
+                'timestamp': datetime.now().isoformat()
+            }
         })
     
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'success': False,
+            'message': f'刷新仪表板数据失败: {str(e)}',
+            'error_code': 500
+        }), 500
