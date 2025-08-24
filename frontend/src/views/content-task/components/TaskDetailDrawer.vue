@@ -97,37 +97,121 @@
         </el-descriptions>
       </div>
       
-      <!-- 执行日志 -->
+      <!-- 任务结果 -->
       <div class="detail-section">
         <h3 class="section-title">
-          执行日志
+          任务结果
           <el-button
             size="small"
             :icon="Refresh"
-            @click="refreshLogs"
-            :loading="logsLoading"
+            @click="refreshResults"
+            :loading="resultsLoading"
           >
             刷新
           </el-button>
         </h3>
-        <div class="logs-container">
-          <el-scrollbar height="300px">
-            <div v-if="logs.length === 0" class="empty-logs">
-              暂无日志
-            </div>
-            <div v-else class="logs-content">
-              <div
-                v-for="log in logs"
-                :key="log.id"
-                class="log-item"
-                :class="`log-${log.level}`"
-              >
-                <span class="log-time">{{ formatTime(log.timestamp) }}</span>
-                <span class="log-level">{{ log.level.toUpperCase() }}</span>
-                <span class="log-message">{{ log.message }}</span>
+        <div class="results-container">
+          <div v-if="!taskResults" class="empty-results">
+            暂无结果数据
+          </div>
+          <div v-else>
+            <!-- 爬虫任务结果 -->
+            <div v-if="task.type === 'crawler'" class="crawler-results">
+              <el-row :gutter="16" class="result-stats">
+                <el-col :span="6">
+                  <el-statistic title="处理项数" :value="taskResults.items_processed || 0" />
+                </el-col>
+                <el-col :span="6">
+                  <el-statistic title="成功项数" :value="taskResults.items_success || 0" />
+                </el-col>
+                <el-col :span="6">
+                  <el-statistic title="失败项数" :value="taskResults.items_failed || 0" />
+                </el-col>
+                <el-col :span="6">
+                  <el-statistic title="执行时长" :value="taskResults.duration || 0" suffix="秒" />
+                </el-col>
+              </el-row>
+              
+              <div v-if="taskResults.results && taskResults.results.length > 0" class="crawler-data">
+                <h4>抓取结果</h4>
+                <el-table :data="taskResults.results" stripe max-height="400">
+                  <el-table-column prop="url" label="URL" width="300" show-overflow-tooltip />
+                  <el-table-column prop="title" label="标题" show-overflow-tooltip />
+                  <el-table-column prop="content" label="内容" show-overflow-tooltip>
+                    <template #default="{ row }">
+                      <span>{{ row.content ? row.content.substring(0, 100) + '...' : '-' }}</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="extracted_data" label="提取数据" width="200">
+                    <template #default="{ row }">
+                      <el-tag v-if="row.extracted_data" size="small">有数据</el-tag>
+                      <span v-else>-</span>
+                    </template>
+                  </el-table-column>
+                </el-table>
               </div>
             </div>
-          </el-scrollbar>
+            
+            <!-- 内容生成任务结果 -->
+            <div v-else-if="task.type === 'content_generation'" class="content-results">
+              <el-row :gutter="16" class="result-stats">
+                <el-col :span="6">
+                  <el-statistic title="处理项数" :value="taskResults.items_processed || 0" />
+                </el-col>
+                <el-col :span="6">
+                  <el-statistic title="成功项数" :value="taskResults.items_success || 0" />
+                </el-col>
+                <el-col :span="6">
+                  <el-statistic title="失败项数" :value="taskResults.items_failed || 0" />
+                </el-col>
+                <el-col :span="6">
+                  <el-statistic title="执行时长" :value="taskResults.duration || 0" suffix="秒" />
+                </el-col>
+              </el-row>
+              
+              <div v-if="taskResults.results && taskResults.results.length > 0" class="content-data">
+                <h4>生成内容</h4>
+                <div class="content-list">
+                  <div v-for="(result, index) in taskResults.results" :key="index" class="content-item">
+                    <div class="content-header">
+                      <span class="content-index">#{{ index + 1 }}</span>
+                      <el-tag size="small" type="success">已生成</el-tag>
+                    </div>
+                    <div class="content-body">
+                      {{ result.content || result.generated_content || '内容为空' }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 组合任务结果 -->
+            <div v-else-if="task.type === 'combined'" class="combined-results">
+              <el-row :gutter="16" class="result-stats">
+                <el-col :span="6">
+                  <el-statistic title="处理项数" :value="taskResults.items_processed || 0" />
+                </el-col>
+                <el-col :span="6">
+                  <el-statistic title="成功项数" :value="taskResults.items_success || 0" />
+                </el-col>
+                <el-col :span="6">
+                  <el-statistic title="失败项数" :value="taskResults.items_failed || 0" />
+                </el-col>
+                <el-col :span="6">
+                  <el-statistic title="执行时长" :value="taskResults.duration || 0" suffix="秒" />
+                </el-col>
+              </el-row>
+              
+              <div class="combined-data">
+                <h4>执行结果</h4>
+                <el-alert
+                  title="组合任务包含多个子任务，请查看各子任务的详细结果"
+                  type="info"
+                  :closable="false"
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       
@@ -212,8 +296,8 @@ const emit = defineEmits<Emits>()
 const taskStore = useTaskStore()
 
 // 响应式数据
-const logs = ref<any[]>([])
-const logsLoading = ref(false)
+const taskResults = ref<any>(null)
+const resultsLoading = ref(false)
 
 // 计算属性
 const visible = computed({
@@ -310,26 +394,26 @@ const handleExport = () => {
   ElMessage.info('导出功能开发中')
 }
 
-const refreshLogs = async () => {
+const refreshResults = async () => {
   if (!props.task?.id) return
   
-  logsLoading.value = true
+  resultsLoading.value = true
   try {
-    await taskStore.fetchTaskLogs(props.task.id, { page: 1, pageSize: 100 })
-    logs.value = taskStore.taskLogs || []
+    await taskStore.fetchTaskResults(props.task.id, { page: 1, pageSize: 100 })
+    taskResults.value = taskStore.taskResults || null
   } catch (error) {
-    ElMessage.error('获取日志失败')
+    ElMessage.error('获取结果失败')
   } finally {
-    logsLoading.value = false
+    resultsLoading.value = false
   }
 }
 
-// 监听任务变化，自动刷新日志
+// 监听任务变化，自动刷新结果
 watch(
   () => props.task?.id,
   (newId) => {
     if (newId && visible.value) {
-      refreshLogs()
+      refreshResults()
     }
   },
   { immediate: true }
@@ -340,7 +424,7 @@ watch(
   visible,
   (newVisible) => {
     if (newVisible && props.task?.id) {
-      refreshLogs()
+      refreshResults()
     }
   }
 )
@@ -369,69 +453,81 @@ watch(
     line-height: 1.6;
   }
   
-  .logs-container {
-    border: 1px solid var(--el-border-color);
-    border-radius: 4px;
-    
-    .empty-logs {
+  .results-container {
+    .empty-results {
       padding: 40px;
       text-align: center;
       color: var(--el-text-color-placeholder);
     }
     
-    .logs-content {
-      .log-item {
-        padding: 8px 12px;
-        border-bottom: 1px solid var(--el-border-color-lighter);
-        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-        font-size: 12px;
-        display: flex;
-        gap: 12px;
+    .result-stats {
+      margin-bottom: 24px;
+    }
+    
+    .crawler-results {
+      .crawler-data {
+        margin-top: 16px;
         
-        &:last-child {
-          border-bottom: none;
-        }
-        
-        .log-time {
-          color: var(--el-text-color-secondary);
-          min-width: 140px;
-        }
-        
-        .log-level {
-          min-width: 50px;
+        h4 {
+          margin: 0 0 12px 0;
+          font-size: 14px;
           font-weight: 600;
+          color: var(--el-text-color-primary);
+        }
+      }
+    }
+    
+    .content-results {
+      .content-data {
+        margin-top: 16px;
+        
+        h4 {
+          margin: 0 0 12px 0;
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--el-text-color-primary);
         }
         
-        .log-message {
-          flex: 1;
-        }
-        
-        &.log-error {
-          background: var(--el-color-error-light-9);
-          
-          .log-level {
-            color: var(--el-color-error);
+        .content-list {
+          .content-item {
+            margin-bottom: 16px;
+            padding: 16px;
+            border: 1px solid var(--el-border-color);
+            border-radius: 8px;
+            background: var(--el-fill-color-lighter);
+            
+            .content-header {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 12px;
+              
+              .content-index {
+                font-weight: 600;
+                color: var(--el-text-color-primary);
+              }
+            }
+            
+            .content-body {
+              line-height: 1.6;
+              color: var(--el-text-color-regular);
+              white-space: pre-wrap;
+              word-break: break-word;
+            }
           }
         }
+      }
+    }
+    
+    .combined-results {
+      .combined-data {
+        margin-top: 16px;
         
-        &.log-warn {
-          background: var(--el-color-warning-light-9);
-          
-          .log-level {
-            color: var(--el-color-warning);
-          }
-        }
-        
-        &.log-info {
-          .log-level {
-            color: var(--el-color-info);
-          }
-        }
-        
-        &.log-debug {
-          .log-level {
-            color: var(--el-text-color-secondary);
-          }
+        h4 {
+          margin: 0 0 12px 0;
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--el-text-color-primary);
         }
       }
     }

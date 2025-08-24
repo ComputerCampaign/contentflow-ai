@@ -6,6 +6,7 @@ import { ElMessage } from 'element-plus'
 export interface XPathConfig {
   id: string
   name: string
+  field_name: string
   description?: string
   xpath: string
   extractType: 'text' | 'html' | 'attr' | 'href'
@@ -72,6 +73,7 @@ export const useXPathStore = defineStore('xpath', () => {
       const keyword = searchKeyword.value.toLowerCase()
       result = result.filter(config => 
         config.name.toLowerCase().includes(keyword) ||
+        config.field_name.toLowerCase().includes(keyword) ||
         config.description?.toLowerCase().includes(keyword) ||
         config.xpath.toLowerCase().includes(keyword)
       )

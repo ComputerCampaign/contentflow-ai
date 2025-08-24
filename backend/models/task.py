@@ -211,11 +211,43 @@ class Task(db.Model):
 
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat(),
+            'createdAt': self.created_at.isoformat(),  # 前端期望的字段名
+            'updatedAt': self.updated_at.isoformat(),  # 前端期望的字段名
             'user_id': self.user_id,
             'crawler_config_id': self.crawler_config_id,
             'xpath_config_id': self.xpath_config_id,
 
         }
+        
+        # 添加爬虫配置信息
+        if self.crawler_config_id:
+            from backend.models.crawler import CrawlerConfig
+            crawler_config = CrawlerConfig.query.get(self.crawler_config_id)
+            if crawler_config:
+                data['crawlerConfig'] = {
+                    'id': crawler_config.id,
+                    'name': crawler_config.name,
+                    'description': crawler_config.description
+                }
+            else:
+                data['crawlerConfig'] = None
+        else:
+            data['crawlerConfig'] = None
+        
+        # 添加XPath配置信息
+        if self.xpath_config_id:
+            from backend.models.xpath import XPathConfig
+            xpath_config = XPathConfig.query.get(self.xpath_config_id)
+            if xpath_config:
+                data['xpathConfig'] = {
+                    'id': xpath_config.id,
+                    'name': xpath_config.name,
+                    'description': xpath_config.description
+                }
+            else:
+                data['xpathConfig'] = None
+        else:
+            data['xpathConfig'] = None
         
         if include_executions:
             from backend.models.task import TaskExecution

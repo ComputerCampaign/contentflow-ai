@@ -53,6 +53,7 @@
           </template>
         </el-table-column>
         <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="field_name" label="字段名称" min-width="120" show-overflow-tooltip />
         <el-table-column prop="xpath" label="XPath表达式" min-width="250" show-overflow-tooltip>
           <template #default="{ row }">
             <code class="xpath-code">{{ row.xpath }}</code>

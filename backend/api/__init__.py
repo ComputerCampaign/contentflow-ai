@@ -12,6 +12,7 @@ from backend.api.monitoring import monitoring_bp
 from backend.api.xpath import xpath_bp
 # ai_config和ai_content_config已合并到ai_model中
 from backend.api.ai_model import ai_model_bp
+from backend.api.prompt import prompt_bp
 from backend.api.dashboard import dashboard_bp
 
 
@@ -28,10 +29,10 @@ def register_blueprints(app):
     app.register_blueprint(tasks_bp, url_prefix=f'{api_prefix}/tasks')
     
     # 注册爬虫配置API
-    app.register_blueprint(crawler_bp, url_prefix=f'{api_prefix}/crawler')
+    app.register_blueprint(crawler_bp, url_prefix='/crawler-configs')
     
     # 注册XPath配置API
-    app.register_blueprint(xpath_bp, url_prefix=f'{api_prefix}/xpath')
+    app.register_blueprint(xpath_bp, url_prefix='/api/xpath')
     
     # ai_config和ai_content_config已合并到ai_model中，无需单独注册
     
@@ -44,6 +45,9 @@ def register_blueprints(app):
     
     # 注册监控API
     app.register_blueprint(monitoring_bp, url_prefix=f'{api_prefix}/monitor')
+    
+    # 注册Prompt管理API
+    app.register_blueprint(prompt_bp, url_prefix=f'{api_prefix}/prompts')
     
     # 注册仪表板API
     app.register_blueprint(dashboard_bp, url_prefix=f'{api_prefix}/dashboard')
@@ -58,6 +62,7 @@ __all__ = [
     'ai_config_bp',
     'ai_content_config_bp',
     'ai_model_bp',
+    'prompt_bp',
     'monitoring_bp',
     'dashboard_bp'
 ]

@@ -172,7 +172,8 @@ def get_crawler_configs():
         
         # 获取查询参数
         page = request.args.get('page', 1, type=int)
-        per_page = min(request.args.get('per_page', 10, type=int), 100)
+        per_page_str = request.args.get('per_page') or request.args.get('pageSize', '10')
+        per_page = min(int(per_page_str), 100)
         search = request.args.get('search', '').strip()
         use_selenium = request.args.get('use_selenium')
         enable_xpath = request.args.get('enable_xpath')
@@ -823,7 +824,8 @@ def get_crawler_results(config_id):
         
         # 获取查询参数
         page = request.args.get('page', 1, type=int)
-        per_page = min(request.args.get('per_page', 20, type=int), 100)
+        per_page_str = request.args.get('per_page') or request.args.get('pageSize', '20')
+        per_page = min(int(per_page_str), 100)
         status = request.args.get('status')
         
         # 构建查询

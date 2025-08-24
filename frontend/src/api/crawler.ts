@@ -194,16 +194,40 @@ class CrawlerApiService extends BaseApiService {
   }
 
   /**
+   * 过滤参数中的undefined和null值
+   * @param params 原始参数
+   */
+  private filterParams(params?: Record<string, any>): Record<string, string> {
+    if (!params) return {}
+    
+    const filtered: Record<string, string> = {}
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        if (Array.isArray(value)) {
+          filtered[key] = value.join(',')
+        } else {
+          filtered[key] = String(value)
+        }
+      }
+    })
+    return filtered
+  }
+
+  /**
    * 获取爬虫配置列表
    * @param params 查询参数
    */
   async getCrawlerConfigs(params?: CrawlerQueryParams): Promise<StandardResponse<{
-    list: CrawlerConfig[]
-    total: number
-    page: number
-    pageSize: number
+    configs: CrawlerConfig[]
+    pagination: {
+      page: number
+      per_page: number
+      total: number
+    }
   }>> {
-    return this.getPagedList<CrawlerConfig>(params)
+    const queryParams = this.filterParams(params)
+    const queryString = new URLSearchParams(queryParams).toString()
+    return apiAdapter.get(`${this.baseUrl}/configs${queryString ? '?' + queryString : ''}`)
   }
 
   /**
@@ -219,7 +243,7 @@ class CrawlerApiService extends BaseApiService {
    * @param params 创建参数
    */
   async createCrawlerConfig(params: CreateCrawlerParams): Promise<StandardResponse<CrawlerConfig>> {
-    return this.create<CrawlerConfig>(params)
+    return apiAdapter.post<CrawlerConfig>(`${this.baseUrl}/configs`, params)
   }
 
   /**

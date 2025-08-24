@@ -12,11 +12,30 @@ export abstract class BaseApiService {
   }
 
   /**
+   * 过滤参数中的undefined和null值
+   * @param params 原始参数
+   */
+  private filterParams(params?: Record<string, any>): Record<string, string> {
+    if (!params) return {}
+    const filtered: Record<string, string> = {}
+    Object.keys(params).forEach(key => {
+      const value = params[key]
+      if (value !== undefined && value !== null) {
+        filtered[key] = String(value)
+      }
+    })
+    return filtered
+  }
+
+  /**
    * 获取列表数据
    * @param params 查询参数
    */
   async getList<T = any>(params?: Record<string, any>): Promise<StandardResponse<T[]>> {
-    const url = params ? `${this.baseUrl}?${new URLSearchParams(params).toString()}` : this.baseUrl
+    const filteredParams = this.filterParams(params)
+    const url = Object.keys(filteredParams).length > 0 
+      ? `${this.baseUrl}?${new URLSearchParams(filteredParams).toString()}` 
+      : this.baseUrl
     return apiAdapter.get<T[]>(url)
   }
 
@@ -39,7 +58,8 @@ export abstract class BaseApiService {
       pageSize: 10,
       ...params
     }
-    const url = `${this.baseUrl}?${new URLSearchParams(queryParams as any).toString()}`
+    const filteredParams = this.filterParams(queryParams)
+    const url = `${this.baseUrl}?${new URLSearchParams(filteredParams).toString()}`
     return apiAdapter.get(url)
   }
 
@@ -114,7 +134,8 @@ export abstract class BaseApiService {
       keyword,
       ...params
     }
-    return apiAdapter.get<T[]>(`${this.baseUrl}/search?${new URLSearchParams(queryParams).toString()}`)
+    const filteredParams = this.filterParams(queryParams)
+    return apiAdapter.get<T[]>(`${this.baseUrl}/search?${new URLSearchParams(filteredParams).toString()}`)
   }
 
   /**
@@ -130,7 +151,8 @@ export abstract class BaseApiService {
       format,
       ...params
     }
-    return apiAdapter.get<Blob>(`${this.baseUrl}/export?${new URLSearchParams(queryParams).toString()}`)
+    const filteredParams = this.filterParams(queryParams)
+    return apiAdapter.get<Blob>(`${this.baseUrl}/export?${new URLSearchParams(filteredParams).toString()}`)
   }
 
   /**
@@ -157,8 +179,9 @@ export abstract class BaseApiService {
    * @param params 统计参数
    */
   async getStats<T = any>(params?: Record<string, any>): Promise<StandardResponse<T>> {
-    const url = params 
-      ? `${this.baseUrl}/stats?${new URLSearchParams(params).toString()}`
+    const filteredParams = this.filterParams(params)
+    const url = Object.keys(filteredParams).length > 0
+      ? `${this.baseUrl}/stats?${new URLSearchParams(filteredParams).toString()}`
       : `${this.baseUrl}/stats`
     return apiAdapter.get<T>(url)
   }

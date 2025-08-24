@@ -205,26 +205,204 @@ def create_crawler_task():
                     'message': '写入XPath配置失败',
                     'error_code': 'XPATH_SYNC_FAILED'
                 }), 500
-        
+
         db.session.commit()
-        
-        # 生成命令预览
-        command_preview = task.get_crawler_params()
-        task_dict = task.to_dict()
-        task_dict['command_preview'] = command_preview
-        
         return jsonify({
             'success': True,
-            'message': '爬虫任务创建成功',
-            'data': task_dict
+            'message': '任务创建成功',
+            'data': {
+                'task_id': task.id,
+                'name': task.name,
+                'type': task.type,
+                'url': task.url,
+                'status': task.status
+            }
         }), 201
-        
+    
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"创建爬虫任务失败: {str(e)}")
         return jsonify({
             'success': False,
-            'message': '创建爬虫任务失败，请稍后重试'
+            'message': '创建任务失败',
+            'error': str(e)
+        }), 500
+
+
+@tasks_bp.route('/<task_id>/results', methods=['GET'])
+@jwt_required()
+def get_task_results(task_id):
+    """获取任务结果"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 401
+        
+        task = Task.query.filter_by(id=task_id, user_id=current_user.id, is_deleted=False).first()
+        if not task:
+            return jsonify({
+                'success': False,
+                'message': '任务不存在'
+            }), 404
+        
+        # 获取任务执行记录
+        executions = TaskExecution.query.filter_by(task_id=task_id)\
+            .order_by(TaskExecution.created_at.desc()).all()
+        
+        if not executions:
+            return jsonify({
+                'success': True,
+                'message': '任务尚未执行',
+                'data': {
+                    'task_id': task_id,
+                    'task_name': task.name,
+                    'task_type': task.type,
+                    'status': task.status,
+                    'results': [],
+                    'statistics': {
+                        'total_executions': 0,
+                        'success_count': 0,
+                        'failed_count': 0,
+                        'items_processed': 0,
+                        'items_success': 0,
+                        'items_failed': 0
+                    }
+                }
+            }), 200
+        
+        # 统计信息
+        success_count = sum(1 for exec in executions if exec.status == 'success')
+        failed_count = sum(1 for exec in executions if exec.status == 'failed')
+        total_items_processed = sum(exec.items_processed or 0 for exec in executions)
+        total_items_success = sum(exec.items_success or 0 for exec in executions)
+        total_items_failed = sum(exec.items_failed or 0 for exec in executions)
+        
+        results = []
+        
+        if task.type == 'crawler':
+            # 爬虫任务结果
+            from backend.models.crawler import CrawlerResult
+            
+            for execution in executions:
+                # 获取该执行记录的爬虫结果
+                crawler_results = CrawlerResult.query.filter_by(
+                    task_execution_id=execution.id
+                ).all()
+                
+                execution_result = {
+                    'execution_id': execution.id,
+                    'status': execution.status,
+                    'start_time': execution.start_time.isoformat() if execution.start_time else None,
+                    'end_time': execution.end_time.isoformat() if execution.end_time else None,
+                    'items_processed': execution.items_processed or 0,
+                    'items_success': execution.items_success or 0,
+                    'items_failed': execution.items_failed or 0,
+                    'error_message': execution.error_message,
+                    'crawler_results': []
+                }
+                
+                # 添加爬虫结果详情
+                for crawler_result in crawler_results:
+                    result_data = {
+                        'id': crawler_result.id,
+                        'url': crawler_result.url,
+                        'title': crawler_result.title,
+                        'content_preview': crawler_result.content[:200] + '...' if crawler_result.content and len(crawler_result.content) > 200 else crawler_result.content,
+                        'content_length': len(crawler_result.content) if crawler_result.content else 0,
+                        'extracted_data': crawler_result.extracted_data,
+                        'page_metadata': crawler_result.page_metadata,
+                        'created_at': crawler_result.created_at.isoformat() if crawler_result.created_at else None
+                    }
+                    execution_result['crawler_results'].append(result_data)
+                
+                results.append(execution_result)
+        
+        elif task.type == 'content_generation':
+            # 内容生成任务结果
+            for execution in executions:
+                execution_result = {
+                    'execution_id': execution.id,
+                    'status': execution.status,
+                    'start_time': execution.start_time.isoformat() if execution.start_time else None,
+                    'end_time': execution.end_time.isoformat() if execution.end_time else None,
+                    'items_processed': execution.items_processed or 0,
+                    'items_success': execution.items_success or 0,
+                    'items_failed': execution.items_failed or 0,
+                    'error_message': execution.error_message,
+                    'result': execution.result,  # 内容生成的结果存储在result字段中
+                    'generated_content': execution.result.get('generated_content', []) if execution.result else []
+                }
+                
+                results.append(execution_result)
+        
+        elif task.type == 'combined':
+            # 组合任务结果（包含爬虫和内容生成）
+            from backend.models.crawler import CrawlerResult
+            
+            for execution in executions:
+                # 获取爬虫结果
+                crawler_results = CrawlerResult.query.filter_by(
+                    task_execution_id=execution.id
+                ).all()
+                
+                execution_result = {
+                    'execution_id': execution.id,
+                    'status': execution.status,
+                    'start_time': execution.start_time.isoformat() if execution.start_time else None,
+                    'end_time': execution.end_time.isoformat() if execution.end_time else None,
+                    'items_processed': execution.items_processed or 0,
+                    'items_success': execution.items_success or 0,
+                    'items_failed': execution.items_failed or 0,
+                    'error_message': execution.error_message,
+                    'crawler_results': [],
+                    'generated_content': execution.result.get('generated_content', []) if execution.result else []
+                }
+                
+                # 添加爬虫结果详情
+                for crawler_result in crawler_results:
+                    result_data = {
+                        'id': crawler_result.id,
+                        'url': crawler_result.url,
+                        'title': crawler_result.title,
+                        'content_preview': crawler_result.content[:200] + '...' if crawler_result.content and len(crawler_result.content) > 200 else crawler_result.content,
+                        'content_length': len(crawler_result.content) if crawler_result.content else 0,
+                        'extracted_data': crawler_result.extracted_data,
+                        'page_metadata': crawler_result.page_metadata,
+                        'created_at': crawler_result.created_at.isoformat() if crawler_result.created_at else None
+                    }
+                    execution_result['crawler_results'].append(result_data)
+                
+                results.append(execution_result)
+        
+        return jsonify({
+            'success': True,
+            'message': '获取任务结果成功',
+            'data': {
+                'task_id': task_id,
+                'task_name': task.name,
+                'task_type': task.type,
+                'status': task.status,
+                'results': results,
+                'statistics': {
+                    'total_executions': len(executions),
+                    'success_count': success_count,
+                    'failed_count': failed_count,
+                    'items_processed': total_items_processed,
+                    'items_success': total_items_success,
+                    'items_failed': total_items_failed
+                }
+            }
+        }), 200
+    
+    except Exception as e:
+        current_app.logger.error(f"获取任务结果失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '获取任务结果失败',
+            'error': str(e)
         }), 500
 
 
@@ -882,11 +1060,33 @@ def get_tasks():
             }), 401
         
         # 获取查询参数
-        page = request.args.get('params[page]', request.args.get('page', 1), type=int)
-        per_page = min(request.args.get('params[per_page]', request.args.get('per_page', 20), type=int), 100)
-        status = request.args.get('params[status]', request.args.get('status'))
-        task_type = request.args.get('params[type]', request.args.get('type'))
-        search = request.args.get('params[search]', request.args.get('search', '')).strip()
+        page_str = request.args.get('page', '1')
+        page = int(page_str)
+        per_page_str = request.args.get('pageSize', '20')
+        per_page = min(int(per_page_str), 100)
+        status = request.args.get('status')
+        task_type = request.args.get('task_type')
+        priority = request.args.get('priority')
+        # 转换priority为整数类型（如果不为None且不为'undefined'）
+        if priority and priority != 'undefined':
+            try:
+                priority = int(priority)
+            except (ValueError, TypeError):
+                priority = None
+        keyword = request.args.get('keyword')
+        search = request.args.get('search', keyword if keyword else '').strip()
+        
+        # 处理前端发送的undefined字符串
+        if status == 'undefined':
+            status = None
+        if task_type == 'undefined':
+            task_type = None
+        if priority == 'undefined':
+            priority = None
+        if keyword == 'undefined':
+            keyword = None
+        if search == 'undefined':
+            search = ''
         
         # 构建查询，排除已删除的任务
         query = Task.query.filter_by(user_id=current_user.id, is_deleted=False)
@@ -899,6 +1099,10 @@ def get_tasks():
         if task_type:
             query = query.filter(Task.type == task_type)
         
+        # 优先级过滤
+        if priority:
+            query = query.filter(Task.priority == priority)
+        
         # 搜索过滤
         if search:
             query = query.filter(
@@ -910,6 +1114,10 @@ def get_tasks():
         
         # 排序和分页
         query = query.order_by(Task.created_at.desc())
+        
+        # 调试信息
+        current_app.logger.info(f"Debug - page: {page} (type: {type(page)}), per_page: {per_page} (type: {type(per_page)})")
+        
         pagination = query.paginate(
             page=page, per_page=per_page, error_out=False
         )
@@ -967,7 +1175,7 @@ def get_task(task_id):
             'success': True,
             'message': '获取任务详情成功',
             'data': {
-                'task': task.to_dict(include_stats=True),
+                'task': task.to_dict(include_executions=True),
                 'recent_executions': [exec.to_dict() for exec in executions]
             }
         }), 200
@@ -1355,7 +1563,8 @@ def get_task_executions(task_id):
         
         # 获取查询参数
         page = request.args.get('page', 1, type=int)
-        per_page = min(request.args.get('per_page', 20, type=int), 100)
+        per_page_str = request.args.get('per_page') or request.args.get('pageSize', '20')
+        per_page = min(int(per_page_str), 100)
         status = request.args.get('status')
         
         # 构建查询

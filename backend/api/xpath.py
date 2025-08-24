@@ -151,7 +151,7 @@ def validate_xpath_config(config_data, partial=False):
     return True, None
 
 
-@xpath_bp.route('/rules', methods=['POST'])
+@xpath_bp.route('/configs', methods=['POST'])
 @jwt_required()
 @limiter.limit("10 per minute")
 def create_xpath_rule():
@@ -172,6 +172,19 @@ def create_xpath_rule():
                 'message': '请求数据不能为空',
                 'error_code': 'VALIDATION_ERROR'
             }), 400
+        
+        # 处理前端字段映射
+        # 前端使用 extractType，后端使用 rule_type
+        if 'extractType' in data and 'rule_type' not in data:
+            data['rule_type'] = data['extractType']
+        
+        # 前端使用 id，后端使用 rule_id
+        if 'id' in data and 'rule_id' not in data:
+            data['rule_id'] = data['id']
+        
+        # 如果没有提供 rule_id，生成一个
+        if 'rule_id' not in data or not data['rule_id']:
+            data['rule_id'] = str(uuid.uuid4())
         
         # 验证配置数据（部分验证，因为更新时可能只传递部分字段）
         is_valid, error_message = validate_xpath_config(data, partial=True)
@@ -198,10 +211,10 @@ def create_xpath_rule():
             rule_id=data['rule_id'],
             name=data['name'],
             description=data.get('description', ''),
-            domain_patterns=data['domain_patterns'],
+            domain_patterns=data.get('domain_patterns', []),
             xpath=data['xpath'],
             rule_type=data['rule_type'],
-            field_name=data['field_name'],
+            field_name=data.get('field_name', ''),
             comment_xpath=data.get('comment_xpath'),
             status=data.get('status', 'active'),
             is_public=data.get('is_public', False),
@@ -234,7 +247,7 @@ def create_xpath_rule():
         }), 500
 
 
-@xpath_bp.route('/rules', methods=['GET'])
+@xpath_bp.route('/configs', methods=['GET'])
 @jwt_required()
 def get_xpath_rules():
     """获取XPath规则列表"""
@@ -255,7 +268,8 @@ def get_xpath_rules():
         
         # 获取查询参数
         page = request.args.get('page', 1, type=int)
-        per_page = min(request.args.get('per_page', 10, type=int), 100)
+        per_page_str = request.args.get('per_page') or request.args.get('pageSize', '10')
+        per_page = min(int(per_page_str), 100)
         search = request.args.get('search', '').strip()
         rule_type = request.args.get('rule_type', '').strip()
         status = request.args.get('status', '').strip()
@@ -335,7 +349,7 @@ def get_xpath_rules():
         }), 500
 
 
-@xpath_bp.route('/rules/<rule_id>', methods=['GET'])
+@xpath_bp.route('/configs/<rule_id>', methods=['GET'])
 @jwt_required()
 def get_xpath_rule(rule_id):
     """获取单个XPath规则"""
@@ -378,7 +392,7 @@ def get_xpath_rule(rule_id):
         }), 500
 
 
-@xpath_bp.route('/rules/<rule_id>', methods=['PUT'])
+@xpath_bp.route('/configs/<rule_id>', methods=['PUT'])
 @jwt_required()
 @limiter.limit("20 per minute")
 def update_xpath_rule(rule_id):
@@ -411,8 +425,17 @@ def update_xpath_rule(rule_id):
                 'error_code': 'VALIDATION_ERROR'
             }), 400
         
+        # 处理前端字段映射
+        # 前端使用 extractType，后端使用 rule_type
+        if 'extractType' in data and 'rule_type' not in data:
+            data['rule_type'] = data['extractType']
+        
+        # 前端使用 id，后端使用 rule_id
+        if 'id' in data and 'rule_id' not in data:
+            data['rule_id'] = data['id']
+        
         # 验证配置数据
-        is_valid, error_message = validate_xpath_config(data)
+        is_valid, error_message = validate_xpath_config(data, partial=True)
         if not is_valid:
             return jsonify({
                 'success': False,
@@ -470,7 +493,7 @@ def update_xpath_rule(rule_id):
         }), 500
 
 
-@xpath_bp.route('/rules/<rule_id>', methods=['DELETE'])
+@xpath_bp.route('/configs/<rule_id>', methods=['DELETE'])
 @jwt_required()
 @limiter.limit("10 per minute")
 def delete_xpath_rule(rule_id):
@@ -534,10 +557,202 @@ def delete_xpath_rule(rule_id):
         }), 500
 
 
+@xpath_bp.route('/configs/batch-delete', methods=['POST'])
+@jwt_required()
+@limiter.limit("5 per minute")
+def batch_delete_xpath_rules():
+    """批量删除XPath规则"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({
+                'success': False,
+                'message': '用户未找到',
+                'error_code': 'UNAUTHORIZED'
+            }), 401
+        
+        data = request.get_json()
+        if not data or 'ids' not in data:
+            return jsonify({
+                'success': False,
+                'message': '请提供要删除的规则ID列表',
+                'error_code': 'INVALID_INPUT'
+            }), 400
+        
+        ids = data['ids']
+        if not isinstance(ids, list) or not ids:
+            return jsonify({
+                'success': False,
+                'message': '规则ID列表不能为空',
+                'error_code': 'INVALID_INPUT'
+            }), 400
+        
+        # 查找要删除的规则
+        rules = XPathConfig.query.filter(
+            XPathConfig.rule_id.in_(ids),
+            XPathConfig.user_id == current_user.id
+        ).all()
+        
+        if not rules:
+            return jsonify({
+                'success': False,
+                'message': '未找到要删除的规则',
+                'error_code': 'NOT_FOUND'
+            }), 404
+        
+        # 删除规则
+        deleted_count = 0
+        for rule in rules:
+            db.session.delete(rule)
+            deleted_count += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'成功删除 {deleted_count} 个规则',
+            'data': {
+                'deleted_count': deleted_count
+            }
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"批量删除XPath规则失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '批量删除失败',
+            'error_code': 'INTERNAL_ERROR'
+        }), 500
+
+
+@xpath_bp.route('/configs/<rule_id>/duplicate', methods=['POST'])
+@jwt_required()
+@limiter.limit("10 per minute")
+def duplicate_xpath_rule(rule_id):
+    """复制XPath规则"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({
+                'success': False,
+                'message': '用户未找到',
+                'error_code': 'UNAUTHORIZED'
+            }), 401
+        
+        # 查找原规则
+        original_rule = XPathConfig.query.filter_by(
+            rule_id=rule_id,
+            user_id=current_user.id
+        ).first()
+        
+        if not original_rule:
+            return jsonify({
+                'success': False,
+                'message': 'XPath规则未找到',
+                'error_code': 'NOT_FOUND'
+            }), 404
+        
+        # 创建新规则
+        new_rule = XPathConfig(
+            rule_id=str(uuid.uuid4()),
+            name=f"{original_rule.name} (副本)",
+            domain_patterns=original_rule.domain_patterns,
+            xpath=original_rule.xpath,
+            rule_type=original_rule.rule_type,
+            field_name=original_rule.field_name,
+            user_id=current_user.id,
+            status='inactive'  # 复制的规则默认为非激活状态
+        )
+        
+        db.session.add(new_rule)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '复制成功',
+            'data': new_rule.to_dict()
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"复制XPath规则失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '复制失败',
+            'error_code': 'INTERNAL_ERROR'
+        }), 500
+
+
+@xpath_bp.route('/configs/<rule_id>/status', methods=['PUT'])
+@jwt_required()
+@limiter.limit("20 per minute")
+def toggle_xpath_rule_status(rule_id):
+    """切换XPath规则状态"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({
+                'success': False,
+                'message': '用户未找到',
+                'error_code': 'UNAUTHORIZED'
+            }), 401
+        
+        data = request.get_json()
+        if not data or 'status' not in data:
+            return jsonify({
+                'success': False,
+                'message': '请提供状态参数',
+                'error_code': 'INVALID_INPUT'
+            }), 400
+        
+        status = data['status']
+        if status not in ['active', 'inactive']:
+            return jsonify({
+                'success': False,
+                'message': '状态值必须为 active 或 inactive',
+                'error_code': 'INVALID_INPUT'
+            }), 400
+        
+        # 查找规则
+        rule = XPathConfig.query.filter_by(
+            rule_id=rule_id,
+            user_id=current_user.id
+        ).first()
+        
+        if not rule:
+            return jsonify({
+                'success': False,
+                'message': 'XPath规则未找到',
+                'error_code': 'NOT_FOUND'
+            }), 404
+        
+        # 更新状态
+        rule.status = status
+        rule.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'规则已{"启用" if status == "active" else "禁用"}',
+            'data': rule.to_dict()
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"切换XPath规则状态失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '状态切换失败',
+            'error_code': 'INTERNAL_ERROR'
+        }), 500
 
 
 
-@xpath_bp.route('/rules/validate', methods=['POST'])
+
+
+@xpath_bp.route('/configs/validate', methods=['POST'])
 @jwt_required()
 @limiter.limit("30 per minute")
 def validate_xpath_rule():
@@ -612,7 +827,7 @@ def validate_xpath_rule():
         }), 500
 
 
-@xpath_bp.route('/rules/test', methods=['POST'])
+@xpath_bp.route('/test', methods=['POST'])
 @jwt_required()
 @limiter.limit("20 per minute")
 def test_xpath_rule():

@@ -1,648 +1,507 @@
 <template>
-  <div class="ai-config-container">
+  <div class="prompt-management-container">
     <!-- 页面头部 -->
     <div class="page-header">
       <div class="header-left">
-        <h1 class="page-title">AI配置</h1>
-        <p class="page-description">配置AI服务提供商和模型参数</p>
+        <h1 class="page-title">Prompt管理</h1>
+        <p class="page-description">管理AI内容生成的提示词模板</p>
       </div>
       <div class="header-right">
-        <el-button type="primary" :icon="Refresh" @click="testAllConnections" :loading="testingAll">
-          测试所有连接
+        <el-button type="primary" :icon="Plus" @click="showCreateDialog">
+          新建Prompt
+        </el-button>
+        <el-button type="success" :icon="Refresh" @click="loadPrompts" :loading="loading">
+          刷新
         </el-button>
       </div>
     </div>
     
-    <!-- 配置卡片 -->
-    <div class="config-cards">
-      <!-- OpenAI配置 -->
-      <div class="config-card">
-        <div class="card-header">
-          <div class="header-left">
-            <div class="provider-info">
-              <img src="https://trae-api-sg.mchost.guru/api/ide/v1/text_to_image?prompt=OpenAI%20logo%20simple%20clean%20design&image_size=square" alt="OpenAI" class="provider-logo" />
-              <div>
-                <h3 class="provider-name">OpenAI</h3>
-                <p class="provider-desc">GPT系列模型提供商</p>
-              </div>
-            </div>
-          </div>
-          <div class="header-right">
-            <el-switch
-              v-model="aiConfig.openai.enabled"
-              @change="handleProviderToggle('openai')"
+    <!-- 搜索和筛选 -->
+    <div class="search-section">
+      <el-card>
+        <el-form :model="searchForm" :inline="true">
+          <el-form-item label="名称">
+            <el-input
+              v-model="searchForm.name"
+              placeholder="请输入Prompt名称"
+              clearable
+              style="width: 200px;"
             />
-          </div>
-        </div>
-        
-        <div v-if="aiConfig.openai.enabled" class="card-content">
-          <el-form :model="aiConfig.openai" label-width="120px">
-            <el-form-item label="API Key">
-              <el-input
-                v-model="aiConfig.openai.apiKey"
-                type="password"
-                placeholder="请输入OpenAI API Key"
-                show-password
-                clearable
-              >
-                <template #append>
-                  <el-button :icon="Key" @click="testConnection('openai')" :loading="testing.openai">
-                    测试
-                  </el-button>
-                </template>
-              </el-input>
-            </el-form-item>
-            
-            <el-form-item label="Base URL">
-              <el-input
-                v-model="aiConfig.openai.baseUrl"
-                placeholder="https://api.openai.com/v1"
-                clearable
-              />
-            </el-form-item>
-            
-            <el-form-item label="默认模型">
-              <el-select
-                v-model="aiConfig.openai.defaultModel"
-                placeholder="选择默认模型"
-                style="width: 100%;"
-              >
-                <el-option
-                  v-for="model in openaiModels"
-                  :key="model.value"
-                  :label="model.label"
-                  :value="model.value"
-                />
-              </el-select>
-            </el-form-item>
-            
-            <el-form-item label="温度">
-              <el-slider
-                v-model="aiConfig.openai.temperature"
-                :min="0"
-                :max="2"
-                :step="0.1"
-                show-input
-                :input-size="'small'"
-              />
-            </el-form-item>
-            
-            <el-form-item label="最大Token">
-              <el-input-number
-                v-model="aiConfig.openai.maxTokens"
-                :min="1"
-                :max="4096"
-                style="width: 100%;"
-              />
-            </el-form-item>
-          </el-form>
-        </div>
-      </div>
-      
-      <!-- Claude配置 -->
-      <div class="config-card">
-        <div class="card-header">
-          <div class="header-left">
-            <div class="provider-info">
-              <img src="https://trae-api-sg.mchost.guru/api/ide/v1/text_to_image?prompt=Anthropic%20Claude%20logo%20simple%20clean%20design&image_size=square" alt="Claude" class="provider-logo" />
-              <div>
-                <h3 class="provider-name">Anthropic Claude</h3>
-                <p class="provider-desc">Claude系列模型提供商</p>
-              </div>
-            </div>
-          </div>
-          <div class="header-right">
-            <el-switch
-              v-model="aiConfig.claude.enabled"
-              @change="handleProviderToggle('claude')"
-            />
-          </div>
-        </div>
-        
-        <div v-if="aiConfig.claude.enabled" class="card-content">
-          <el-form :model="aiConfig.claude" label-width="120px">
-            <el-form-item label="API Key">
-              <el-input
-                v-model="aiConfig.claude.apiKey"
-                type="password"
-                placeholder="请输入Claude API Key"
-                show-password
-                clearable
-              >
-                <template #append>
-                  <el-button :icon="Key" @click="testConnection('claude')" :loading="testing.claude">
-                    测试
-                  </el-button>
-                </template>
-              </el-input>
-            </el-form-item>
-            
-            <el-form-item label="Base URL">
-              <el-input
-                v-model="aiConfig.claude.baseUrl"
-                placeholder="https://api.anthropic.com"
-                clearable
-              />
-            </el-form-item>
-            
-            <el-form-item label="默认模型">
-              <el-select
-                v-model="aiConfig.claude.defaultModel"
-                placeholder="选择默认模型"
-                style="width: 100%;"
-              >
-                <el-option
-                  v-for="model in claudeModels"
-                  :key="model.value"
-                  :label="model.label"
-                  :value="model.value"
-                />
-              </el-select>
-            </el-form-item>
-            
-            <el-form-item label="温度">
-              <el-slider
-                v-model="aiConfig.claude.temperature"
-                :min="0"
-                :max="1"
-                :step="0.1"
-                show-input
-                :input-size="'small'"
-              />
-            </el-form-item>
-            
-            <el-form-item label="最大Token">
-              <el-input-number
-                v-model="aiConfig.claude.maxTokens"
-                :min="1"
-                :max="4096"
-                style="width: 100%;"
-              />
-            </el-form-item>
-          </el-form>
-        </div>
-      </div>
-      
-      <!-- Gemini配置 -->
-      <div class="config-card">
-        <div class="card-header">
-          <div class="header-left">
-            <div class="provider-info">
-              <img src="https://trae-api-sg.mchost.guru/api/ide/v1/text_to_image?prompt=Google%20Gemini%20logo%20simple%20clean%20design&image_size=square" alt="Gemini" class="provider-logo" />
-              <div>
-                <h3 class="provider-name">Google Gemini</h3>
-                <p class="provider-desc">Gemini系列模型提供商</p>
-              </div>
-            </div>
-          </div>
-          <div class="header-right">
-            <el-switch
-              v-model="aiConfig.gemini.enabled"
-              @change="handleProviderToggle('gemini')"
-            />
-          </div>
-        </div>
-        
-        <div v-if="aiConfig.gemini.enabled" class="card-content">
-          <el-form :model="aiConfig.gemini" label-width="120px">
-            <el-form-item label="API Key">
-              <el-input
-                v-model="aiConfig.gemini.apiKey"
-                type="password"
-                placeholder="请输入Gemini API Key"
-                show-password
-                clearable
-              >
-                <template #append>
-                  <el-button :icon="Key" @click="testConnection('gemini')" :loading="testing.gemini">
-                    测试
-                  </el-button>
-                </template>
-              </el-input>
-            </el-form-item>
-            
-            <el-form-item label="Base URL">
-              <el-input
-                v-model="aiConfig.gemini.baseUrl"
-                placeholder="https://generativelanguage.googleapis.com/v1"
-                clearable
-              />
-            </el-form-item>
-            
-            <el-form-item label="默认模型">
-              <el-select
-                v-model="aiConfig.gemini.defaultModel"
-                placeholder="选择默认模型"
-                style="width: 100%;"
-              >
-                <el-option
-                  v-for="model in geminiModels"
-                  :key="model.value"
-                  :label="model.label"
-                  :value="model.value"
-                />
-              </el-select>
-            </el-form-item>
-            
-            <el-form-item label="温度">
-              <el-slider
-                v-model="aiConfig.gemini.temperature"
-                :min="0"
-                :max="1"
-                :step="0.1"
-                show-input
-                :input-size="'small'"
-              />
-            </el-form-item>
-            
-            <el-form-item label="最大Token">
-              <el-input-number
-                v-model="aiConfig.gemini.maxTokens"
-                :min="1"
-                :max="4096"
-                style="width: 100%;"
-              />
-            </el-form-item>
-          </el-form>
-        </div>
-      </div>
-    </div>
-    
-    <!-- 全局设置 -->
-    <div class="global-settings">
-      <div class="settings-header">
-        <h2 class="settings-title">全局设置</h2>
-      </div>
-      
-      <div class="settings-content">
-        <el-form :model="globalSettings" label-width="150px">
-          <el-row :gutter="24">
-            <el-col :span="12">
-              <el-form-item label="默认AI提供商">
-                <el-select
-                  v-model="globalSettings.defaultProvider"
-                  placeholder="选择默认AI提供商"
-                  style="width: 100%;"
-                >
-                  <el-option
-                    v-for="provider in enabledProviders"
-                    :key="provider.value"
-                    :label="provider.label"
-                    :value="provider.value"
-                  />
-                </el-select>
-              </el-form-item>
-            </el-col>
-            
-            <el-col :span="12">
-              <el-form-item label="请求超时时间">
-                <el-input-number
-                  v-model="globalSettings.timeout"
-                  :min="5"
-                  :max="300"
-                  style="width: 100%;"
-                >
-                  <template #append>秒</template>
-                </el-input-number>
-              </el-form-item>
-            </el-col>
-          </el-row>
-          
-          <el-row :gutter="24">
-            <el-col :span="12">
-              <el-form-item label="重试次数">
-                <el-input-number
-                  v-model="globalSettings.retryCount"
-                  :min="0"
-                  :max="5"
-                  style="width: 100%;"
-                />
-              </el-form-item>
-            </el-col>
-            
-            <el-col :span="12">
-              <el-form-item label="并发限制">
-                <el-input-number
-                  v-model="globalSettings.concurrency"
-                  :min="1"
-                  :max="10"
-                  style="width: 100%;"
-                />
-              </el-form-item>
-            </el-col>
-          </el-row>
-          
-          <el-form-item label="启用日志记录">
-            <el-switch v-model="globalSettings.enableLogging" />
           </el-form-item>
-          
-          <el-form-item label="启用缓存">
-            <el-switch v-model="globalSettings.enableCache" />
+          <el-form-item label="类型">
+            <el-select
+              v-model="searchForm.type"
+              placeholder="选择类型"
+              clearable
+              style="width: 150px;"
+            >
+              <el-option label="内容生成" value="content" />
+              <el-option label="标题生成" value="title" />
+              <el-option label="摘要生成" value="summary" />
+              <el-option label="关键词提取" value="keywords" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="状态">
+            <el-select
+              v-model="searchForm.status"
+              placeholder="选择状态"
+              clearable
+              style="width: 120px;"
+            >
+              <el-option label="启用" value="active" />
+              <el-option label="禁用" value="inactive" />
+            </el-select>
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="handleSearch">搜索</el-button>
+            <el-button @click="handleReset">重置</el-button>
           </el-form-item>
         </el-form>
-      </div>
+      </el-card>
     </div>
+
+    <!-- Prompt列表 -->
+    <div class="prompt-list">
+      <el-card>
+        <el-table
+          :data="filteredPrompts"
+          v-loading="loading"
+          stripe
+          style="width: 100%"
+        >
+          <el-table-column prop="name" label="名称" width="200" />
+          <el-table-column prop="type" label="类型" width="120">
+            <template #default="{ row }">
+              <el-tag :type="getTypeTagType(row.type)">{{ getTypeLabel(row.type) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="description" label="描述" show-overflow-tooltip />
+          <el-table-column prop="status" label="状态" width="100">
+            <template #default="{ row }">
+              <el-tag :type="row.status === 'active' ? 'success' : 'danger'">
+                {{ row.status === 'active' ? '启用' : '禁用' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="usageCount" label="使用次数" width="100" />
+          <el-table-column prop="updatedAt" label="更新时间" width="180">
+            <template #default="{ row }">
+              {{ formatDate(row.updatedAt) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="200" fixed="right">
+            <template #default="{ row }">
+              <el-button size="small" @click="handleView(row)">查看</el-button>
+              <el-button size="small" type="primary" @click="handleEdit(row)">编辑</el-button>
+              <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        
+        <!-- 分页 -->
+        <div class="pagination-wrapper">
+          <el-pagination
+            v-model:current-page="pagination.page"
+            v-model:page-size="pagination.size"
+            :page-sizes="[10, 20, 50, 100]"
+            :total="pagination.total"
+            layout="total, sizes, prev, pager, next, jumper"
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange"
+          />
+        </div>
+      </el-card>
+    </div>
+      
+
+
     
-    <!-- 操作按钮 -->
-    <div class="actions">
-      <el-button @click="resetConfig">重置配置</el-button>
-      <el-button type="primary" @click="saveConfig" :loading="saving">
-        保存配置
-      </el-button>
-    </div>
+    <!-- 创建/编辑Prompt对话框 -->
+    <el-dialog
+      v-model="dialogVisible"
+      :title="isEdit ? '编辑Prompt' : '新建Prompt'"
+      width="800px"
+      :before-close="handleDialogClose"
+    >
+      <el-form
+        ref="formRef"
+        :model="formData"
+        :rules="formRules"
+        label-width="100px"
+      >
+        <el-form-item label="名称" prop="name">
+          <el-input v-model="formData.name" placeholder="请输入Prompt名称" />
+        </el-form-item>
+        
+        <el-form-item label="类型" prop="type">
+          <el-select v-model="formData.type" placeholder="选择类型" style="width: 100%;">
+            <el-option label="内容生成" value="content" />
+            <el-option label="标题生成" value="title" />
+            <el-option label="摘要生成" value="summary" />
+            <el-option label="关键词提取" value="keywords" />
+          </el-select>
+        </el-form-item>
+        
+        <el-form-item label="描述" prop="description">
+          <el-input
+            v-model="formData.description"
+            type="textarea"
+            :rows="3"
+            placeholder="请输入Prompt描述"
+          />
+        </el-form-item>
+        
+        <el-form-item label="提示词" prop="content">
+          <el-input
+            v-model="formData.content"
+            type="textarea"
+            :rows="8"
+            placeholder="请输入提示词内容，可以使用变量如 {title}, {content} 等"
+          />
+        </el-form-item>
+        
+        <el-form-item label="变量说明" prop="variables">
+          <el-input
+            v-model="formData.variables"
+            type="textarea"
+            :rows="3"
+            placeholder="说明提示词中使用的变量，如：{title} - 文章标题, {content} - 文章内容"
+          />
+        </el-form-item>
+        
+        <el-form-item label="状态" prop="status">
+          <el-radio-group v-model="formData.status">
+            <el-radio value="active">启用</el-radio>
+            <el-radio value="inactive">禁用</el-radio>
+          </el-radio-group>
+        </el-form-item>
+      </el-form>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="handleDialogClose">取消</el-button>
+          <el-button type="primary" @click="handleSubmit" :loading="submitting">
+            {{ isEdit ? '更新' : '创建' }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh, Key } from '@element-plus/icons-vue'
+import { Refresh, Plus, Edit, Delete } from '@element-plus/icons-vue'
 
-interface AIProviderConfig {
-  enabled: boolean
-  apiKey: string
-  baseUrl: string
-  defaultModel: string
-  temperature: number
-  maxTokens: number
-}
-
-interface GlobalSettings {
-  defaultProvider: string
-  timeout: number
-  retryCount: number
-  concurrency: number
-  enableLogging: boolean
-  enableCache: boolean
+interface Prompt {
+  id?: number
+  name: string
+  type: string
+  description: string
+  content: string
+  variables: string
+  status: string
+  createdAt?: string
+  updatedAt?: string
+  usageCount?: number
 }
 
 // 响应式数据
-const saving = ref(false)
-const testingAll = ref(false)
-const testing = ref({
-  openai: false,
-  claude: false,
-  gemini: false
+const loading = ref(false)
+const submitting = ref(false)
+const dialogVisible = ref(false)
+const isEdit = ref(false)
+const currentPage = ref(1)
+const pageSize = ref(10)
+const total = ref(0)
+
+// 搜索和筛选
+const searchForm = ref({
+  name: '',
+  type: '',
+  status: ''
 })
 
-const aiConfig = ref({
-  openai: {
-    enabled: false,
-    apiKey: '',
-    baseUrl: 'https://api.openai.com/v1',
-    defaultModel: 'gpt-3.5-turbo',
-    temperature: 0.7,
-    maxTokens: 2048
-  } as AIProviderConfig,
-  claude: {
-    enabled: false,
-    apiKey: '',
-    baseUrl: 'https://api.anthropic.com',
-    defaultModel: 'claude-3-sonnet-20240229',
-    temperature: 0.7,
-    maxTokens: 2048
-  } as AIProviderConfig,
-  gemini: {
-    enabled: false,
-    apiKey: '',
-    baseUrl: 'https://generativelanguage.googleapis.com/v1',
-    defaultModel: 'gemini-pro',
-    temperature: 0.7,
-    maxTokens: 2048
-  } as AIProviderConfig
+// 表单数据
+const formRef = ref()
+const formData = ref<Prompt>({
+  name: '',
+  type: '',
+  description: '',
+  content: '',
+  variables: '',
+  status: 'active'
 })
 
-const globalSettings = ref<GlobalSettings>({
-  defaultProvider: 'openai',
-  timeout: 30,
-  retryCount: 3,
-  concurrency: 3,
-  enableLogging: true,
-  enableCache: true
+// 表单验证规则
+const formRules = {
+  name: [
+    { required: true, message: '请输入Prompt名称', trigger: 'blur' },
+    { min: 2, max: 50, message: '名称长度在2到50个字符', trigger: 'blur' }
+  ],
+  type: [
+    { required: true, message: '请选择Prompt类型', trigger: 'change' }
+  ],
+  description: [
+    { required: true, message: '请输入Prompt描述', trigger: 'blur' },
+    { max: 200, message: '描述不能超过200个字符', trigger: 'blur' }
+  ],
+  content: [
+    { required: true, message: '请输入提示词内容', trigger: 'blur' },
+    { min: 10, message: '提示词内容至少10个字符', trigger: 'blur' }
+  ],
+  status: [
+    { required: true, message: '请选择状态', trigger: 'change' }
+  ]
+}
+
+// Prompt列表
+const promptList = ref<Prompt[]>([])
+
+// 类型选项
+const typeOptions = [
+  { label: '内容生成', value: 'content' },
+  { label: '标题生成', value: 'title' },
+  { label: '摘要生成', value: 'summary' },
+  { label: '关键词提取', value: 'keywords' }
+]
+
+// 状态选项
+const statusOptions = [
+  { label: '全部', value: '' },
+  { label: '启用', value: 'active' },
+  { label: '禁用', value: 'inactive' }
+]
+
+// 分页
+const pagination = ref({
+  page: 1,
+  size: 10,
+  total: 0
 })
-
-// 模型选项
-const openaiModels = [
-  { label: 'GPT-3.5 Turbo', value: 'gpt-3.5-turbo' },
-  { label: 'GPT-3.5 Turbo 16K', value: 'gpt-3.5-turbo-16k' },
-  { label: 'GPT-4', value: 'gpt-4' },
-  { label: 'GPT-4 Turbo', value: 'gpt-4-turbo-preview' },
-  { label: 'GPT-4o', value: 'gpt-4o' }
-]
-
-const claudeModels = [
-  { label: 'Claude 3 Haiku', value: 'claude-3-haiku-20240307' },
-  { label: 'Claude 3 Sonnet', value: 'claude-3-sonnet-20240229' },
-  { label: 'Claude 3 Opus', value: 'claude-3-opus-20240229' },
-  { label: 'Claude 3.5 Sonnet', value: 'claude-3-5-sonnet-20241022' }
-]
-
-const geminiModels = [
-  { label: 'Gemini Pro', value: 'gemini-pro' },
-  { label: 'Gemini Pro Vision', value: 'gemini-pro-vision' },
-  { label: 'Gemini 1.5 Pro', value: 'gemini-1.5-pro' },
-  { label: 'Gemini 1.5 Flash', value: 'gemini-1.5-flash' }
-]
 
 // 计算属性
-const enabledProviders = computed(() => {
-  const providers = []
-  if (aiConfig.value.openai.enabled) {
-    providers.push({ label: 'OpenAI', value: 'openai' })
+const filteredPrompts = computed(() => {
+  let filtered = prompts.value
+  
+  if (searchForm.value.name) {
+    filtered = filtered.filter(p => 
+      p.name.toLowerCase().includes(searchForm.value.name.toLowerCase())
+    )
   }
-  if (aiConfig.value.claude.enabled) {
-    providers.push({ label: 'Claude', value: 'claude' })
+  
+  if (searchForm.value.type) {
+    filtered = filtered.filter(p => p.type === searchForm.value.type)
   }
-  if (aiConfig.value.gemini.enabled) {
-    providers.push({ label: 'Gemini', value: 'gemini' })
+  
+  if (searchForm.value.status) {
+    filtered = filtered.filter(p => p.status === searchForm.value.status)
   }
-  return providers
+  
+  return filtered
 })
 
-// 事件处理
-const handleProviderToggle = (provider: string) => {
-  if (enabledProviders.value.length === 0) {
-    globalSettings.value.defaultProvider = ''
-  } else if (!enabledProviders.value.some(p => p.value === globalSettings.value.defaultProvider)) {
-    globalSettings.value.defaultProvider = enabledProviders.value[0].value
+const paginatedPrompts = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return filteredPrompts.value.slice(start, end)
+})
+
+// 辅助方法
+const getTypeTagType = (type: string) => {
+  const typeMap: Record<string, string> = {
+    content: 'primary',
+    title: 'warning',
+    summary: 'success',
+    keywords: 'danger'
+  }
+  return typeMap[type] || 'info'
+}
+
+const getTypeLabel = (type: string) => {
+  const labelMap: Record<string, string> = {
+    content: '内容生成',
+    title: '标题生成',
+    summary: '摘要生成',
+    keywords: '关键词提取'
+  }
+  return labelMap[type] || type
+}
+
+const formatDate = (dateStr: string) => {
+  if (!dateStr) return '-'
+  return new Date(dateStr).toLocaleString('zh-CN')
+}
+
+// 搜索Prompt
+const handleSearch = () => {
+  currentPage.value = 1
+  loadPrompts()
+}
+
+// 重置搜索
+const handleReset = () => {
+  searchForm.value = {
+    name: '',
+    type: '',
+    status: ''
+  }
+  currentPage.value = 1
+  loadPrompts()
+}
+
+// 创建Prompt
+const handleCreate = () => {
+  promptForm.value = {
+    name: '',
+    description: '',
+    type: 'content',
+    content: '',
+    variables: '',
+    status: 'active'
+  }
+  dialogVisible.value = true
+  isEditing.value = false
+}
+
+// 编辑Prompt
+const handleEdit = (prompt: Prompt) => {
+  promptForm.value = { ...prompt }
+  dialogVisible.value = true
+  isEditing.value = true
+}
+
+const handleDelete = async (prompt: Prompt) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除Prompt "${prompt.name}" 吗？此操作不可撤销。`,
+      '确认删除',
+      {
+        type: 'warning'
+      }
+    )
+    
+    // 调用删除API
+    const response = await fetch(`http://localhost:5002/api/prompts/${prompt.id}`, {
+      method: 'DELETE'
+    })
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+    
+    ElMessage.success('删除成功')
+    await loadPrompts()
+  } catch (error: any) {
+    if (error.message !== 'cancel') {
+      ElMessage.error(`删除失败: ${error.message}`)
+    }
   }
 }
 
-const testConnection = async (provider: string) => {
-  const config = aiConfig.value[provider as keyof typeof aiConfig.value]
-  
-  if (!config.apiKey) {
-    ElMessage.warning('请先输入API Key')
-    return
-  }
-  
+const handleDialogClose = () => {
+  dialogVisible.value = false
+  formRef.value?.resetFields()
+}
+
+const handleSubmit = async () => {
   try {
-    testing.value[provider as keyof typeof testing.value] = true
+    await formRef.value?.validate()
+    submitting.value = true
     
-    // 这里应该调用后端API来测试连接
-    const response = await fetch('/api/ai/test-connection', {
-      method: 'POST',
+    const url = isEdit.value 
+      ? `http://localhost:5002/api/prompts/${formData.value.id}`
+      : 'http://localhost:5002/api/prompts'
+    
+    const method = isEdit.value ? 'PUT' : 'POST'
+    
+    const response = await fetch(url, {
+      method,
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        provider,
-        config
-      })
+      body: JSON.stringify(formData.value)
     })
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+    
+    ElMessage.success(isEdit.value ? '更新成功' : '创建成功')
+    handleDialogClose()
+    await loadPrompts()
+  } catch (error: any) {
+    ElMessage.error(`${isEdit.value ? '更新' : '创建'}失败: ${error.message}`)
+  } finally {
+    submitting.value = false
+  }
+}
+
+const loadPrompts = async () => {
+  try {
+    loading.value = true
+    
+    const response = await fetch('http://localhost:5002/api/prompts')
     
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`)
     }
     
     const data = await response.json()
-    
-    if (data.success) {
-      ElMessage.success(`${provider.toUpperCase()} 连接测试成功`)
-    } else {
-      throw new Error(data.error || '连接测试失败')
-    }
+    promptList.value = data.data || []
+    total.value = data.total || 0
   } catch (error: any) {
-    ElMessage.error(`${provider.toUpperCase()} 连接测试失败: ${error.message}`)
-    // 模拟测试结果
-    if (config.apiKey.length > 10) {
-      ElMessage.success(`${provider.toUpperCase()} 连接测试成功`)
-    }
-  } finally {
-    testing.value[provider as keyof typeof testing.value] = false
-  }
-}
-
-const testAllConnections = async () => {
-  const enabledProviderKeys = enabledProviders.value.map(p => p.value)
-  
-  if (enabledProviderKeys.length === 0) {
-    ElMessage.warning('请先启用至少一个AI提供商')
-    return
-  }
-  
-  testingAll.value = true
-  
-  try {
-    for (const provider of enabledProviderKeys) {
-      await testConnection(provider)
-    }
-    ElMessage.success('所有连接测试完成')
-  } finally {
-    testingAll.value = false
-  }
-}
-
-const saveConfig = async () => {
-  try {
-    saving.value = true
-    
-    // 这里应该调用后端API来保存配置
-    const response = await fetch('/api/ai/config', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        aiConfig: aiConfig.value,
-        globalSettings: globalSettings.value
-      })
-    })
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-    }
-    
-    ElMessage.success('配置保存成功')
-  } catch (error: any) {
-    ElMessage.error(`配置保存失败: ${error.message}`)
-    // 模拟保存成功
-    ElMessage.success('配置保存成功')
-  } finally {
-    saving.value = false
-  }
-}
-
-const resetConfig = async () => {
-  try {
-    await ElMessageBox.confirm(
-      '确定要重置所有AI配置吗？此操作不可撤销。',
-      '确认重置',
+    ElMessage.error(`加载Prompt列表失败: ${error.message}`)
+    // 添加一些模拟数据用于演示
+    promptList.value = [
       {
-        type: 'warning'
-      }
-    )
-    
-    // 重置配置
-    aiConfig.value = {
-      openai: {
-        enabled: false,
-        apiKey: '',
-        baseUrl: 'https://api.openai.com/v1',
-        defaultModel: 'gpt-3.5-turbo',
-        temperature: 0.7,
-        maxTokens: 2048
+        id: 1,
+        name: '文章内容生成',
+        type: 'content',
+        description: '根据标题和关键词生成文章内容',
+        content: '请根据标题"{title}"和关键词"{keywords}"生成一篇详细的文章内容。',
+        variables: '{title} - 文章标题, {keywords} - 关键词',
+        status: 'active',
+        createdAt: '2024-01-01 10:00:00',
+        usageCount: 15
       },
-      claude: {
-        enabled: false,
-        apiKey: '',
-        baseUrl: 'https://api.anthropic.com',
-        defaultModel: 'claude-3-sonnet-20240229',
-        temperature: 0.7,
-        maxTokens: 2048
-      },
-      gemini: {
-        enabled: false,
-        apiKey: '',
-        baseUrl: 'https://generativelanguage.googleapis.com/v1',
-        defaultModel: 'gemini-pro',
-        temperature: 0.7,
-        maxTokens: 2048
+      {
+        id: 2,
+        name: '标题优化',
+        type: 'title',
+        description: '优化文章标题使其更吸引人',
+        content: '请为以下内容生成3个吸引人的标题："{content}"',
+        variables: '{content} - 文章内容摘要',
+        status: 'active',
+        createdAt: '2024-01-02 14:30:00',
+        usageCount: 8
       }
-    }
-    
-    globalSettings.value = {
-      defaultProvider: 'openai',
-      timeout: 30,
-      retryCount: 3,
-      concurrency: 3,
-      enableLogging: true,
-      enableCache: true
-    }
-    
-    ElMessage.success('配置已重置')
-  } catch (error) {
-    // 用户取消重置
+    ]
+  } finally {
+    loading.value = false
   }
 }
 
-const loadConfig = async () => {
-  try {
-    // 这里应该调用后端API来加载配置
-    const response = await fetch('/api/ai/config')
-    
-    if (response.ok) {
-      const data = await response.json()
-      if (data.aiConfig) {
-        aiConfig.value = { ...aiConfig.value, ...data.aiConfig }
-      }
-      if (data.globalSettings) {
-        globalSettings.value = { ...globalSettings.value, ...data.globalSettings }
-      }
-    }
-  } catch (error) {
-    console.error('加载配置失败:', error)
-  }
+const handleCurrentChange = (page: number) => {
+  currentPage.value = page
+  loadPrompts()
+}
+
+const handleSizeChange = (size: number) => {
+  pageSize.value = size
+  currentPage.value = 1
+  loadPrompts()
 }
 
 // 组件挂载
 onMounted(() => {
-  loadConfig()
+  loadPrompts()
 })
 </script>
 
 <style lang="scss" scoped>
-.ai-config-container {
+.prompt-management-container {
   padding: 24px;
   
   .page-header {
@@ -665,116 +524,154 @@ onMounted(() => {
         margin: 0;
       }
     }
-  }
-  
-  .config-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-    gap: 24px;
-    margin-bottom: 32px;
     
-    .config-card {
-      background: var(--el-bg-color);
-      border: 1px solid var(--el-border-color-light);
-      border-radius: 12px;
-      overflow: hidden;
-      transition: all 0.3s ease;
-      
-      &:hover {
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-      }
-      
-      .card-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 20px;
-        background: var(--el-fill-color-lighter);
-        border-bottom: 1px solid var(--el-border-color-lighter);
-        
-        .header-left {
-          .provider-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            
-            .provider-logo {
-              width: 40px;
-              height: 40px;
-              border-radius: 8px;
-              object-fit: cover;
-            }
-            
-            .provider-name {
-              font-size: 16px;
-              font-weight: 600;
-              color: var(--el-text-color-primary);
-              margin: 0 0 4px 0;
-            }
-            
-            .provider-desc {
-              font-size: 12px;
-              color: var(--el-text-color-secondary);
-              margin: 0;
-            }
-          }
-        }
-      }
-      
-      .card-content {
-        padding: 20px;
-        
-        :deep(.el-form-item) {
-          margin-bottom: 20px;
-          
-          &:last-child {
-            margin-bottom: 0;
-          }
-        }
-        
-        :deep(.el-slider) {
-          margin-right: 16px;
-        }
-      }
+    .header-actions {
+      display: flex;
+      gap: 12px;
     }
   }
   
-  .global-settings {
+  .search-section {
     background: var(--el-bg-color);
     border: 1px solid var(--el-border-color-light);
     border-radius: 12px;
-    margin-bottom: 32px;
+    padding: 20px;
+    margin-bottom: 24px;
     
-    .settings-header {
-      padding: 20px;
-      border-bottom: 1px solid var(--el-border-color-lighter);
-      background: var(--el-fill-color-lighter);
-      
-      .settings-title {
-        font-size: 18px;
-        font-weight: 600;
-        color: var(--el-text-color-primary);
-        margin: 0;
+    .search-form {
+      :deep(.el-form-item) {
+        margin-bottom: 0;
       }
     }
     
-    .settings-content {
-      padding: 20px;
+    .search-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 16px;
+    }
+  }
+  
+  .prompt-table {
+    background: var(--el-bg-color);
+    border: 1px solid var(--el-border-color-light);
+    border-radius: 12px;
+    overflow: hidden;
+    
+    :deep(.el-table) {
+      .el-table__header {
+        background: var(--el-fill-color-lighter);
+      }
       
-      :deep(.el-form-item) {
-        margin-bottom: 20px;
-        
-        &:last-child {
-          margin-bottom: 0;
+      .status-tag {
+        &.active {
+          background: var(--el-color-success-light-9);
+          color: var(--el-color-success);
+          border-color: var(--el-color-success-light-5);
         }
+        
+        &.inactive {
+          background: var(--el-color-info-light-9);
+          color: var(--el-color-info);
+          border-color: var(--el-color-info-light-5);
+        }
+      }
+      
+      .type-tag {
+        &.content {
+          background: var(--el-color-primary-light-9);
+          color: var(--el-color-primary);
+          border-color: var(--el-color-primary-light-5);
+        }
+        
+        &.title {
+          background: var(--el-color-warning-light-9);
+          color: var(--el-color-warning);
+          border-color: var(--el-color-warning-light-5);
+        }
+        
+        &.summary {
+          background: var(--el-color-success-light-9);
+          color: var(--el-color-success);
+          border-color: var(--el-color-success-light-5);
+        }
+        
+        &.keywords {
+          background: var(--el-color-danger-light-9);
+          color: var(--el-color-danger);
+          border-color: var(--el-color-danger-light-5);
+        }
+      }
+    }
+    
+    .table-pagination {
+      padding: 20px;
+      display: flex;
+      justify-content: flex-end;
+      border-top: 1px solid var(--el-border-color-lighter);
+    }
+  }
+  
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--el-text-color-secondary);
+    
+    .empty-icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+    
+    .empty-text {
+      font-size: 16px;
+      margin-bottom: 8px;
+    }
+    
+    .empty-description {
+      font-size: 14px;
+      opacity: 0.8;
+    }
+  }
+}
+
+// 对话框样式
+:deep(.el-dialog) {
+  .el-dialog__header {
+    padding: 20px 20px 0;
+    
+    .el-dialog__title {
+      font-size: 18px;
+      font-weight: 600;
+    }
+  }
+  
+  .el-dialog__body {
+    padding: 20px;
+    
+    .el-form-item {
+      margin-bottom: 20px;
+      
+      &:last-child {
+        margin-bottom: 0;
+      }
+    }
+    
+    .el-textarea {
+      .el-textarea__inner {
+        resize: vertical;
       }
     }
   }
   
-  .actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
+  .el-dialog__footer {
+    padding: 0 20px 20px;
+    
+    .dialog-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+    }
   }
 }
 </style>

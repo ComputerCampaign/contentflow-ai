@@ -19,9 +19,16 @@ const whiteList = ['/login', '/register', '/forgot-password', '/404', '/403']
 // 权限映射表
 const permissionMap: Record<string, string[]> = {
   '/dashboard': ['dashboard:view'],
-  '/tasks': ['task:view'],
-  '/tasks/create': ['task:create'],
-  '/tasks/edit': ['task:edit'],
+  '/crawler-tasks': ['task:view'],
+  '/crawler-tasks/create': ['task:create'],
+  '/crawler-tasks/edit': ['task:edit'],
+  '/crawler-tasks/detail': ['task:view'],
+  '/crawler-tasks/monitor': ['task:view'],
+  '/content-tasks': ['task:view'],
+  '/content-tasks/create': ['task:create'],
+  '/content-tasks/edit': ['task:edit'],
+  '/content-tasks/detail': ['task:view'],
+  '/content-tasks/monitor': ['task:view'],
   '/crawler': ['crawler:view'],
   '/crawler/create': ['crawler:create'],
   '/crawler/edit': ['crawler:edit'],
@@ -129,7 +136,8 @@ export function setupRouterGuard(router: Router): void {
             // 没有dashboard权限，查找其他有权限的页面
             const availableRoutes = [
               { path: '/profile', permissions: ['profile:view'] },
-              { path: '/tasks', permissions: ['task:view'] },
+              { path: '/crawler-tasks', permissions: ['task:view'] },
+              { path: '/content-tasks', permissions: ['task:view'] },
               { path: '/crawler', permissions: ['crawler:view'] },
               { path: '/xpath', permissions: ['xpath:view'] },
               { path: '/ai-config', permissions: ['ai:config'] },

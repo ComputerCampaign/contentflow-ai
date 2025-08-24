@@ -111,6 +111,7 @@ class XPathConfig(db.Model):
     def to_dict(self):
         """转换为字典"""
         return {
+            'id': self.rule_id,  # 前端使用 id 字段
             'config_id': self.id,
             'rule_id': self.rule_id,
             'name': self.name,
@@ -118,6 +119,7 @@ class XPathConfig(db.Model):
             'domain_patterns': self.domain_patterns,
             'xpath': self.xpath,
             'rule_type': self.rule_type,
+            'extractType': self.rule_type,  # 前端使用 extractType 字段
             'field_name': self.field_name,
             'comment_xpath': self.comment_xpath,
             'status': self.status,
@@ -126,7 +128,9 @@ class XPathConfig(db.Model):
             'usage_count': self.usage_count,
             'last_used_at': self.last_used_at.isoformat() if self.last_used_at else None,
             'created_at': self.created_at.isoformat(),
+            'createdAt': self.created_at.isoformat(),  # 前端使用 createdAt 字段
             'updated_at': self.updated_at.isoformat(),
+            'updatedAt': self.updated_at.isoformat(),  # 前端使用 updatedAt 字段
             'user_id': self.user_id
         }
     

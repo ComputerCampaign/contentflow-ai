@@ -1,6 +1,6 @@
 <template>
-  <div class="task-list-page">
-    <PageHeader title="任务管理" description="管理和监控所有爬虫任务" />
+  <div class="crawler-task-list-page">
+    <PageHeader title="爬虫任务管理" description="管理和监控所有爬虫任务" />
     
     <!-- 数据表格 -->
     <DataTable
@@ -19,7 +19,7 @@
       <!-- 工具栏左侧 -->
       <template #toolbar-left>
         <el-button type="primary" :icon="Plus" @click="handleCreate">
-          创建任务
+          创建爬虫任务
         </el-button>
         <el-button :icon="Download" @click="handleExport">
           导出
@@ -64,40 +64,6 @@
       
       <!-- 操作列 -->
       <template #actions="{ row }">
-        <el-button
-          v-if="row.status === 'pending' || row.status === 'paused'"
-          type="primary"
-          size="small"
-          :icon="VideoPlay"
-          @click="handleStart(row)"
-        >
-          启动
-        </el-button>
-        <el-button
-          v-if="row.status === 'running'"
-          type="warning"
-          size="small"
-          :icon="VideoPause"
-          @click="handlePause(row)"
-        >
-          暂停
-        </el-button>
-        <el-button
-          v-if="row.status === 'running' || row.status === 'paused'"
-          type="danger"
-          size="small"
-          :icon="VideoPause"
-          @click="handleStop(row)"
-        >
-          停止
-        </el-button>
-        <el-button
-          size="small"
-          :icon="View"
-          @click="handleView(row)"
-        >
-          查看
-        </el-button>
         <el-dropdown trigger="click">
           <el-button size="small" :icon="More" />
           <template #dropdown>
@@ -107,6 +73,9 @@
               </el-dropdown-item>
               <el-dropdown-item :icon="CopyDocument" @click="handleClone(row)">
                 克隆
+              </el-dropdown-item>
+              <el-dropdown-item :icon="Plus" @click="handleCreateContentTask(row)">
+                创建文本生成任务
               </el-dropdown-item>
               <el-dropdown-item :icon="Download" @click="handleExportSingle(row)">
                 导出结果
@@ -132,6 +101,7 @@
       v-model="formVisible"
       :task="currentTask"
       :mode="formMode"
+      task-type="crawler"
       @success="handleFormSuccess"
     />
   </div>
@@ -139,6 +109,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Plus,
@@ -157,6 +128,10 @@ import DataTable from '@/components/common/DataTable.vue'
 import TaskDetailDrawer from './components/TaskDetailDrawer.vue'
 import TaskFormDialog from './components/TaskFormDialog.vue'
 import type { TableColumn } from '@/components/common/DataTable.vue'
+import { formatDate } from '@/utils/date'
+
+// 路由
+const router = useRouter()
 
 // 状态管理
 const taskStore = useTaskStore()
@@ -204,13 +179,13 @@ const columns: TableColumn[] = [
     prop: 'createdAt',
     label: '创建时间',
     width: 180,
-    formatter: (row: any) => new Date(row.createdAt).toLocaleString()
+    formatter: (row: any) => formatDate(row.createdAt)
   },
   {
     prop: 'updatedAt',
     label: '更新时间',
     width: 180,
-    formatter: (row: any) => new Date(row.updatedAt).toLocaleString()
+    formatter: (row: any) => formatDate(row.updatedAt)
   }
 ]
 
@@ -259,11 +234,13 @@ const getPriorityText = (priority: string) => {
 
 // 事件处理方法
 const handleRefresh = () => {
+  // 设置任务类型过滤为爬虫任务
+  taskStore.setFilter({ task_type: 'crawler' })
   taskStore.fetchTasks()
 }
 
 const handleSearch = (keyword: string) => {
-  taskStore.setFilter({ keyword })
+  taskStore.setFilter({ keyword, task_type: 'crawler' })
   taskStore.fetchTasks()
 }
 
@@ -282,50 +259,18 @@ const handleCurrentChange = (page: number) => {
 }
 
 const handleCreate = () => {
-  currentTask.value = null
-  formMode.value = 'create'
-  formVisible.value = true
+  // 跳转到创建页面，传递任务类型参数
+  router.push('/tasks/create?type=web_scraping')
 }
 
 const handleEdit = (task: any) => {
-  currentTask.value = task
-  formMode.value = 'edit'
-  formVisible.value = true
+  // 跳转到编辑页面
+  router.push(`/tasks/edit/${task.id}`)
 }
 
-const handleView = (task: any) => {
-  currentTask.value = task
-  detailVisible.value = true
-}
-
-const handleStart = async (task: any) => {
-  try {
-    await taskStore.startTask(task.id)
-    ElMessage.success('任务启动成功')
-    handleRefresh()
-  } catch (error) {
-    ElMessage.error('任务启动失败')
-  }
-}
-
-const handlePause = async (task: any) => {
-  try {
-    await taskStore.pauseTask(task.id)
-    ElMessage.success('任务暂停成功')
-    handleRefresh()
-  } catch (error) {
-    ElMessage.error('任务暂停失败')
-  }
-}
-
-const handleStop = async (task: any) => {
-  try {
-    await taskStore.stopTask(task.id)
-    ElMessage.success('任务停止成功')
-    handleRefresh()
-  } catch (error) {
-    ElMessage.error('任务停止失败')
-  }
+const handleCreateContentTask = (task: any) => {
+  // 跳转到文本生成任务创建页面，可以传递爬虫任务的相关信息
+  router.push(`/content-tasks/create?source_task_id=${task.id}`)
 }
 
 const handleDelete = async (task: any) => {
@@ -423,7 +368,7 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
-.task-list-page {
+.crawler-task-list-page {
   padding: 24px;
   
   .el-progress {

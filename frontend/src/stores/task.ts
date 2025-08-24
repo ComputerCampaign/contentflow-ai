@@ -22,6 +22,7 @@ interface TaskFilter {
   keyword?: string
   dateRange?: [string, string]
   crawlerConfigId?: string
+  task_type?: string
 }
 
 // 分页参数接口
@@ -36,6 +37,7 @@ export const useTaskStore = defineStore('task', () => {
   const tasks = ref<Task[]>([])
   const currentTask = ref<Task | null>(null)
   const taskLogs = ref<TaskLog[]>([])
+  const taskResults = ref<any>(null)
   const taskStatistics = ref<TaskStats | null>(null)
   const taskTemplates = ref<any[]>([])
   const runningTasks = ref<Task[]>([])
@@ -43,6 +45,7 @@ export const useTaskStore = defineStore('task', () => {
   // 加载状态
   const loading = ref(false)
   const logsLoading = ref(false)
+  const resultsLoading = ref(false)
   const statisticsLoading = ref(false)
   const templatesLoading = ref(false)
   const operationLoading = ref(false)
@@ -130,18 +133,27 @@ export const useTaskStore = defineStore('task', () => {
         priority: filter.value.priority?.[0],
         keyword: filter.value.keyword,
         sortBy: sortField.value as any,
-        sortOrder: sortOrder.value
+        sortOrder: sortOrder.value,
+        task_type: params?.task_type || filter.value.task_type
       }
+      
+      console.log('🔍 发送给后端的queryParams:', queryParams)
       
       const response = await taskApi.getTasks(queryParams)
       
+      console.log('📥 后端返回的原始response:', response)
+      console.log('📊 response.data的结构:', response.data)
+      
       if (response.success && response.data) {
-        tasks.value = response.data.list
+        console.log('✅ 最终赋值给tasks.value的数据:', response.data.tasks)
+        tasks.value = response.data.tasks || []
         pagination.value = {
-          page: response.data.page,
-          pageSize: response.data.pageSize,
-          total: response.data.total
+          page: response.data.pagination?.page || 1,
+          pageSize: response.data.pagination?.per_page || 20,
+          total: response.data.pagination?.total || 0
         }
+      } else {
+        console.error('❌ 响应失败:', response.message)
       }
     } catch (error: any) {
       console.error('Fetch tasks error:', error)
@@ -435,6 +447,23 @@ export const useTaskStore = defineStore('task', () => {
     }
   }
 
+  // 获取任务结果
+  const fetchTaskResults = async (taskId: number, params?: { page?: number; pageSize?: number }): Promise<void> => {
+    try {
+      resultsLoading.value = true
+      const response = await taskApi.getTaskResults(taskId, params)
+      
+      if (response.success && response.data) {
+        taskResults.value = response.data
+      }
+    } catch (error: any) {
+      console.error('Fetch task results error:', error)
+      ElMessage.error(error.message || '获取任务结果失败')
+    } finally {
+      resultsLoading.value = false
+    }
+  }
+
   // 获取任务统计
   const fetchTaskStatistics = async (): Promise<void> => {
     try {
@@ -596,8 +625,9 @@ export const useTaskStore = defineStore('task', () => {
       operationLoading.value = true
       const response = await taskApi.duplicateTask(taskId)
       
-      if (response.success) {
-        await fetchTasks()
+      if (response.success && response.data) {
+        tasks.value.unshift(response.data)
+        pagination.value.total += 1
         ElMessage.success('任务克隆成功')
         return true
       } else {
@@ -656,11 +686,13 @@ export const useTaskStore = defineStore('task', () => {
     tasks,
     currentTask,
     taskLogs,
+    taskResults,
     taskStatistics,
     taskTemplates,
     runningTasks,
     loading,
     logsLoading,
+    resultsLoading,
     statisticsLoading,
     templatesLoading,
     operationLoading,
@@ -695,6 +727,7 @@ export const useTaskStore = defineStore('task', () => {
     cloneTask,
     batchDeleteTasks,
     fetchTaskLogs,
+    fetchTaskResults,
     fetchTaskStatistics,
     fetchRunningTasks,
     fetchTaskTemplates,

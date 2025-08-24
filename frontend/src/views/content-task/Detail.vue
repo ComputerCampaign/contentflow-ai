@@ -334,6 +334,19 @@ const handleViewResults = () => {
   router.push(`/tasks/results/${route.params.id}`)
 }
 
+// 根据任务类型获取正确的列表页面路径
+const getTaskListPath = (taskType: string) => {
+  switch (taskType) {
+    case 'web_scraping':
+    case 'crawler':
+      return '/crawler-tasks/list'
+    case 'content_generation':
+      return '/content-tasks/list'
+    default:
+      return '/crawler-tasks/list' // 默认跳转到爬虫任务列表
+  }
+}
+
 const handleDelete = async () => {
   try {
     await ElMessageBox.confirm(
@@ -348,7 +361,7 @@ const handleDelete = async () => {
     
     await taskStore.deleteTask(parseInt(route.params.id as string))
     ElMessage.success('任务删除成功')
-    router.push('/tasks/list')
+    router.push(getTaskListPath(taskData.value?.type || 'web_scraping'))
   } catch (error) {
     if (error !== 'cancel') {
       console.error('删除任务失败:', error)
@@ -375,7 +388,7 @@ const loadTaskData = async () => {
   } catch (error) {
     console.error('加载任务数据失败:', error)
     ElMessage.error('加载任务数据失败')
-    router.push('/tasks/list')
+    router.push('/crawler-tasks/list') // 默认跳转到爬虫任务列表
   }
 }
 

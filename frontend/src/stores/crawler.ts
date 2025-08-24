@@ -162,11 +162,11 @@ export const useCrawlerStore = defineStore('crawler', () => {
       const response = await crawlerApi.getCrawlerConfigs(queryParams)
       
       if (response.success && response.data) {
-        crawlerConfigs.value = response.data.list
+        crawlerConfigs.value = response.data.configs
         pagination.value = {
-          page: response.data.page,
-          pageSize: response.data.pageSize,
-          total: response.data.total
+          page: response.data.pagination.page,
+          pageSize: response.data.pagination.per_page,
+          total: response.data.pagination.total
         }
       }
     } catch (error: any) {

@@ -93,6 +93,7 @@ export interface TaskQueryParams {
   keyword?: string
   sortBy?: 'createdAt' | 'updatedAt' | 'scheduledAt' | 'priority'
   sortOrder?: 'asc' | 'desc'
+  task_type?: string
 }
 
 // 任务统计数据
@@ -280,6 +281,33 @@ class TaskApiService extends BaseApiService {
   }>> {
     const queryParams = params ? new URLSearchParams(params as any).toString() : ''
     return apiAdapter.get(`${this.baseUrl}/${id}/logs${queryParams ? '?' + queryParams : ''}`)
+  }
+
+  /**
+   * 获取任务结果
+   * @param id 任务ID
+   * @param params 查询参数
+   */
+  async getTaskResults(id: number, params?: {
+    page?: number
+    pageSize?: number
+  }): Promise<StandardResponse<{
+    task_type: string
+    execution_stats: {
+      items_processed: number
+      items_success: number
+      items_failed: number
+      start_time: string
+      end_time: string
+      duration: number
+    }
+    results: any[]
+    total: number
+    page: number
+    pageSize: number
+  }>> {
+    const queryParams = params ? new URLSearchParams(params as any).toString() : ''
+    return apiAdapter.get(`${this.baseUrl}/${id}/results${queryParams ? '?' + queryParams : ''}`)
   }
 
   /**

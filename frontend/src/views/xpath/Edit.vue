@@ -33,6 +33,14 @@
               </el-form-item>
             </el-col>
             <el-col :span="12">
+              <el-form-item label="字段名称" prop="field_name">
+                <el-input v-model="form.field_name" placeholder="请输入字段名称" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          
+          <el-row :gutter="20">
+            <el-col :span="12">
               <el-form-item label="状态" prop="status">
                 <el-radio-group v-model="form.status">
                   <el-radio label="active">启用</el-radio>
@@ -194,6 +202,7 @@ const testResult = ref<any>(null)
 const form = reactive({
   id: '',
   name: '',
+  field_name: '',
   description: '',
   xpath: '',
   extractType: 'text',
@@ -208,6 +217,10 @@ const form = reactive({
 const rules = {
   name: [
     { required: true, message: '请输入配置名称', trigger: 'blur' },
+    { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
+  ],
+  field_name: [
+    { required: true, message: '请输入字段名称', trigger: 'blur' },
     { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
   ],
   xpath: [

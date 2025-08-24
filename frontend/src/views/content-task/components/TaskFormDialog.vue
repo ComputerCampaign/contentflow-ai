@@ -212,6 +212,7 @@ interface Props {
   modelValue: boolean
   task?: any
   mode: 'create' | 'edit'
+  taskType?: 'crawler' | 'content_generation'
 }
 
 interface Emits {
@@ -389,9 +390,16 @@ const handleSubmit = async () => {
     }
     
     if (props.mode === 'create') {
+      // 根据taskType确定任务类型
+      const taskTypeMap = {
+        'crawler': 'web_scraping',
+        'content_generation': 'content_generation'
+      }
+      const taskType = taskTypeMap[props.taskType || 'crawler'] || 'web_scraping'
+      
       await taskStore.createTask({
         ...taskData,
-        type: 'web_scraping' as any,
+        type: taskType as any,
         priority: taskData.priority as any,
         crawlerConfigId: taskData.crawlerConfigId || undefined
       })

@@ -394,21 +394,23 @@ const handleSubmit = async () => {
     await formRef.value.validate()
     loading.value = true
     
-    // 转换表单数据为CreateCrawlerParams格式
+    // 转换表单数据为后端API格式
     const createParams = {
       name: formData.name,
       description: formData.description,
-      type: 'web' as const,
-      targetUrl: formData.url,
-      extractionRules: formData.xpathRules.map(rule => ({
-        name: rule.name,
-        method: 'xpath' as const,
-        selector: rule.xpath,
-        field: rule.name,
-        dataType: rule.type as 'text' | 'html' | 'attribute',
-        required: false,
-        defaultValue: ''
-      }))
+      output: 'output',
+      data_dir: 'crawler_data',
+      use_selenium: formData.dataFormat === 'html',
+      timeout: formData.timeout,
+      retry: formData.retryCount,
+      config: 'config.json',
+      email_notification: false,
+      headless: true,
+      proxy: formData.enableProxy ? formData.proxyConfig : null,
+      page_load_wait: Math.floor(formData.delay / 1000),
+      user_agent: formData.userAgent === 'custom' ? formData.customUserAgent : getUserAgentString(formData.userAgent),
+      rule_ids: formData.xpathRules.map(rule => rule.name).join(','),
+      enable_xpath: formData.xpathRules.length > 0
     }
     
     // 创建爬虫配置
@@ -421,6 +423,15 @@ const handleSubmit = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const getUserAgentString = (type: string) => {
+  const userAgents = {
+    chrome: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    firefox: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0',
+    safari: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15'
+  }
+  return userAgents[type as keyof typeof userAgents] || userAgents.chrome
 }
 </script>
 

@@ -231,6 +231,19 @@ const rules: FormRules = {
   ]
 }
 
+// 根据任务类型获取正确的列表页面路径
+const getTaskListPath = (taskType: string) => {
+  switch (taskType) {
+    case 'web_scraping':
+    case 'crawler':
+      return '/crawler-tasks/list'
+    case 'content_generation':
+      return '/content-tasks/list'
+    default:
+      return '/crawler-tasks/list' // 默认跳转到爬虫任务列表
+  }
+}
+
 const handleSubmit = async () => {
   if (!formRef.value) return
   
@@ -243,7 +256,7 @@ const handleSubmit = async () => {
       priority: form.priority as any
     })
     ElMessage.success('任务修改成功')
-    router.push('/tasks/list')
+    router.push(getTaskListPath(taskData.value?.type || 'web_scraping'))
   } catch (error) {
     console.error('修改任务失败:', error)
     ElMessage.error('修改任务失败，请重试')
@@ -263,7 +276,7 @@ const handleCancel = async () => {
         type: 'warning'
       }
     )
-    router.push('/tasks/list')
+    router.push(getTaskListPath(taskData.value?.type || 'web_scraping'))
   } catch {
     // 用户取消
   }
@@ -294,7 +307,7 @@ const loadTaskData = async () => {
   } catch (error) {
     console.error('加载任务数据失败:', error)
     ElMessage.error('加载任务数据失败')
-    router.push('/tasks/list')
+    router.push('/crawler-tasks/list') // 默认跳转到爬虫任务列表
   }
 }
 

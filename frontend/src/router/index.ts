@@ -52,61 +52,122 @@ const routes: RouteRecordRaw[] = [
     ]
   },
   {
-    path: '/tasks',
+    path: '/crawler-tasks',
     component: Layout,
-    redirect: '/tasks/list',
+    redirect: '/crawler-tasks/list',
     meta: {
-      title: '任务管理',
-      icon: 'task'
+      title: '爬虫任务',
+      icon: 'crawler-task'
     },
     children: [
       {
         path: 'list',
-        name: 'TaskList',
-        component: () => import('@/views/task/List.vue'),
+        name: 'CrawlerTaskList',
+        component: () => import('@/views/crawler-task/List.vue'),
         meta: {
-          title: '任务列表',
+          title: '爬虫任务列表',
           icon: 'list'
         }
       },
       {
         path: 'create',
-        name: 'TaskCreate',
-        component: () => import('@/views/task/Create.vue'),
+        name: 'CrawlerTaskCreate',
+        component: () => import('@/views/crawler-task/Create.vue'),
         meta: {
-          title: '创建任务',
+          title: '创建爬虫任务',
           icon: 'plus',
           hidden: true
         }
       },
       {
         path: 'edit/:id',
-        name: 'TaskEdit',
-        component: () => import('@/views/task/Edit.vue'),
+        name: 'CrawlerTaskEdit',
+        component: () => import('@/views/crawler-task/Edit.vue'),
         meta: {
-          title: '编辑任务',
+          title: '编辑爬虫任务',
           icon: 'edit',
           hidden: true,
-          activeMenu: '/tasks/list'
+          activeMenu: '/crawler-tasks/list'
         }
       },
       {
         path: 'detail/:id',
-        name: 'TaskDetail',
-        component: () => import('@/views/task/Detail.vue'),
+        name: 'CrawlerTaskDetail',
+        component: () => import('@/views/crawler-task/Detail.vue'),
         meta: {
-          title: '任务详情',
+          title: '爬虫任务详情',
           icon: 'detail',
           hidden: true,
-          activeMenu: '/tasks/list'
+          activeMenu: '/crawler-tasks/list'
         }
       },
       {
         path: 'monitor',
-        name: 'TaskMonitor',
-        component: () => import('@/views/task/Monitor.vue'),
+        name: 'CrawlerTaskMonitor',
+        component: () => import('@/views/crawler-task/Monitor.vue'),
         meta: {
-          title: '任务监控',
+          title: '爬虫任务监控',
+          icon: 'monitor'
+        }
+      }
+    ]
+  },
+  {
+    path: '/content-tasks',
+    component: Layout,
+    redirect: '/content-tasks/list',
+    meta: {
+      title: '文本生成任务',
+      icon: 'content-task'
+    },
+    children: [
+      {
+        path: 'list',
+        name: 'ContentTaskList',
+        component: () => import('@/views/content-task/List.vue'),
+        meta: {
+          title: '文本生成任务列表',
+          icon: 'list'
+        }
+      },
+      {
+        path: 'create',
+        name: 'ContentTaskCreate',
+        component: () => import('@/views/content-task/Create.vue'),
+        meta: {
+          title: '创建文本生成任务',
+          icon: 'plus',
+          hidden: true
+        }
+      },
+      {
+        path: 'edit/:id',
+        name: 'ContentTaskEdit',
+        component: () => import('@/views/content-task/Edit.vue'),
+        meta: {
+          title: '编辑文本生成任务',
+          icon: 'edit',
+          hidden: true,
+          activeMenu: '/content-tasks/list'
+        }
+      },
+      {
+        path: 'detail/:id',
+        name: 'ContentTaskDetail',
+        component: () => import('@/views/content-task/Detail.vue'),
+        meta: {
+          title: '文本生成任务详情',
+          icon: 'detail',
+          hidden: true,
+          activeMenu: '/content-tasks/list'
+        }
+      },
+      {
+        path: 'monitor',
+        name: 'ContentTaskMonitor',
+        component: () => import('@/views/content-task/Monitor.vue'),
+        meta: {
+          title: '文本生成任务监控',
           icon: 'monitor'
         }
       }

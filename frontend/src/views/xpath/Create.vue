@@ -29,6 +29,15 @@
             />
           </el-form-item>
           
+          <el-form-item label="字段名称" prop="field_name">
+            <el-input
+              v-model="form.field_name"
+              placeholder="请输入字段名称，用于标识提取的数据字段"
+              maxlength="50"
+              show-word-limit
+            />
+          </el-form-item>
+          
           <el-form-item label="描述" prop="description">
             <el-input
               v-model="form.description"
@@ -165,6 +174,7 @@ const testResult = ref('')
 // 表单数据
 const form = reactive<Partial<XPathConfig>>({
   name: '',
+  field_name: '',
   description: '',
   xpath: '',
   extractType: 'text',
@@ -183,6 +193,10 @@ const rules: FormRules = {
   name: [
     { required: true, message: '请输入配置名称', trigger: 'blur' },
     { min: 2, max: 50, message: '配置名称长度在 2 到 50 个字符', trigger: 'blur' }
+  ],
+  field_name: [
+    { required: true, message: '请输入字段名称', trigger: 'blur' },
+    { min: 2, max: 50, message: '字段名称长度在 2 到 50 个字符', trigger: 'blur' }
   ],
   xpath: [
     { required: true, message: '请输入XPath表达式', trigger: 'blur' }

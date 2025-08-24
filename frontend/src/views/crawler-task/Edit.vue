@@ -1,15 +1,15 @@
 <template>
-  <div class="task-create">
-    <PageHeader title="创建任务" description="创建新的爬虫任务">
+  <div class="task-edit">
+    <PageHeader :title="`编辑任务 - ${taskData?.name || ''}`" description="修改任务配置">
       <template #actions>
         <el-button @click="handleCancel">取消</el-button>
         <el-button type="primary" @click="handleSubmit" :loading="loading">
-          创建任务
+          保存修改
         </el-button>
       </template>
     </PageHeader>
 
-    <div class="task-create-content">
+    <div class="task-edit-content" v-loading="pageLoading">
       <el-form
         ref="formRef"
         :model="form"
@@ -63,6 +63,16 @@
               <el-option label="低" value="low" />
               <el-option label="中" value="medium" />
               <el-option label="高" value="high" />
+            </el-select>
+          </el-form-item>
+          
+          <el-form-item label="任务状态" prop="status">
+            <el-select v-model="form.status" placeholder="请选择状态">
+              <el-option label="待执行" value="pending" />
+              <el-option label="执行中" value="running" />
+              <el-option label="已完成" value="completed" />
+              <el-option label="已失败" value="failed" />
+              <el-option label="已暂停" value="paused" />
             </el-select>
           </el-form-item>
         </el-card>
@@ -162,7 +172,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -170,18 +180,22 @@ import { useTaskStore } from '@/stores/task'
 import { useCrawlerStore } from '@/stores/crawler'
 
 const router = useRouter()
+const route = useRoute()
 const taskStore = useTaskStore()
 const crawlerStore = useCrawlerStore()
 
 const formRef = ref<FormInstance>()
 const loading = ref(false)
+const pageLoading = ref(true)
 const crawlerList = ref<any[]>([])
+const taskData = ref<any>(null)
 
 const form = reactive({
   name: '',
   description: '',
   crawlerId: '',
   priority: 'medium',
+  status: 'pending',
   mode: 'immediate',
   scheduledTime: '',
   retryCount: 3,
@@ -203,6 +217,9 @@ const rules: FormRules = {
   priority: [
     { required: true, message: '请选择任务优先级', trigger: 'change' }
   ],
+  status: [
+    { required: true, message: '请选择任务状态', trigger: 'change' }
+  ],
   mode: [
     { required: true, message: '请选择执行模式', trigger: 'change' }
   ],
@@ -214,6 +231,19 @@ const rules: FormRules = {
   ]
 }
 
+// 根据任务类型获取正确的列表页面路径
+const getTaskListPath = (taskType: string) => {
+  switch (taskType) {
+    case 'web_scraping':
+    case 'crawler':
+      return '/crawler-tasks/list'
+    case 'content_generation':
+      return '/content-tasks/list'
+    default:
+      return '/crawler-tasks/list' // 默认跳转到爬虫任务列表
+  }
+}
+
 const handleSubmit = async () => {
   if (!formRef.value) return
   
@@ -221,16 +251,15 @@ const handleSubmit = async () => {
     await formRef.value.validate()
     loading.value = true
     
-    await taskStore.createTask({
+    await taskStore.updateTask(parseInt(route.params.id as string), {
       ...form,
-      type: 'web_scraping' as any,
       priority: form.priority as any
     })
-    ElMessage.success('任务创建成功')
-    router.push('/tasks/list')
+    ElMessage.success('任务修改成功')
+    router.push(getTaskListPath(taskData.value?.type || 'web_scraping'))
   } catch (error) {
-    console.error('创建任务失败:', error)
-    ElMessage.error('创建任务失败，请重试')
+    console.error('修改任务失败:', error)
+    ElMessage.error('修改任务失败，请重试')
   } finally {
     loading.value = false
   }
@@ -239,7 +268,7 @@ const handleSubmit = async () => {
 const handleCancel = async () => {
   try {
     await ElMessageBox.confirm(
-      '确定要取消创建任务吗？未保存的数据将丢失。',
+      '确定要取消修改吗？未保存的数据将丢失。',
       '确认取消',
       {
         confirmButtonText: '确定',
@@ -247,9 +276,38 @@ const handleCancel = async () => {
         type: 'warning'
       }
     )
-    router.push('/tasks/list')
+    router.push(getTaskListPath(taskData.value?.type || 'web_scraping'))
   } catch {
     // 用户取消
+  }
+}
+
+const loadTaskData = async () => {
+  try {
+    const taskId = route.params.id as string
+    const task = await taskStore.fetchTaskById(parseInt(taskId))
+    taskData.value = task
+    
+    // 填充表单数据
+    Object.assign(form, {
+      name: task?.name || '',
+      description: task?.description || '',
+      crawlerId: task?.crawlerConfigId || '',
+      priority: task?.priority || 'medium',
+      status: task?.status || 'pending',
+      mode: task?.mode || 'immediate',
+      scheduledTime: task?.scheduledTime || '',
+      retryCount: task?.retryCount || 3,
+      timeout: task?.timeout || 30000,
+      concurrency: task?.concurrency || 1,
+      delay: task?.delay || 1000,
+      enableNotification: task?.enableNotification || false,
+      notificationEmail: task?.notificationEmail || ''
+    })
+  } catch (error) {
+    console.error('加载任务数据失败:', error)
+    ElMessage.error('加载任务数据失败')
+    router.push('/crawler-tasks/list') // 默认跳转到爬虫任务列表
   }
 }
 
@@ -263,13 +321,25 @@ const loadCrawlerList = async () => {
   }
 }
 
+const initPage = async () => {
+  pageLoading.value = true
+  try {
+    await Promise.all([
+      loadTaskData(),
+      loadCrawlerList()
+    ])
+  } finally {
+    pageLoading.value = false
+  }
+}
+
 onMounted(() => {
-  loadCrawlerList()
+  initPage()
 })
 </script>
 
 <style scoped lang="scss">
-.task-create {
+.task-edit {
   padding: 20px;
   
   &-content {

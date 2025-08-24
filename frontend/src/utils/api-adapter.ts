@@ -37,7 +37,7 @@ class ApiAdapter {
    * @param requestPromise 请求Promise
    * @returns 标准化响应Promise
    */
-  private async handleRequest<T>(requestPromise: Promise<any>): Promise<StandardResponse<T>> {
+  private async handleRequest<T>(requestPromise: Promise<ApiResponse<any>>): Promise<StandardResponse<T>> {
     try {
       const response = await requestPromise
       
