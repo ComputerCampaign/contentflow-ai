@@ -1,259 +1,186 @@
 <template>
   <el-dialog
     v-model="visible"
-    :title="mode === 'create' ? '创建爬虫配置' : '编辑爬虫配置'"
+    :title="mode === 'create' ? '新建爬虫配置' : '编辑爬虫配置'"
     width="800px"
-    :before-close="handleClose"
+    :close-on-click-modal="false"
   >
     <el-form
       ref="formRef"
       :model="formData"
       :rules="formRules"
       label-width="120px"
-      label-position="left"
     >
       <!-- 基本信息 -->
-      <div class="form-section">
-        <h3 class="section-title">基本信息</h3>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="配置名称" prop="name">
-              <el-input
-                v-model="formData.name"
-                placeholder="请输入配置名称"
-                maxlength="50"
-                show-word-limit
-              />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="类型" prop="type">
-              <el-select v-model="formData.type" placeholder="请选择类型">
-                <el-option label="列表页" value="list" />
-                <el-option label="详情页" value="detail" />
-                <el-option label="搜索页" value="search" />
-                <el-option label="分类页" value="category" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        
-        <el-form-item label="目标URL" prop="url">
-          <el-input
-            v-model="formData.url"
-            placeholder="请输入目标URL，如：https://example.com"
-          />
-        </el-form-item>
-        
-        <el-form-item label="描述">
-          <el-input
-            v-model="formData.description"
-            type="textarea"
-            :rows="3"
-            placeholder="请输入配置描述"
-            maxlength="200"
-            show-word-limit
-          />
-        </el-form-item>
-        
-        <el-form-item label="状态">
-          <el-radio-group v-model="formData.status">
-            <el-radio label="active">启用</el-radio>
-            <el-radio label="inactive">禁用</el-radio>
-          </el-radio-group>
-        </el-form-item>
-      </div>
+      <el-divider content-position="left">基本信息</el-divider>
+      <el-form-item label="配置名称" prop="name" required>
+        <el-input 
+          v-model="formData.name" 
+          placeholder="请输入配置名称"
+        />
+      </el-form-item>
+      <el-form-item label="配置描述">
+        <el-input
+          v-model="formData.description"
+          type="textarea"
+          :rows="2"
+          placeholder="请输入配置描述"
+        />
+      </el-form-item>
       
-      <!-- 爬取配置 -->
-      <div class="form-section">
-        <h3 class="section-title">爬取配置</h3>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="请求间隔" prop="delay">
-              <el-input-number
-                v-model="formData.delay"
-                :min="100"
-                :max="60000"
-                :step="100"
-                controls-position="right"
-              />
-              <span class="unit">毫秒</span>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="超时时间" prop="timeout">
-              <el-input-number
-                v-model="formData.timeout"
-                :min="1000"
-                :max="300000"
-                :step="1000"
-                controls-position="right"
-              />
-              <span class="unit">毫秒</span>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="重试次数" prop="retries">
-              <el-input-number
-                v-model="formData.retries"
-                :min="0"
-                :max="10"
-                controls-position="right"
-              />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="并发数" prop="concurrency">
-              <el-input-number
-                v-model="formData.concurrency"
-                :min="1"
-                :max="10"
-                controls-position="right"
-              />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        
-        <el-form-item label="User-Agent">
-          <el-select
-            v-model="formData.userAgent"
-            placeholder="请选择或输入User-Agent"
-            filterable
-            allow-create
-          >
-            <el-option
-              v-for="ua in userAgentOptions"
-              :key="ua.value"
-              :label="ua.label"
-              :value="ua.value"
-            />
-          </el-select>
-        </el-form-item>
-        
-        <el-form-item label="Cookie">
-          <el-input
-            v-model="formData.cookies"
-            type="textarea"
-            :rows="2"
-            placeholder="请输入Cookie，格式：name1=value1; name2=value2"
-          />
-        </el-form-item>
-      </div>
+      <!-- 存储配置 -->
+      <el-divider content-position="left">存储配置</el-divider>
+      <el-form-item label="数据目录">
+        <el-input v-model="formData.data_dir" placeholder="crawler_data" />
+      </el-form-item>
       
-      <!-- 提取规则 -->
-      <div class="form-section">
-        <h3 class="section-title">
-          提取规则
-          <el-button
-            type="primary"
-            size="small"
-            :icon="Plus"
-            @click="addExtractionRule"
+      <!-- 爬虫核心配置 -->
+      <el-divider content-position="left">爬虫核心配置</el-divider>
+      <el-row :gutter="20">
+        <el-col :span="8">
+          <el-form-item label="超时时间(秒)" prop="timeout">
+            <el-input-number v-model="formData.timeout" :min="1" :max="300" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="8">
+          <el-form-item label="重试次数" prop="retry">
+            <el-input-number v-model="formData.retry" :min="0" :max="10" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="8">
+          <el-form-item label="最大工作线程" prop="max_workers">
+            <el-input-number v-model="formData.max_workers" :min="1" :max="20" />
+          </el-form-item>
+        </el-col>
+      </el-row>
+      <el-row :gutter="20">
+        <el-col :span="12">
+          <el-form-item label="使用Selenium">
+            <el-switch v-model="formData.use_selenium" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="邮件通知">
+            <el-switch v-model="formData.email_notification" />
+          </el-form-item>
+        </el-col>
+      </el-row>
+      <el-form-item label="User Agent">
+        <el-input v-model="formData.user_agent" type="textarea" :rows="2" placeholder="请输入User Agent" />
+      </el-form-item>
+      
+      <!-- Selenium配置 -->
+      <el-divider content-position="left">Selenium配置</el-divider>
+      <el-row :gutter="20">
+        <el-col :span="8">
+          <el-form-item label="无头模式">
+            <el-switch v-model="formData.headless" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="8">
+          <el-form-item label="禁用GPU">
+            <el-switch v-model="formData.selenium_disable_gpu" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="8">
+          <el-form-item label="禁用dev-shm">
+            <el-switch v-model="formData.selenium_disable_dev_shm_usage" />
+          </el-form-item>
+        </el-col>
+      </el-row>
+      <el-row :gutter="20">
+        <el-col :span="8">
+          <el-form-item label="窗口大小">
+            <el-input v-model="formData.selenium_window_size" placeholder="1920,1080" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="8">
+          <el-form-item label="页面加载超时" prop="selenium_page_load_timeout">
+            <el-input-number v-model="formData.selenium_page_load_timeout" :min="1" :max="300" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="8">
+          <el-form-item label="隐式等待" prop="selenium_implicit_wait">
+            <el-input-number v-model="formData.selenium_implicit_wait" :min="1" :max="60" />
+          </el-form-item>
+        </el-col>
+      </el-row>
+      <el-row :gutter="20">
+        <el-col :span="12">
+          <el-form-item label="代理设置">
+            <el-input v-model="formData.proxy" placeholder="请输入代理地址，如：http://proxy.example.com:8080" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="页面加载等待时间">
+            <el-input-number v-model="formData.page_load_wait" :min="1" :max="300" />
+          </el-form-item>
+        </el-col>
+      </el-row>
+
+      
+      <!-- XPath配置 -->
+      <el-divider content-position="left">XPath配置</el-divider>
+      <el-form-item label="启用XPath">
+        <el-switch v-model="formData.enable_xpath" />
+      </el-form-item>
+      <el-form-item label="规则ID列表">
+        <el-select
+          v-model="formData.rule_ids"
+          multiple
+          filterable
+          placeholder="请选择要使用的XPath规则"
+          style="width: 100%"
+          :loading="loadingXPathRules"
+        >
+          <el-option
+            v-for="rule in enabledXPathRules"
+            :key="rule.rule_id"
+            :label="`${rule.name} (${rule.rule_id})`"
+            :value="rule.rule_id"
           >
-            添加规则
-          </el-button>
-        </h3>
-        
-        <div v-if="formData.extractionRules.length" class="rules-list">
-          <div
-            v-for="(rule, index) in formData.extractionRules"
-            :key="index"
-            class="rule-item"
-          >
-            <div class="rule-header">
-              <span class="rule-index">规则 {{ index + 1 }}</span>
-              <el-button
-                type="danger"
-                size="small"
-                :icon="Delete"
-                @click="removeExtractionRule(index)"
-              >
-                删除
-              </el-button>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span>{{ rule.name }}</span>
+              <span style="color: #999; font-size: 12px;">{{ rule.rule_id }}</span>
             </div>
-            
-            <el-row :gutter="20">
-              <el-col :span="12">
-                <el-form-item
-                  :prop="`extractionRules.${index}.name`"
-                  :rules="[{ required: true, message: '请输入规则名称' }]"
-                  label="规则名称"
-                >
-                  <el-input
-                    v-model="rule.name"
-                    placeholder="请输入规则名称"
-                  />
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="数据类型">
-                  <el-select v-model="rule.type" placeholder="请选择数据类型">
-                    <el-option label="文本" value="text" />
-                    <el-option label="链接" value="link" />
-                    <el-option label="图片" value="image" />
-                    <el-option label="数字" value="number" />
-                  </el-select>
-                </el-form-item>
-              </el-col>
-            </el-row>
-            
-            <el-form-item
-              :prop="`extractionRules.${index}.xpath`"
-              :rules="[{ required: true, message: '请输入XPath表达式' }]"
-              label="XPath表达式"
-            >
-              <el-input
-                v-model="rule.xpath"
-                placeholder="请输入XPath表达式，如：//div[@class='title']/text()"
-              />
-            </el-form-item>
-            
-            <el-row :gutter="20">
-              <el-col :span="12">
-                <el-form-item label="属性名">
-                  <el-input
-                    v-model="rule.attribute"
-                    placeholder="如：href, src等"
-                  />
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="默认值">
-                  <el-input
-                    v-model="rule.defaultValue"
-                    placeholder="提取失败时的默认值"
-                  />
-                </el-form-item>
-              </el-col>
-            </el-row>
-            
-            <el-form-item label="正则表达式">
-              <el-input
-                v-model="rule.regex"
-                placeholder="用于进一步处理提取的内容"
-              />
-            </el-form-item>
-          </div>
-        </div>
-        
-        <div v-else class="empty-rules">
-          <el-empty description="暂无提取规则" :image-size="60">
-            <el-button type="primary" :icon="Plus" @click="addExtractionRule">
-              添加第一个规则
-            </el-button>
-          </el-empty>
-        </div>
-      </div>
+          </el-option>
+        </el-select>
+        <div style="font-size: 12px; color: #999; margin-top: 4px;">选择要使用的XPath规则，支持多选和搜索</div>
+      </el-form-item>
+      <el-row :gutter="20">
+        <el-col :span="12">
+          <el-form-item label="XPath规则路径">
+            <el-input v-model="formData.xpath_rules_path" placeholder="crawler/config/xpath/xpath_rules.json" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="默认规则ID">
+            <el-input v-model="formData.xpath_default_rule_id" placeholder="general_article" />
+          </el-form-item>
+        </el-col>
+      </el-row>
+      
+      <!-- 脚本配置 -->
+      <el-divider content-position="left">脚本配置</el-divider>
+      <el-form-item label="Stealth脚本路径">
+        <el-input v-model="formData.scripts_stealth_path" placeholder="crawler/config/scripts/stealth.min.js" />
+      </el-form-item>
+      
+      <!-- 图片存储配置 -->
+      <el-divider content-position="left">图片存储配置</el-divider>
+      <el-form-item label="存储类型">
+        <el-select v-model="formData.image_storage_type" style="width: 100%">
+          <el-option label="GitHub" value="github"></el-option>
+          <el-option label="本地" value="local"></el-option>
+        </el-select>
+      </el-form-item>
     </el-form>
     
     <template #footer>
       <div class="dialog-footer">
         <el-button @click="handleClose">取消</el-button>
         <el-button type="primary" :loading="loading" @click="handleSubmit">
-          {{ mode === 'create' ? '创建' : '保存' }}
+          {{ mode === 'create' ? '创建配置' : '更新配置' }}
         </el-button>
       </div>
     </template>
@@ -261,10 +188,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { Plus, Delete } from '@element-plus/icons-vue'
 import { useCrawlerStore } from '@/stores/crawler'
+import request from '@/utils/request'
 
 interface Props {
   modelValue: boolean
@@ -283,6 +210,8 @@ const emit = defineEmits<Emits>()
 const crawlerStore = useCrawlerStore()
 const formRef = ref<FormInstance>()
 const loading = ref(false)
+const loadingXPathRules = ref(false)
+const enabledXPathRules = ref<any[]>([])
 
 // 计算属性
 const visible = computed({
@@ -293,17 +222,37 @@ const visible = computed({
 // 表单数据
 const defaultFormData = {
   name: '',
-  url: '',
-  type: 'web',
   description: '',
-  status: 'active',
-  delay: 1000,
-  timeout: 30000,
-  retries: 3,
-  concurrency: 1,
-  userAgent: '',
-  cookies: '',
-  extractionRules: [] as any[]
+  // 基本配置
+  output: '',
+  config: 'config.json',
+  // 存储配置
+  data_dir: 'crawler_data',
+  // 爬虫核心配置
+  timeout: 30,
+  retry: 3,
+  max_workers: 4,
+  use_selenium: false,
+  email_notification: false,
+  user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+  // Selenium配置
+  headless: true,
+  selenium_disable_gpu: true,
+  selenium_disable_dev_shm_usage: true,
+  selenium_window_size: '1920,1080',
+  selenium_page_load_timeout: 30,
+  selenium_implicit_wait: 10,
+  proxy: '',
+  page_load_wait: 10,
+  // XPath配置
+  enable_xpath: false,
+  rule_ids: [] as string[],
+  xpath_rules_path: 'crawler/config/xpath/xpath_rules.json',
+  xpath_default_rule_id: 'general_article',
+  // 脚本配置
+  scripts_stealth_path: 'crawler/config/scripts/stealth.min.js',
+  // 图片存储配置
+  image_storage_type: 'github'
 }
 
 const formData = ref({ ...defaultFormData })
@@ -312,52 +261,52 @@ const formData = ref({ ...defaultFormData })
 const formRules: FormRules = {
   name: [
     { required: true, message: '请输入配置名称', trigger: 'blur' },
-    { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
-  ],
-  url: [
-    { required: true, message: '请输入目标URL', trigger: 'blur' },
-    {
-      pattern: /^https?:\/\/.+/,
-      message: '请输入有效的URL',
-      trigger: 'blur'
-    }
-  ],
-  type: [
-    { required: true, message: '请选择类型', trigger: 'change' }
-  ],
-  delay: [
-    { required: true, message: '请输入请求间隔', trigger: 'blur' }
+    { min: 1, max: 50, message: '配置名称长度在1到50个字符', trigger: 'blur' }
   ],
   timeout: [
-    { required: true, message: '请输入超时时间', trigger: 'blur' }
+    { required: true, message: '请输入超时时间', trigger: 'blur' },
+    { type: 'number', min: 1, max: 300, message: '超时时间范围为1-300秒', trigger: 'blur' }
   ],
-  retries: [
-    { required: true, message: '请输入重试次数', trigger: 'blur' }
+  retry: [
+    { required: true, message: '请输入重试次数', trigger: 'blur' },
+    { type: 'number', min: 0, max: 10, message: '重试次数范围为0-10次', trigger: 'blur' }
   ],
-  concurrency: [
-    { required: true, message: '请输入并发数', trigger: 'blur' }
+  max_workers: [
+    { required: true, message: '请输入最大工作线程数', trigger: 'blur' },
+    { type: 'number', min: 1, max: 20, message: '最大工作线程数范围为1-20', trigger: 'blur' }
+  ],
+  selenium_page_load_timeout: [
+    { type: 'number', min: 1, max: 300, message: '页面加载超时范围为1-300秒', trigger: 'blur' }
+  ],
+  selenium_implicit_wait: [
+    { type: 'number', min: 1, max: 60, message: '隐式等待范围为1-60秒', trigger: 'blur' }
   ]
 }
 
-// User-Agent选项
-const userAgentOptions = [
-  {
-    label: 'Chrome (Windows)',
-    value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-  },
-  {
-    label: 'Chrome (Mac)',
-    value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-  },
-  {
-    label: 'Firefox (Windows)',
-    value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0'
-  },
-  {
-    label: 'Safari (Mac)',
-    value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15'
+// 获取启用状态的XPath规则
+const fetchEnabledXPathRules = async () => {
+  try {
+    loadingXPathRules.value = true
+    const response = await request.get('/xpath/configs', {
+      params: {
+        status: 'active',
+        per_page: 100
+      }
+    })
+    
+    if (response.success) {
+      enabledXPathRules.value = response.data.items || []
+    } else {
+      console.error('获取XPath规则失败:', response.message)
+      ElMessage.error(response.message || '获取XPath规则失败')
+    }
+  } catch (error: any) {
+    console.error('获取XPath规则失败:', error)
+    ElMessage.error(error.response?.data?.message || error.message || '获取XPath规则失败')
+  } finally {
+    loadingXPathRules.value = false
   }
-]
+}
 
 // 监听配置变化
 watch(
@@ -367,7 +316,10 @@ watch(
       formData.value = {
         ...defaultFormData,
         ...newConfig,
-        extractionRules: newConfig.extractionRules || []
+        // 处理rule_ids字段：如果是字符串，转换为数组
+        rule_ids: typeof newConfig.rule_ids === 'string' 
+          ? (newConfig.rule_ids ? newConfig.rule_ids.split(',').map((id: string) => id.trim()) : [])
+          : (newConfig.rule_ids || [])
       }
     } else {
       formData.value = { ...defaultFormData }
@@ -379,27 +331,12 @@ watch(
 // 监听对话框显示状态
 watch(visible, (newVisible) => {
   if (newVisible) {
+    fetchEnabledXPathRules()
     nextTick(() => {
       formRef.value?.clearValidate()
     })
   }
 })
-
-// 提取规则相关方法
-const addExtractionRule = () => {
-  formData.value.extractionRules.push({
-    name: '',
-    type: 'text',
-    xpath: '',
-    attribute: '',
-    regex: '',
-    defaultValue: ''
-  })
-}
-
-const removeExtractionRule = (index: number) => {
-  formData.value.extractionRules.splice(index, 1)
-}
 
 // 事件处理
 const handleClose = () => {
@@ -407,107 +344,75 @@ const handleClose = () => {
 }
 
 const handleSubmit = async () => {
+  if (!formRef.value) return
+  
   try {
-    await formRef.value?.validate()
-    
+    await formRef.value.validate()
+  } catch (error) {
+    ElMessage.error('请检查表单输入')
+    return
+  }
+  
+  try {
     loading.value = true
     
     if (props.mode === 'create') {
-      const createParams = {
+      // 创建模式：直接调用后端API
+      const configData = {
         name: formData.value.name,
         description: formData.value.description,
-        type: formData.value.type as 'web' | 'api' | 'rss' | 'sitemap',
-        targetUrl: formData.value.url,
-        extractionRules: formData.value.extractionRules.map((rule: any) => ({
-          name: rule.name,
-          method: rule.type as 'xpath' | 'css' | 'regex' | 'json',
-          selector: rule.xpath || rule.selector || '',
-          field: rule.attribute || 'text',
-          required: rule.required || false,
-          defaultValue: rule.defaultValue || ''
-        }))
+        output: formData.value.output,
+        data_dir: formData.value.data_dir,
+        use_selenium: formData.value.use_selenium,
+        timeout: formData.value.timeout,
+        retry: formData.value.retry,
+        config: formData.value.config,
+        email_notification: formData.value.email_notification,
+        headless: formData.value.headless,
+        selenium_disable_gpu: formData.value.selenium_disable_gpu,
+        selenium_disable_dev_shm_usage: formData.value.selenium_disable_dev_shm_usage,
+        selenium_window_size: formData.value.selenium_window_size,
+        selenium_page_load_timeout: formData.value.selenium_page_load_timeout,
+        selenium_implicit_wait: formData.value.selenium_implicit_wait,
+        proxy: formData.value.proxy,
+        page_load_wait: formData.value.page_load_wait,
+        user_agent: formData.value.user_agent,
+        rule_ids: Array.isArray(formData.value.rule_ids) ? formData.value.rule_ids.join(',') : (formData.value.rule_ids || ''),
+        enable_xpath: formData.value.enable_xpath,
+        xpath_rules_path: formData.value.xpath_rules_path,
+        xpath_default_rule_id: formData.value.xpath_default_rule_id,
+        scripts_stealth_path: formData.value.scripts_stealth_path,
+        image_storage_type: formData.value.image_storage_type
       }
-      await crawlerStore.createCrawlerConfig(createParams)
-      ElMessage.success('创建成功')
+      await request.post('/api/crawler/configs', configData)
     } else {
-      const updateParams = {
-        name: formData.value.name,
-        description: formData.value.description,
-        type: formData.value.type as 'web' | 'api' | 'rss' | 'sitemap',
-        targetUrl: formData.value.url,
-        extractionRules: formData.value.extractionRules.map((rule: any) => ({
-          name: rule.name,
-          method: rule.type as 'xpath' | 'css' | 'regex' | 'json',
-          selector: rule.xpath || rule.selector || '',
-          field: rule.attribute || 'text',
-          required: rule.required || false,
-          defaultValue: rule.defaultValue || ''
-        }))
+      // 编辑模式：直接调用后端API
+      const submitData = { ...formData.value }
+      // 处理rule_ids：如果是数组，转换为字符串
+      if (Array.isArray(submitData.rule_ids)) {
+        (submitData as any).rule_ids = submitData.rule_ids.join(',')
       }
-      await crawlerStore.updateCrawlerConfig(props.config.id, updateParams)
-      ElMessage.success('保存成功')
+      await request.put(`/api/crawler/configs/${props.config.id}`, submitData)
     }
     
+    ElMessage.success(props.mode === 'create' ? '创建成功' : '更新成功')
     emit('success')
-  } catch (error) {
+    visible.value = false
+  } catch (error: any) {
     console.error('提交失败:', error)
-    ElMessage.error('操作失败')
+    ElMessage.error(error.response?.data?.message || error.message || '操作失败')
   } finally {
     loading.value = false
   }
 }
+
+// 组件挂载时获取数据
+onMounted(() => {
+  fetchEnabledXPathRules()
+})
 </script>
 
 <style lang="scss" scoped>
-.form-section {
-  margin-bottom: 32px;
-  
-  .section-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--el-text-color-primary);
-    margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--el-border-color-lighter);
-  }
-}
-
-.unit {
-  margin-left: 8px;
-  color: var(--el-text-color-regular);
-  font-size: 12px;
-}
-
-.rules-list {
-  .rule-item {
-    border: 1px solid var(--el-border-color-light);
-    border-radius: 6px;
-    padding: 16px;
-    margin-bottom: 16px;
-    background: var(--el-fill-color-extra-light);
-    
-    .rule-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 16px;
-      
-      .rule-index {
-        font-weight: 500;
-        color: var(--el-text-color-primary);
-      }
-    }
-  }
-}
-
-.empty-rules {
-  text-align: center;
-  padding: 40px 0;
-}
-
 .dialog-footer {
   display: flex;
   justify-content: flex-end;

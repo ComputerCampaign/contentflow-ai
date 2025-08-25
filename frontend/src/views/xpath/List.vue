@@ -15,7 +15,7 @@
 
       <!-- 搜索和筛选 -->
       <div class="filter-section">
-        <el-form :model="searchForm" inline>
+        <el-form :model="searchForm" inline class="search-form">
           <el-form-item label="配置名称">
             <el-input
               v-model="searchForm.name"
@@ -25,9 +25,27 @@
             />
           </el-form-item>
           <el-form-item label="状态">
-            <el-select v-model="searchForm.status" placeholder="选择状态" clearable>
+            <el-select 
+              v-model="searchForm.status" 
+              placeholder="选择状态" 
+              clearable
+              style="width: 120px"
+            >
               <el-option label="启用" value="active" />
               <el-option label="禁用" value="inactive" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="规则类型">
+            <el-select 
+              v-model="searchForm.rule_type" 
+              placeholder="选择规则类型" 
+              clearable
+              style="width: 140px"
+            >
+              <el-option label="文本" value="text" />
+              <el-option label="图片" value="image" />
+              <el-option label="链接" value="link" />
+              <el-option label="数据" value="data" />
             </el-select>
           </el-form-item>
           <el-form-item>
@@ -47,23 +65,46 @@
         <el-table-column type="selection" width="55" />
         <el-table-column prop="name" label="配置名称" min-width="150">
           <template #default="{ row }">
-            <el-link type="primary" @click="handleView(row)">
-              {{ row.name }}
-            </el-link>
+            <div>
+              <el-link type="primary" @click="handleView(row)">
+                {{ row.name }}
+              </el-link>
+              <div class="rule-id">{{ row.rule_id }}</div>
+            </div>
           </template>
         </el-table-column>
         <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
         <el-table-column prop="field_name" label="字段名称" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="domain_patterns" label="域名模式" min-width="150">
+          <template #default="{ row }">
+            <el-tag
+              v-for="domain in row.domain_patterns.slice(0, 2)"
+              :key="domain"
+              size="small"
+              class="domain-tag"
+            >
+              {{ domain }}
+            </el-tag>
+            <span v-if="row.domain_patterns.length > 2" class="more-domains">
+              +{{ row.domain_patterns.length - 2 }}
+            </span>
+          </template>
+        </el-table-column>
         <el-table-column prop="xpath" label="XPath表达式" min-width="250" show-overflow-tooltip>
           <template #default="{ row }">
             <code class="xpath-code">{{ row.xpath }}</code>
           </template>
         </el-table-column>
-        <el-table-column prop="extractType" label="提取类型" width="100">
+        <el-table-column prop="rule_type" label="规则类型" width="100">
           <template #default="{ row }">
-            <el-tag :type="getExtractTypeTag(row.extractType)">
-              {{ getExtractTypeText(row.extractType) }}
+            <el-tag :type="getRuleTypeTag(row.rule_type)">
+              {{ getRuleTypeText(row.rule_type) }}
             </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="usage_count" label="使用次数" width="100" align="center">
+          <template #default="{ row }">
+            <el-badge :value="row.usage_count" :max="999" class="usage-badge" />
           </template>
         </el-table-column>
         <el-table-column prop="status" label="状态" width="80">
@@ -78,11 +119,24 @@
             {{ formatDate(row.createdAt) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="80" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" @click="handleTest(row)">测试</el-button>
-            <el-button size="small" type="primary" @click="handleEdit(row)">编辑</el-button>
-            <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-dropdown trigger="click">
+              <el-button size="small" :icon="More" />
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item @click="handleEdit(row)">
+                    编辑
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="handleToggleStatus(row)">
+                    {{ row.status === 'active' ? '禁用' : '启用' }}
+                  </el-dropdown-item>
+                  <el-dropdown-item divided @click="handleDelete(row)">
+                    删除
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </template>
         </el-table-column>
       </el-table>
@@ -101,49 +155,7 @@
       </div>
     </el-card>
 
-    <!-- 测试对话框 -->
-    <el-dialog
-      v-model="testDialogVisible"
-      title="XPath测试"
-      width="800px"
-      :close-on-click-modal="false"
-    >
-      <div class="test-form">
-        <el-form :model="testForm" label-width="100px">
-          <el-form-item label="测试URL">
-            <el-input v-model="testForm.url" placeholder="请输入要测试的URL" />
-          </el-form-item>
-          <el-form-item label="XPath">
-            <el-input
-              v-model="testForm.xpath"
-              type="textarea"
-              :rows="3"
-              readonly
-            />
-          </el-form-item>
-        </el-form>
-        
-        <div class="test-actions">
-          <el-button type="primary" @click="runTest" :loading="testLoading">
-            开始测试
-          </el-button>
-        </div>
-        
-        <div v-if="testResult" class="test-result">
-          <h4>测试结果：</h4>
-          <el-input
-            v-model="testResult"
-            type="textarea"
-            :rows="6"
-            readonly
-          />
-        </div>
-      </div>
-      
-      <template #footer>
-        <el-button @click="testDialogVisible = false">关闭</el-button>
-      </template>
-    </el-dialog>
+
   </div>
 </template>
 
@@ -151,7 +163,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import { Plus, More } from '@element-plus/icons-vue'
 import { useXPathStore } from '@/stores/xpath'
 import type { XPathConfig } from '@/stores/xpath'
 import { formatDate } from '@/utils/date'
@@ -165,7 +177,8 @@ const selectedRows = ref<XPathConfig[]>([])
 
 const searchForm = reactive({
   name: '',
-  status: ''
+  status: '',
+  rule_type: ''
 })
 
 const pagination = reactive({
@@ -174,33 +187,26 @@ const pagination = reactive({
   total: 0
 })
 
-// 测试对话框
-const testDialogVisible = ref(false)
-const testLoading = ref(false)
-const testResult = ref('')
-const testForm = reactive({
-  url: '',
-  xpath: ''
-})
 
-// 获取提取类型标签颜色
-const getExtractTypeTag = (type: string) => {
+
+// 获取规则类型标签颜色
+const getRuleTypeTag = (type: string) => {
   const tagMap: Record<string, string> = {
     text: 'primary',
-    html: 'success',
-    attr: 'warning',
-    href: 'info'
+    image: 'info',
+    link: 'success',
+    data: 'warning'
   }
   return tagMap[type] || 'default'
 }
 
-// 获取提取类型文本
-const getExtractTypeText = (type: string) => {
+// 获取规则类型文本
+const getRuleTypeText = (type: string) => {
   const textMap: Record<string, string> = {
     text: '文本',
-    html: 'HTML',
-    attr: '属性',
-    href: '链接'
+    image: '图片',
+    link: '链接',
+    data: '数据'
   }
   return textMap[type] || type
 }
@@ -212,8 +218,12 @@ const fetchData = async () => {
     const params = {
       page: pagination.page,
       pageSize: pagination.pageSize,
-      ...searchForm
+      name: searchForm.name,
+      status: searchForm.status,
+      rule_type: searchForm.rule_type
     }
+    
+    console.log('Sending params:', params) // 调试日志
     
     const success = await xpathStore.fetchXPathConfigs(params)
     if (success) {
@@ -238,7 +248,8 @@ const handleSearch = () => {
 const handleReset = () => {
   Object.assign(searchForm, {
     name: '',
-    status: ''
+    status: '',
+    rule_type: ''
   })
   pagination.page = 1
   fetchData()
@@ -273,44 +284,23 @@ const handleView = (row: any) => {
 
 // 编辑
 const handleEdit = (row: any) => {
-  router.push(`/xpath/${row.id}/edit`)
+  router.push(`/xpath/edit/${row.id}`)
 }
 
-// 测试
-const handleTest = (row: any) => {
-  testForm.xpath = row.xpath
-  testForm.url = ''
-  testResult.value = ''
-  testDialogVisible.value = true
-}
 
-// 运行测试
-const runTest = async () => {
-  if (!testForm.url) {
-    ElMessage.warning('请输入测试URL')
-    return
-  }
-  
+
+// 切换状态
+const handleToggleStatus = async (row: any) => {
   try {
-    testLoading.value = true
-    const result = await xpathStore.testXPath({
-      url: testForm.url,
-      xpath: testForm.xpath
-    })
-    
-    if (result.success) {
-      testResult.value = result.data || '无匹配结果'
-      ElMessage.success('测试完成')
-    } else {
-      testResult.value = `测试失败: ${result.message}`
-      ElMessage.error('测试失败')
+    const newStatus = row.status === 'active' ? 'inactive' : 'active'
+    const success = await xpathStore.toggleXPathConfigStatus(row.id, newStatus)
+    if (success) {
+      ElMessage.success(`${newStatus === 'active' ? '启用' : '禁用'}成功`)
+      fetchData()
     }
   } catch (error) {
-    console.error('Test error:', error)
-    testResult.value = '测试过程中发生错误'
-    ElMessage.error('测试失败')
-  } finally {
-    testLoading.value = false
+    console.error('Toggle status error:', error)
+    ElMessage.error(`${row.status === 'active' ? '禁用' : '启用'}失败`)
   }
 }
 
@@ -373,8 +363,23 @@ onMounted(() => {
 .filter-section {
   margin-bottom: 20px;
   padding: 20px;
-  background-color: #f8f9fa;
-  border-radius: 4px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.search-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.search-form .el-form-item {
+  margin-bottom: 0;
+}
+
+.search-form .el-select {
+  min-width: 120px;
 }
 
 .xpath-code {
@@ -383,6 +388,27 @@ onMounted(() => {
   background-color: #f5f5f5;
   padding: 2px 4px;
   border-radius: 2px;
+}
+
+.rule-id {
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}
+
+.domain-tag {
+  margin-right: 4px;
+  margin-bottom: 2px;
+}
+
+.more-domains {
+  font-size: 12px;
+  color: #666;
+  margin-left: 4px;
+}
+
+.usage-badge :deep(.el-badge__content) {
+  background-color: #409eff;
 }
 
 .pagination-wrapper {

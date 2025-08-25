@@ -5,7 +5,6 @@
         <div class="card-header">
           <h2>编辑爬虫配置</h2>
           <div class="header-actions">
-            <el-button @click="handleTest" :loading="testing">测试配置</el-button>
             <el-button type="primary" @click="handleSave" :loading="saving">保存配置</el-button>
           </div>
         </div>
@@ -33,6 +32,27 @@
             <el-col :span="12">
               <el-form-item label="目标网站" prop="baseUrl">
                 <el-input v-model="form.baseUrl" placeholder="请输入目标网站URL" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item label="配置类型" prop="type">
+                <el-select v-model="form.type" placeholder="请选择配置类型">
+                  <el-option label="网页爬虫" value="web" />
+                  <el-option label="API接口" value="api" />
+                  <el-option label="RSS订阅" value="rss" />
+                  <el-option label="站点地图" value="sitemap" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="状态" prop="status">
+                <el-radio-group v-model="form.status">
+                  <el-radio value="active">启用</el-radio>
+                  <el-radio value="inactive">禁用</el-radio>
+                </el-radio-group>
               </el-form-item>
             </el-col>
           </el-row>
@@ -259,11 +279,12 @@ const crawlerStore = useCrawlerStore()
 
 const formRef = ref<FormInstance>()
 const saving = ref(false)
-const testing = ref(false)
 
 const form = reactive({
   name: '',
   description: '',
+  type: 'web',
+  status: 'active',
   baseUrl: '',
   method: 'GET',
   headers: [] as { key: string; value: string }[],
@@ -284,7 +305,14 @@ const rules = {
   ],
   baseUrl: [
     { required: true, message: '请输入目标网站URL', trigger: 'blur' },
-    { type: 'url', message: '请输入有效的URL', trigger: 'blur' }
+    { 
+      pattern: /^https?:\/\/.+/,
+      message: '请输入有效的URL地址',
+      trigger: 'blur'
+    }
+  ],
+  type: [
+    { required: true, message: '请选择配置类型', trigger: 'change' }
   ],
   method: [
     { required: true, message: '请选择请求方法', trigger: 'change' }
@@ -324,26 +352,7 @@ const removeRule = (index: number) => {
   form.extractionRules.splice(index, 1)
 }
 
-// 测试配置
-const handleTest = async () => {
-  if (!formRef.value) return
-  
-  try {
-    const valid = await formRef.value.validate()
-    if (!valid) return
-    
-    testing.value = true
-    const success = await crawlerStore.testCrawlerConfig(form.baseUrl)
-    
-    if (success) {
-      ElMessage.success('配置测试通过')
-    }
-  } catch (error) {
-    console.error('Test config error:', error)
-  } finally {
-    testing.value = false
-  }
-}
+
 
 // 保存配置
 const handleSave = async () => {
@@ -358,6 +367,7 @@ const handleSave = async () => {
     const updateParams = {
       name: form.name,
       description: form.description,
+      type: form.type as 'web' | 'api' | 'rss' | 'sitemap',
       targetUrl: form.baseUrl,
       extractionRules: form.extractionRules.map(rule => ({
         name: rule.name,
@@ -366,13 +376,7 @@ const handleSave = async () => {
         field: rule.field,
         required: rule.required,
         defaultValue: rule.defaultValue
-      })),
-      headers: form.headers.reduce((acc, header) => {
-        if (header.key && header.value) {
-          acc[header.key] = header.value
-        }
-        return acc
-      }, {} as Record<string, string>)
+      }))
     }
     const success = await crawlerStore.updateCrawlerConfig(configId, updateParams)
     
@@ -401,6 +405,8 @@ const loadConfig = async () => {
     Object.assign(form, {
       name: config.name,
       description: config.description || '',
+      type: config.type || 'web',
+      status: config.status || 'active',
       baseUrl: config.targetUrl,
       method: 'GET',
       headers: Object.entries(config.headers || {}).map(([key, value]) => ({ key, value })),

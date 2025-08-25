@@ -172,7 +172,7 @@ def get_crawler_configs():
         
         # 获取查询参数
         page = request.args.get('page', 1, type=int)
-        per_page_str = request.args.get('per_page') or request.args.get('pageSize', '10')
+        per_page_str = request.args.get('pageSize', '10')
         per_page = min(int(per_page_str), 100)
         search = request.args.get('search', '').strip()
         use_selenium = request.args.get('use_selenium')

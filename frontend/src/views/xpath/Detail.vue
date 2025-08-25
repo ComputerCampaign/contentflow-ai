@@ -32,7 +32,7 @@
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="使用次数">
-            {{ config.usageCount || 0 }}
+            {{ config.usage_count || 0 }}
           </el-descriptions-item>
           <el-descriptions-item label="创建时间">
             {{ formatDate(config.createdAt) }}
@@ -218,7 +218,7 @@ const goBack = () => {
 // 编辑
 const handleEdit = () => {
   if (config.value) {
-    router.push(`/xpath/${config.value.id}/edit`)
+    router.push(`/xpath/edit/${config.value.id}`)
   }
 }
 

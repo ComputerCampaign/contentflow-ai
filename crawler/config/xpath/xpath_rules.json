@@ -1,44 +1,8 @@
 {
     "rules": [
         {
-            "id": "reddit_post_title",
-            "name": "Reddit帖子标题",
-            "description": "提取Reddit帖子的标题",
-            "domain_patterns": [
-                "reddit.com",
-                "www.reddit.com"
-            ],
-            "xpath": "//h1[@slot='title']/text()",
-            "rule_type": "text",
-            "field_name": "title"
-        },
-        {
-            "id": "reddit_media",
-            "name": "Reddit媒体图片",
-            "description": "Reddit网站媒体图片区域",
-            "domain_patterns": [
-                "reddit.com",
-                "www.reddit.com"
-            ],
-            "xpath": "//img[contains(@class, 'media-lightbox-img')]",
-            "rule_type": "image",
-            "field_name": "reddit_media_images"
-        },
-        {
-            "id": "reddit_post_description",
-            "name": "Reddit帖子描述提取",
-            "description": "提取Reddit帖子的描述信息",
-            "domain_patterns": [
-                "reddit.com",
-                "www.reddit.com"
-            ],
-            "xpath": "//div[@property='schema:articleBody']//p[1]/text()",
-            "rule_type": "text",
-            "field_name": "description"
-        },
-        {
             "id": "reddit_comments",
-            "name": "Reddit评论",
+            "name": "Reddit评论规则",
             "description": "Reddit网站评论区域 - 基于最新HTML结构优化",
             "domain_patterns": [
                 "reddit.com",
@@ -56,6 +20,42 @@
                 "timestamp": ".//time/@datetime",
                 "comment_id": "@thingid"
             }
+        },
+        {
+            "id": "reddit_post_description",
+            "name": "Reddit帖子描述提取",
+            "description": "提取Reddit帖子的描述信息",
+            "domain_patterns": [
+                "reddit.com",
+                "www.reddit.com"
+            ],
+            "xpath": "//div[@property='schema:articleBody']//p[1]/text()",
+            "rule_type": "text",
+            "field_name": "description"
+        },
+        {
+            "id": "reddit_media",
+            "name": "Reddit媒体图片",
+            "description": "Reddit网站媒体图片区域",
+            "domain_patterns": [
+                "reddit.com",
+                "www.reddit.com"
+            ],
+            "xpath": "//img[contains(@class, 'media-lightbox-img')]",
+            "rule_type": "image",
+            "field_name": "reddit_media_images"
+        },
+        {
+            "id": "reddit_post_title",
+            "name": "Reddit帖子标题",
+            "description": "提取Reddit帖子的标题",
+            "domain_patterns": [
+                "reddit.com",
+                "www.reddit.com"
+            ],
+            "xpath": "//h1[@slot='title']/text()",
+            "rule_type": "text",
+            "field_name": "title"
         }
     ]
 }

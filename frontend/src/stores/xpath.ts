@@ -5,22 +5,42 @@ import { ElMessage } from 'element-plus'
 
 export interface XPathConfig {
   id: string
+  rule_id: string
+  config_id: string
   name: string
   field_name: string
   description?: string
   xpath: string
-  extractType: 'text' | 'html' | 'attr' | 'href'
+  extractType: 'text' | 'html' | 'attr' | 'href' | 'image'
+  rule_type: 'text' | 'image' | 'attr' | 'href'
   attrName?: string
   status: 'active' | 'inactive'
-  processing: string[]
+  enabled: boolean
+  processing?: string[]
+  domain_patterns: string[]
+  comment_xpath?: {
+    author?: string
+    comment_id?: string
+    depth?: string
+    permalink?: string
+    score?: string
+    text?: string
+    timestamp?: string
+  } | null
+  is_public: boolean
+  user_id: string
+  usage_count: number
+  last_used_at: string | null
   createdAt: string
   updatedAt: string
-  usageCount?: number
+  created_at: string
+  updated_at: string
 }
 
 export interface XPathTestConfig {
   url: string
   xpath: string
+  rule_type?: 'text' | 'image' | 'attr' | 'href'
   extractType?: 'text' | 'html' | 'attr' | 'href'
   attrName?: string
   processing?: string[]
@@ -92,20 +112,36 @@ export const useXPathStore = defineStore('xpath', () => {
   const fetchXPathConfigs = async (params?: any) => {
     try {
       loading.value = true
-      const response = await apiClient.get('/api/xpath/configs', {
-        page: currentPage.value,
-        pageSize: pageSize.value,
-        search: searchKeyword.value,
-        status: statusFilter.value,
-        extractType: extractTypeFilter.value,
-        sortField: sortField.value,
-        sortOrder: sortOrder.value,
-        ...params
-      })
+      
+      // 构建请求参数，映射前端参数到后端期望的参数名
+      const requestParams: any = {
+        page: params?.page || currentPage.value,
+        pageSize: params?.pageSize || pageSize.value
+      }
+      
+      // 处理搜索参数
+      if (params?.name || searchKeyword.value) {
+        requestParams.search = params?.name || searchKeyword.value
+      }
+      
+      // 处理状态过滤
+      if (params?.status || statusFilter.value) {
+        requestParams.status = params?.status || statusFilter.value
+      }
+      
+      // 处理规则类型过滤 - 前端的 rule_type 对应后端的 rule_type
+      if (params?.rule_type || extractTypeFilter.value) {
+        requestParams.rule_type = params?.rule_type || extractTypeFilter.value
+      }
+      
+      console.log('Store received params:', params) // 调试日志
+      console.log('Final request params:', requestParams) // 调试日志
+      
+      const response = await apiClient.get('/xpath/configs', { params: requestParams })
       
       if (response.success) {
-        xpathConfigs.value = response.data.configs || []
-        total.value = response.data.total || 0
+        xpathConfigs.value = response.data.rules || []
+        total.value = response.data.pagination?.total || 0
         return true
       } else {
         ElMessage.error(response.message || '获取XPath配置失败')
@@ -122,7 +158,7 @@ export const useXPathStore = defineStore('xpath', () => {
   
   const getXPathConfig = async (id: string) => {
     try {
-      const response = await apiClient.get(`/api/xpath/configs/${id}`)
+      const response = await apiClient.get(`/xpath/configs/${id}`)
       
       if (response.success) {
         currentConfig.value = response.data
@@ -140,7 +176,7 @@ export const useXPathStore = defineStore('xpath', () => {
   
   const createXPathConfig = async (configData: Partial<XPathConfig>) => {
     try {
-      const response = await apiClient.post('/api/xpath/configs', configData)
+      const response = await apiClient.post('/xpath/configs', configData)
       
       if (response.success) {
         await fetchXPathConfigs()
@@ -158,7 +194,7 @@ export const useXPathStore = defineStore('xpath', () => {
   
   const updateXPathConfig = async (id: string, configData: Partial<XPathConfig>) => {
     try {
-      const response = await apiClient.put(`/api/xpath/configs/${id}`, configData)
+      const response = await apiClient.put(`/xpath/configs/${id}`, configData)
       
       if (response.success) {
         await fetchXPathConfigs()
@@ -176,7 +212,7 @@ export const useXPathStore = defineStore('xpath', () => {
   
   const deleteXPathConfig = async (id: string) => {
     try {
-      const response = await apiClient.delete(`/api/xpath/configs/${id}`)
+      const response = await apiClient.delete(`/xpath/configs/${id}`)
       
       if (response.success) {
         await fetchXPathConfigs()
@@ -195,7 +231,7 @@ export const useXPathStore = defineStore('xpath', () => {
   
   const batchDeleteXPathConfigs = async (ids: string[]) => {
     try {
-      const response = await apiClient.post('/api/xpath/configs/batch-delete', { ids })
+      const response = await apiClient.post('/xpath/configs/batch-delete', { ids })
       
       if (response.success) {
         await fetchXPathConfigs()
@@ -214,7 +250,7 @@ export const useXPathStore = defineStore('xpath', () => {
   
   const testXPath = async (testConfig: XPathTestConfig): Promise<XPathTestResult> => {
     try {
-      const response = await apiClient.post('/api/xpath/test', testConfig)
+      const response = await apiClient.post('/xpath/test', testConfig)
       
       if (response.success) {
         return {
@@ -239,7 +275,7 @@ export const useXPathStore = defineStore('xpath', () => {
   
   const duplicateXPathConfig = async (id: string) => {
     try {
-      const response = await apiClient.post(`/api/xpath/configs/${id}/duplicate`)
+      const response = await apiClient.post(`/xpath/configs/${id}/duplicate`)
       
       if (response.success) {
         await fetchXPathConfigs()
@@ -258,7 +294,7 @@ export const useXPathStore = defineStore('xpath', () => {
   
   const toggleXPathConfigStatus = async (id: string, status: 'active' | 'inactive') => {
     try {
-      const response = await apiClient.put(`/api/xpath/configs/${id}/status`, { status })
+      const response = await apiClient.put(`/xpath/configs/${id}/status`, { status })
       
       if (response.success) {
         await fetchXPathConfigs()

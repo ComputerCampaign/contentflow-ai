@@ -54,6 +54,27 @@
               show-word-limit
             />
           </el-form-item>
+          
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item label="配置类型" prop="type">
+                <el-select v-model="formData.type" placeholder="请选择类型">
+                  <el-option label="网页爬虫" value="web" />
+                  <el-option label="API接口" value="api" />
+                  <el-option label="RSS订阅" value="rss" />
+                  <el-option label="站点地图" value="sitemap" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="状态" prop="status">
+                <el-radio-group v-model="formData.status">
+                  <el-radio label="active">启用</el-radio>
+                  <el-radio label="inactive">禁用</el-radio>
+                </el-radio-group>
+              </el-form-item>
+            </el-col>
+          </el-row>
         </el-card>
 
         <el-card class="form-section">
@@ -308,6 +329,8 @@ const formData = reactive({
   name: '',
   url: '',
   description: '',
+  type: 'web',
+  status: 'active',
   method: 'GET',
   timeout: 30,
   retryCount: 3,
@@ -332,7 +355,14 @@ const formRules: FormRules = {
   ],
   url: [
     { required: true, message: '请输入目标网站URL', trigger: 'blur' },
-    { type: 'url', message: '请输入有效的URL地址', trigger: 'blur' }
+    { 
+      pattern: /^https?:\/\/.+/,
+      message: '请输入有效的URL地址',
+      trigger: 'blur'
+    }
+  ],
+  type: [
+    { required: true, message: '请选择配置类型', trigger: 'change' }
   ],
   method: [
     { required: true, message: '请选择请求方法', trigger: 'change' }
@@ -398,19 +428,16 @@ const handleSubmit = async () => {
     const createParams = {
       name: formData.name,
       description: formData.description,
-      output: 'output',
-      data_dir: 'crawler_data',
-      use_selenium: formData.dataFormat === 'html',
-      timeout: formData.timeout,
-      retry: formData.retryCount,
-      config: 'config.json',
-      email_notification: false,
-      headless: true,
-      proxy: formData.enableProxy ? formData.proxyConfig : null,
-      page_load_wait: Math.floor(formData.delay / 1000),
-      user_agent: formData.userAgent === 'custom' ? formData.customUserAgent : getUserAgentString(formData.userAgent),
-      rule_ids: formData.xpathRules.map(rule => rule.name).join(','),
-      enable_xpath: formData.xpathRules.length > 0
+      type: formData.type as 'web' | 'api' | 'rss' | 'sitemap',
+      targetUrl: formData.url,
+      extractionRules: formData.xpathRules.map((rule: any) => ({
+        name: rule.name,
+        method: 'xpath' as 'xpath' | 'css' | 'regex' | 'json',
+        selector: rule.xpath || '',
+        field: 'text',
+        required: false,
+        defaultValue: ''
+      }))
     }
     
     // 创建爬虫配置

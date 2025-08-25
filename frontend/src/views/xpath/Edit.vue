@@ -28,27 +28,45 @@
           
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-form-item label="配置名称" prop="name">
-                <el-input v-model="form.name" placeholder="请输入配置名称" />
+              <el-form-item label="规则ID" prop="rule_id">
+                <el-input v-model="form.rule_id" placeholder="请输入规则ID" />
               </el-form-item>
             </el-col>
             <el-col :span="12">
-              <el-form-item label="字段名称" prop="field_name">
-                <el-input v-model="form.field_name" placeholder="请输入字段名称" />
+              <el-form-item label="配置名称" prop="name">
+                <el-input v-model="form.name" placeholder="请输入配置名称" />
               </el-form-item>
             </el-col>
           </el-row>
           
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-form-item label="状态" prop="status">
-                <el-radio-group v-model="form.status">
-                  <el-radio label="active">启用</el-radio>
-                  <el-radio label="inactive">禁用</el-radio>
-                </el-radio-group>
+              <el-form-item label="字段名称" prop="field_name">
+                <el-input v-model="form.field_name" placeholder="请输入字段名称" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="规则类型" prop="rule_type">
+                <el-select v-model="form.rule_type" placeholder="选择规则类型">
+                  <el-option label="文本" value="text" />
+                  <el-option label="图片" value="image" />
+                  <el-option label="属性" value="attr" />
+                  <el-option label="链接" value="href" />
+                </el-select>
               </el-form-item>
             </el-col>
           </el-row>
+          
+          <el-form-item label="域名模式" prop="domain_patterns">
+            <el-input
+              v-model="domainPatternsText"
+              type="textarea"
+              :rows="3"
+              placeholder="请输入域名模式，每行一个，例如：\nexample.com\nwww.example.com"
+              @blur="updateDomainPatterns"
+            />
+            <div class="form-tip">每行输入一个域名模式，支持通配符</div>
+          </el-form-item>
           
           <el-form-item label="描述">
             <el-input
@@ -74,36 +92,117 @@
               placeholder="请输入XPath表达式，例如：//div[@class='content']//text()"
             />
           </el-form-item>
+        </el-card>
+        
+        <!-- 扩展 XPath 配置 -->
+        <el-card class="form-section" shadow="never">
+          <template #header>
+            <div class="section-header">
+              <h3>扩展 XPath 配置</h3>
+              <el-switch
+                v-model="enableCommentXpath"
+                active-text="启用"
+                inactive-text="禁用"
+              />
+            </div>
+          </template>
+          
+          <div v-if="enableCommentXpath">
+            <el-row :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="文本XPath">
+                  <el-input
+                    v-model="commentXpathFields.text"
+                    type="textarea"
+                    :rows="3"
+                    placeholder="请输入评论文本的XPath表达式"
+                  />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="作者XPath">
+                  <el-input
+                    v-model="commentXpathFields.author"
+                    placeholder="请输入作者的XPath表达式"
+                  />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            
+            <el-row :gutter="20">
+              <el-col :span="8">
+                <el-form-item label="评分XPath">
+                  <el-input
+                    v-model="commentXpathFields.score"
+                    placeholder="请输入评分的XPath表达式"
+                  />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="时间戳XPath">
+                  <el-input
+                    v-model="commentXpathFields.timestamp"
+                    placeholder="请输入时间戳的XPath表达式"
+                  />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="评论ID XPath">
+                  <el-input
+                    v-model="commentXpathFields.comment_id"
+                    placeholder="请输入评论ID的XPath表达式"
+                  />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            
+            <el-row :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="深度XPath">
+                  <el-input
+                    v-model="commentXpathFields.depth"
+                    placeholder="请输入深度的XPath表达式"
+                  />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="链接XPath">
+                  <el-input
+                    v-model="commentXpathFields.permalink"
+                    placeholder="请输入链接的XPath表达式"
+                  />
+                </el-form-item>
+              </el-col>
+            </el-row>
+          </div>
+        </el-card>
+        
+        <!-- 状态设置 -->
+        <el-card class="form-section" shadow="never">
+          <template #header>
+            <h3>状态设置</h3>
+          </template>
           
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-form-item label="提取类型" prop="extractType">
-                <el-select v-model="form.extractType" placeholder="选择提取类型">
-                  <el-option label="文本内容" value="text" />
-                  <el-option label="HTML内容" value="html" />
-                  <el-option label="属性值" value="attr" />
-                  <el-option label="链接地址" value="href" />
-                </el-select>
+              <el-form-item label="启用状态">
+                <el-switch
+                  v-model="form.enabled"
+                  active-text="启用"
+                  inactive-text="禁用"
+                />
               </el-form-item>
             </el-col>
             <el-col :span="12">
-              <el-form-item
-                v-if="form.extractType === 'attr'"
-                label="属性名称"
-                prop="attrName"
-              >
-                <el-input v-model="form.attrName" placeholder="请输入属性名称" />
+              <el-form-item label="公开配置">
+                <el-switch
+                  v-model="form.is_public"
+                  active-text="公开"
+                  inactive-text="私有"
+                />
               </el-form-item>
             </el-col>
           </el-row>
-          
-          <el-form-item label="数据处理">
-            <el-checkbox-group v-model="form.processing">
-              <el-checkbox label="trim">去除首尾空格</el-checkbox>
-              <el-checkbox label="removeEmpty">移除空值</el-checkbox>
-              <el-checkbox label="unique">去重</el-checkbox>
-            </el-checkbox-group>
-          </el-form-item>
         </el-card>
 
         <!-- 测试配置 -->
@@ -157,22 +256,28 @@
           </template>
           
           <el-row :gutter="20">
-            <el-col :span="8">
+            <el-col :span="6">
               <div class="stat-item">
                 <div class="stat-label">创建时间</div>
-                <div class="stat-value">{{ formatDate(form.createdAt) }}</div>
+                <div class="stat-value">{{ formatDate(form.created_at) }}</div>
               </div>
             </el-col>
-            <el-col :span="8">
+            <el-col :span="6">
               <div class="stat-item">
                 <div class="stat-label">最后修改</div>
-                <div class="stat-value">{{ formatDate(form.updatedAt) }}</div>
+                <div class="stat-value">{{ formatDate(form.updated_at) }}</div>
               </div>
             </el-col>
-            <el-col :span="8">
+            <el-col :span="6">
               <div class="stat-item">
                 <div class="stat-label">使用次数</div>
-                <div class="stat-value">{{ form.usageCount || 0 }}</div>
+                <div class="stat-value">{{ form.usage_count || 0 }}</div>
+              </div>
+            </el-col>
+            <el-col :span="6">
+              <div class="stat-item">
+                <div class="stat-label">最后使用</div>
+                <div class="stat-value">{{ formatDate(form.last_used_at) || '未使用' }}</div>
               </div>
             </el-col>
           </el-row>
@@ -198,23 +303,55 @@ const saving = ref(false)
 const testing = ref(false)
 const testUrl = ref('')
 const testResult = ref<any>(null)
+const enableCommentXpath = ref(false)
+const domainPatternsText = ref('')
+
+// 扩展 XPath 配置字段
+const commentXpathFields = reactive({
+  text: '',
+  author: '',
+  score: '',
+  timestamp: '',
+  comment_id: '',
+  depth: '',
+  permalink: ''
+})
 
 const form = reactive({
   id: '',
+  rule_id: '',
   name: '',
   field_name: '',
   description: '',
   xpath: '',
-  extractType: 'text',
-  attrName: '',
+  rule_type: 'text' as 'text' | 'image' | 'attr' | 'href',
+  domain_patterns: [] as string[],
+  enabled: true,
+  is_public: false,
   status: 'active',
-  processing: ['trim'],
-  createdAt: '',
-  updatedAt: '',
-  usageCount: 0
+  created_at: '',
+  updated_at: '',
+  usage_count: 0,
+  last_used_at: ''
 })
 
+// 域名模式处理
+const updateDomainPatterns = () => {
+  if (domainPatternsText.value.trim()) {
+    form.domain_patterns = domainPatternsText.value
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+  } else {
+    form.domain_patterns = []
+  }
+}
+
 const rules = {
+  rule_id: [
+    { required: true, message: '请输入规则ID', trigger: 'blur' },
+    { min: 2, max: 50, message: '规则ID长度在 2 到 50 个字符', trigger: 'blur' }
+  ],
   name: [
     { required: true, message: '请输入配置名称', trigger: 'blur' },
     { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
@@ -223,14 +360,14 @@ const rules = {
     { required: true, message: '请输入字段名称', trigger: 'blur' },
     { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
   ],
+  rule_type: [
+    { required: true, message: '请选择规则类型', trigger: 'change' }
+  ],
   xpath: [
     { required: true, message: '请输入XPath表达式', trigger: 'blur' }
   ],
-  extractType: [
-    { required: true, message: '请选择提取类型', trigger: 'change' }
-  ],
-  attrName: [
-    { required: true, message: '请输入属性名称', trigger: 'blur' }
+  domain_patterns: [
+    { required: true, message: '请输入域名模式', trigger: 'blur' }
   ]
 }
 
@@ -248,6 +385,17 @@ const loadConfig = async () => {
     const config = await xpathStore.getXPathConfig(id)
     if (config) {
       Object.assign(form, config)
+      
+      // 处理域名模式
+      if (config.domain_patterns && Array.isArray(config.domain_patterns)) {
+        domainPatternsText.value = config.domain_patterns.join('\n')
+      }
+      
+      // 处理扩展XPath配置
+      if (config.comment_xpath) {
+        enableCommentXpath.value = true
+        Object.assign(commentXpathFields, config.comment_xpath)
+      }
     } else {
       ElMessage.error('配置不存在')
       router.push('/xpath/list')
@@ -279,9 +427,7 @@ const handleTest = async () => {
     const testConfig = {
       url: testUrl.value,
       xpath: form.xpath,
-      extractType: form.extractType as 'text' | 'html' | 'attr' | 'href',
-      attrName: form.attrName,
-      processing: form.processing
+      rule_type: form.rule_type as 'text' | 'image' | 'attr' | 'href'
     }
     
     const result = await xpathStore.testXPath(testConfig)
@@ -310,11 +456,31 @@ const handleSave = async () => {
     
     saving.value = true
     
-    const success = await xpathStore.updateXPathConfig(form.id, {
+    // 更新域名模式
+    updateDomainPatterns()
+    
+    const updateData = {
       ...form,
-      extractType: form.extractType as 'text' | 'html' | 'attr' | 'href',
-      status: form.status as 'active' | 'inactive'
-    })
+      status: form.enabled ? 'active' : 'inactive',
+      updated_at: new Date().toISOString()
+    } as any
+    
+    // 如果启用了扩展XPath配置
+    if (enableCommentXpath.value) {
+      updateData.comment_xpath = {
+        text: commentXpathFields.text,
+        author: commentXpathFields.author,
+        score: commentXpathFields.score,
+        timestamp: commentXpathFields.timestamp,
+        comment_id: commentXpathFields.comment_id,
+        depth: commentXpathFields.depth,
+        permalink: commentXpathFields.permalink
+      }
+    } else {
+      updateData.comment_xpath = null
+    }
+    
+    const success = await xpathStore.updateXPathConfig(form.id, updateData)
     if (success) {
       ElMessage.success('保存成功')
       router.push('/xpath/list')

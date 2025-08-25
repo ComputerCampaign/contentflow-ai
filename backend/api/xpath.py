@@ -153,7 +153,7 @@ def validate_xpath_config(config_data, partial=False):
 
 @xpath_bp.route('/configs', methods=['POST'])
 @jwt_required()
-@limiter.limit("10 per minute")
+@limiter.limit("100 per minute")
 def create_xpath_rule():
     """创建XPath规则"""
     try:

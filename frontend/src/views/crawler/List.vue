@@ -41,42 +41,32 @@
       
       <!-- 状态列 -->
       <template #status="{ row }">
-        <el-tag :type="getStatusType(row.status)" size="small">
-          {{ getStatusText(row.status) }}
+        <el-tag :type="row.enabled ? 'success' : 'danger'" size="small">
+          {{ row.enabled ? '启用' : '禁用' }}
         </el-tag>
       </template>
       
-      <!-- 类型列 -->
-      <template #type="{ row }">
-        <el-tag type="info" size="small">
-          {{ getTypeText(row.type) }}
-        </el-tag>
-      </template>
-      
-      <!-- URL列 -->
-      <template #url="{ row }">
-        <el-link :href="row.url" target="_blank" type="primary">
-          {{ row.url }}
-        </el-link>
+      <!-- 提取规则列 -->
+      <template #rules="{ row }">
+        <div v-if="!row.rule_ids || (typeof row.rule_ids === 'string' && !row.rule_ids.trim())" class="text-gray-400">
+          -
+        </div>
+        <div v-else class="rules-container">
+          <el-tag
+            v-for="rule in getRulesList(row.rule_ids)"
+            :key="rule"
+            size="small"
+            type="info"
+            class="rule-tag"
+          >
+            {{ rule }}
+          </el-tag>
+        </div>
       </template>
       
       <!-- 操作列 -->
       <template #actions="{ row }">
-        <el-button
-          type="primary"
-          size="small"
-          :icon="VideoPlay"
-          @click="handleTest(row)"
-        >
-          测试
-        </el-button>
-        <el-button
-          size="small"
-          :icon="View"
-          @click="handleView(row)"
-        >
-          查看
-        </el-button>
+
         <el-dropdown trigger="click">
           <el-button size="small" :icon="More" />
           <template #dropdown>
@@ -84,15 +74,7 @@
               <el-dropdown-item :icon="Edit" @click="handleEdit(row)">
                 编辑
               </el-dropdown-item>
-              <el-dropdown-item :icon="CopyDocument" @click="handleDuplicate(row)">
-                复制
-              </el-dropdown-item>
-              <el-dropdown-item :icon="Setting" @click="handleConfigure(row)">
-                配置XPath
-              </el-dropdown-item>
-              <el-dropdown-item :icon="Download" @click="handleExportSingle(row)">
-                导出配置
-              </el-dropdown-item>
+
               <el-dropdown-item :icon="Delete" divided @click="handleDelete(row)">
                 删除
               </el-dropdown-item>
@@ -140,12 +122,9 @@ import {
   Delete,
   Download,
   Upload,
-  VideoPlay,
-  View,
   Edit,
   More,
-  CopyDocument,
-  Setting
+  CopyDocument
 } from '@element-plus/icons-vue'
 import { useCrawlerStore } from '@/stores/crawler'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -174,75 +153,62 @@ const columns: TableColumn[] = [
   {
     prop: 'name',
     label: '配置名称',
-    minWidth: 200,
+    minWidth: 150, /* 调整宽度 */
     showOverflowTooltip: true
   },
   {
-    prop: 'url',
-    label: '目标URL',
-    minWidth: 300,
-    slot: 'url',
-    showOverflowTooltip: true
-  },
-  {
-    prop: 'type',
-    label: '类型',
-    width: 100,
-    slot: 'type'
-  },
-  {
-    prop: 'status',
+    prop: 'enable',
     label: '状态',
     width: 100,
     slot: 'status'
   },
   {
-    prop: 'extractionRules',
+    prop: 'rule_ids',
     label: '提取规则',
-    width: 120,
-    formatter: (row: any) => row.extractionRules?.length || 0
+    width: 250, /* 增加宽度 */
+    slot: 'rules'
   },
   {
-    prop: 'createdAt',
+    prop: 'created_at',
     label: '创建时间',
     width: 180,
-    formatter: (row: any) => new Date(row.createdAt).toLocaleString()
+    formatter: (row: any) => {
+      if (!row.created_at) return '-'
+      return new Date(row.created_at).toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      })
+    }
   },
   {
-    prop: 'updatedAt',
+    prop: 'updated_at',
     label: '更新时间',
     width: 180,
-    formatter: (row: any) => new Date(row.updatedAt).toLocaleString()
+    formatter: (row: any) => {
+      if (!row.updated_at) return '-'
+      return new Date(row.updated_at).toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      })
+    }
   }
 ]
 
-// 状态相关方法
-const getStatusType = (status: string) => {
-  const statusMap: Record<string, string> = {
-    active: 'success',
-    inactive: 'info',
-    error: 'danger'
-  }
-  return statusMap[status] || 'info'
-}
 
-const getStatusText = (status: string) => {
-  const statusMap: Record<string, string> = {
-    active: '启用',
-    inactive: '禁用',
-    error: '错误'
-  }
-  return statusMap[status] || status
-}
 
-const getTypeText = (type: string) => {
-  const typeMap: Record<string, string> = {
-    list: '列表页',
-    detail: '详情页',
-    search: '搜索页',
-    category: '分类页'
-  }
-  return typeMap[type] || type
+// 辅助方法
+const getRulesList = (ruleIds: string | string[]) => {
+  if (!ruleIds) return []
+  if (Array.isArray(ruleIds)) return ruleIds
+  return ruleIds.split(',').map(rule => rule.trim()).filter(rule => rule)
 }
 
 // 事件处理方法
@@ -282,27 +248,7 @@ const handleEdit = (config: any) => {
   formVisible.value = true
 }
 
-const handleView = (config: any) => {
-  currentConfig.value = config
-  detailVisible.value = true
-}
 
-const handleTest = async (config: any) => {
-  try {
-    currentConfig.value = config
-    const result = await crawlerStore.testCrawlerConfig(config.id)
-    testResult.value = result
-    testVisible.value = true
-  } catch (error) {
-    ElMessage.error('测试失败')
-  }
-}
-
-const handleConfigure = (config: any) => {
-  // 跳转到XPath配置页面
-  // TODO: 实现路由跳转
-  ElMessage.info('XPath配置功能开发中')
-}
 
 const handleDelete = async (config: any) => {
   try {
@@ -324,15 +270,7 @@ const handleDelete = async (config: any) => {
   }
 }
 
-const handleDuplicate = async (config: any) => {
-  try {
-    await crawlerStore.duplicateCrawlerConfig(config.id)
-    ElMessage.success('复制成功')
-    handleRefresh()
-  } catch (error) {
-    ElMessage.error('复制失败')
-  }
-}
+
 
 const handleImport = () => {
   importVisible.value = true
@@ -343,10 +281,7 @@ const handleExport = () => {
   ElMessage.info('导出功能开发中')
 }
 
-const handleExportSingle = (config: any) => {
-  // TODO: 实现单个配置导出
-  ElMessage.info('导出功能开发中')
-}
+
 
 const handleBatchDelete = async (selection: any[]) => {
   try {
@@ -399,5 +334,26 @@ onMounted(() => {
 <style lang="scss" scoped>
 .crawler-list-page {
   padding: 24px;
+}
+
+.rules-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 180px;
+}
+
+.rule-tag {
+  /* 移除固定宽度限制，让标签自适应内容 */
+  /* overflow: hidden; */
+  /* text-overflow: ellipsis; */
+  /* white-space: nowrap; */
+  background-color: #e0f7fa; /* 淡蓝色背景 */
+  color: #00796b; /* 深一点的文字颜色 */
+  border-color: #b2ebf2; /* 边框颜色 */
+}
+
+.text-gray-400 {
+  color: #9ca3af;
 }
 </style>

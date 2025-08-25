@@ -29,10 +29,10 @@ def register_blueprints(app):
     app.register_blueprint(tasks_bp, url_prefix=f'{api_prefix}/tasks')
     
     # 注册爬虫配置API
-    app.register_blueprint(crawler_bp, url_prefix='/crawler-configs')
+    app.register_blueprint(crawler_bp, url_prefix=f'{api_prefix}/crawler-configs')
     
     # 注册XPath配置API
-    app.register_blueprint(xpath_bp, url_prefix='/api/xpath')
+    app.register_blueprint(xpath_bp, url_prefix=f'{api_prefix}/xpath')
     
     # ai_config和ai_content_config已合并到ai_model中，无需单独注册
     
