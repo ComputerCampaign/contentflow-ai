@@ -135,13 +135,13 @@
         >
           <el-option
             v-for="rule in enabledXPathRules"
-            :key="rule.rule_id"
-            :label="`${rule.name} (${rule.rule_id})`"
-            :value="rule.rule_id"
+            :key="rule.id"
+            :label="`${rule.name} (${rule.id})`"
+            :value="rule.id"
           >
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <span>{{ rule.name }}</span>
-              <span style="color: #999; font-size: 12px;">{{ rule.rule_id }}</span>
+              <span style="color: #999; font-size: 12px;">{{ rule.id }}</span>
             </div>
           </el-option>
         </el-select>
@@ -191,6 +191,7 @@
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { useCrawlerStore } from '@/stores/crawler'
+import crawlerApi from '@/api/crawler'
 import request from '@/utils/request'
 
 interface Props {
@@ -290,12 +291,14 @@ const fetchEnabledXPathRules = async () => {
     const response = await request.get('/xpath/configs', {
       params: {
         status: 'active',
+        enabled: 'true',
         per_page: 100
       }
     })
     
     if (response.success) {
-      enabledXPathRules.value = response.data.items || []
+      // 与 Edit.vue 保持一致，使用 response.data.rules
+      enabledXPathRules.value = response.data.rules || []
     } else {
       console.error('获取XPath规则失败:', response.message)
       ElMessage.error(response.message || '获取XPath规则失败')
@@ -357,7 +360,7 @@ const handleSubmit = async () => {
     loading.value = true
     
     if (props.mode === 'create') {
-      // 创建模式：直接调用后端API
+      // 创建模式：调用crawlerApi
       const configData = {
         name: formData.value.name,
         description: formData.value.description,
@@ -384,15 +387,15 @@ const handleSubmit = async () => {
         scripts_stealth_path: formData.value.scripts_stealth_path,
         image_storage_type: formData.value.image_storage_type
       }
-      await request.post('/api/crawler/configs', configData)
+      await crawlerApi.createCrawlerFormConfig(configData)
     } else {
-      // 编辑模式：直接调用后端API
+      // 编辑模式：调用crawlerApi
       const submitData = { ...formData.value }
       // 处理rule_ids：如果是数组，转换为字符串
       if (Array.isArray(submitData.rule_ids)) {
         (submitData as any).rule_ids = submitData.rule_ids.join(',')
       }
-      await request.put(`/api/crawler/configs/${props.config.id}`, submitData)
+      await crawlerApi.updateCrawlerFormConfig(props.config.id, submitData)
     }
     
     ElMessage.success(props.mode === 'create' ? '创建成功' : '更新成功')

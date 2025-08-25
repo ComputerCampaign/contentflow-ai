@@ -359,8 +359,7 @@ const handleSubmit = async () => {
     const valid = await formRef.value.validate()
     if (!valid) return
     
-    const id = parseInt(modelId.value)
-    await aiStore.updateAIModel(id, formData)
+    await aiStore.updateAIModel(modelId.value, formData)
     ElMessage.success('保存成功')
     router.push('/ai')
   } catch (error) {

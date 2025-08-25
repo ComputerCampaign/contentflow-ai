@@ -301,7 +301,8 @@ const handleTest = async () => {
 }
 
 const handleEdit = () => {
-  router.push(`/crawler/edit/${config.value.id}`)
+  // 跳转到列表页面，用户可以在列表页面使用编辑对话框
+  router.push('/crawler/list')
 }
 
 const handleExport = async () => {

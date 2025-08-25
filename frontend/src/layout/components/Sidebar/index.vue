@@ -30,11 +30,14 @@ import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import SidebarItem from './SidebarItem.vue'
 import SidebarLogo from './SidebarLogo.vue'
-// 使用CSS变量替代SCSS变量导入
+// 使用现代化的颜色方案
 const variables = {
-  menuBg: '#304156',
-  menuText: '#bfcbd9',
-  menuActiveText: '#409eff'
+  menuBg: '#ffffff',
+  menuText: '#606266',
+  menuActiveText: '#409eff',
+  menuHover: '#f5f7fa',
+  menuActiveBg: '#ecf5ff',
+  borderColor: '#e4e7ed'
 }
 
 const route = useRoute()
@@ -140,8 +143,8 @@ const hasPermission = (route: any) => {
 
 .sidebar-container {
   transition: width 0.28s;
-  width: 210px !important;
-  background-color: #304156;
+  width: 220px !important;
+  background-color: #ffffff;
   height: 100%;
   position: fixed;
   font-size: 0px;
@@ -150,6 +153,8 @@ const hasPermission = (route: any) => {
   left: 0;
   z-index: 1001;
   overflow: hidden;
+  border-right: 1px solid #e4e7ed;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
 
   // reset element-ui css
   .horizontal-collapse-transition {
@@ -199,36 +204,85 @@ const hasPermission = (route: any) => {
     width: 100% !important;
   }
 
-  // menu hover
-  .submenu-title-noDropdown,
-  .el-submenu__title {
+  // 菜单项样式优化
+  .el-menu-item {
+    margin: 4px 12px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    
     &:hover {
-      background-color: #263445 !important;
+      background-color: #f5f7fa !important;
+      color: #409eff !important;
+    }
+    
+    &.is-active {
+      background-color: #ecf5ff !important;
+      color: #409eff !important;
+      font-weight: 500;
+      
+      &::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 3px;
+        height: 20px;
+        background-color: #409eff;
+        border-radius: 0 2px 2px 0;
+      }
     }
   }
-
-  .is-active > .el-submenu__title {
-    color: #f4f4f5 !important;
+  
+  .el-submenu {
+    margin: 4px 12px;
+    
+    .el-submenu__title {
+      border-radius: 8px;
+      transition: all 0.3s ease;
+      
+      &:hover {
+        background-color: #f5f7fa !important;
+        color: #409eff !important;
+      }
+    }
+    
+    &.is-active > .el-submenu__title {
+      background-color: #ecf5ff !important;
+      color: #409eff !important;
+      font-weight: 500;
+    }
   }
-
-  & .nest-menu .el-submenu > .el-submenu__title,
-  & .el-submenu .el-menu-item {
-    min-height: 50px !important;
-    background-color: #1f2d3d !important;
-
-    &:hover {
-      background-color: #001528 !important;
+  
+  // 子菜单样式
+  .nest-menu {
+    .el-menu-item {
+      margin: 2px 8px 2px 24px;
+      padding-left: 32px !important;
+      min-height: 44px !important;
+      
+      &:hover {
+        background-color: #f0f9ff !important;
+      }
+      
+      &.is-active {
+        background-color: #e1f5fe !important;
+        
+        &::before {
+          left: 8px;
+        }
+      }
     }
   }
 }
 
 .hideSidebar {
   .sidebar-container {
-    width: 54px !important;
+    width: 64px !important;
   }
 
   .main-container {
-    margin-left: 54px;
+    margin-left: 64px;
   }
 
   .submenu-title-noDropdown {
@@ -284,7 +338,7 @@ const hasPermission = (route: any) => {
 }
 
 .el-menu--collapse .el-menu .el-submenu {
-  min-width: 210px !important;
+  min-width: 220px !important;
 }
 
 // mobile responsive
@@ -295,14 +349,14 @@ const hasPermission = (route: any) => {
 
   .sidebar-container {
     transition: transform 0.28s;
-    width: 210px !important;
+    width: 220px !important;
   }
 
   &.hideSidebar {
     .sidebar-container {
       pointer-events: none;
       transition-duration: 0.3s;
-      transform: translate3d(-210px, 0, 0);
+      transform: translate3d(-220px, 0, 0);
     }
   }
 }

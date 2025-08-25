@@ -3,7 +3,7 @@ import { ref, reactive } from 'vue'
 import apiClient from '@/utils/request'
 
 export interface AIModel {
-  id?: number
+  id?: string
   name: string
   model_key: string
   model: string
@@ -131,7 +131,7 @@ export const useAIStore = defineStore('ai', () => {
   }
 
   // 更新AI模型
-  const updateAIModel = async (id: number, modelData: Partial<AIModel>) => {
+  const updateAIModel = async (id: string, modelData: Partial<AIModel>) => {
     try {
       const response = await apiClient.put(`/ai-config/models/${id}`, modelData)
       if (response.data) {
@@ -145,7 +145,7 @@ export const useAIStore = defineStore('ai', () => {
   }
 
   // 删除AI模型
-  const deleteAIModel = async (id: number) => {
+  const deleteAIModel = async (id: string) => {
     try {
       await apiClient.delete(`/ai-config/models/${id}`)
       await fetchAIModels() // 重新获取列表
@@ -201,7 +201,7 @@ export const useAIStore = defineStore('ai', () => {
   }
 
   // 测试AI模型
-  const testAIModel = async (modelId: number, testPrompt: string) => {
+  const testAIModel = async (modelId: string, testPrompt: string) => {
     try {
       const response = await apiClient.post(`/ai-config/models/${modelId}/test`, {
         prompt: testPrompt

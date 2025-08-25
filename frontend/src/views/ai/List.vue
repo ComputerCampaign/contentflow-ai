@@ -98,31 +98,21 @@
           </template>
         </el-table-column>
         
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="80" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" type="primary" @click="handleView(row)">
-              <el-icon><View /></el-icon>
-              查看
-            </el-button>
-            <el-button size="small" @click="handleEdit(row)">
-              <el-icon><Edit /></el-icon>
-              编辑
-            </el-button>
-            <el-button size="small" type="success" @click="handleTest(row)">
-              <el-icon><VideoPlay /></el-icon>
-              测试
-            </el-button>
-            <el-popconfirm
-              title="确定要删除这个模型吗？"
-              @confirm="handleDelete(row)"
-            >
-              <template #reference>
-                <el-button size="small" type="danger">
-                  <el-icon><Delete /></el-icon>
-                  删除
-                </el-button>
+            <el-dropdown trigger="click">
+              <el-button size="small" :icon="More" />
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item @click="handleEdit(row)">
+                    编辑
+                  </el-dropdown-item>
+                  <el-dropdown-item divided @click="handleDelete(row)">
+                    删除
+                  </el-dropdown-item>
+                </el-dropdown-menu>
               </template>
-            </el-popconfirm>
+            </el-dropdown>
           </template>
         </el-table-column>
       </el-table>
@@ -133,15 +123,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Plus,
   Search,
   Refresh,
-  View,
   Edit,
   Delete,
-  VideoPlay
+  More
 } from '@element-plus/icons-vue'
 import { useAIStore, type AIModel } from '@/stores/ai'
 import { formatDate } from '@/utils/date'
@@ -191,31 +180,33 @@ const handleCreate = () => {
   router.push('/ai/create')
 }
 
-// 查看模型详情
-const handleView = (model: AIModel) => {
-  router.push(`/ai/detail/${model.id}`)
-}
-
 // 编辑模型
 const handleEdit = (model: AIModel) => {
   router.push(`/ai/edit/${model.id}`)
 }
 
-// 测试模型
-const handleTest = (model: AIModel) => {
-  router.push(`/ai/test/${model.id}`)
-}
-
 // 删除模型
 const handleDelete = async (model: AIModel) => {
   try {
+    await ElMessageBox.confirm(
+      `确定要删除模型 "${model.name}" 吗？此操作不可恢复。`,
+      '确认删除',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
     if (model.id) {
       await aiStore.deleteAIModel(model.id)
       ElMessage.success('删除成功')
     }
   } catch (error) {
-    ElMessage.error('删除失败')
-    console.error('删除模型失败:', error)
+    if (error !== 'cancel') {
+      ElMessage.error('删除失败')
+      console.error('删除模型失败:', error)
+    }
   }
 }
 

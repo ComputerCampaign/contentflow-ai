@@ -45,11 +45,13 @@ const logo = '/logo.svg' // 可以放在public目录下
 .sidebar-logo-container {
   position: relative;
   width: 100%;
-  height: 50px;
-  line-height: 50px;
-  background: #2b2f3a;
+  height: 60px;
+  line-height: 60px;
+  background: #ffffff;
   text-align: center;
   overflow: hidden;
+  border-bottom: 1px solid #e4e7ed;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 
   & .sidebar-logo-link {
     height: 100%;
@@ -60,21 +62,27 @@ const logo = '/logo.svg' // 可以放在public目录下
     text-decoration: none;
 
     & .sidebar-logo {
-      width: 32px;
-      height: 32px;
+      width: 36px;
+      height: 36px;
       vertical-align: middle;
       margin-right: 12px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2);
     }
 
     & .sidebar-title {
       display: inline-block;
       margin: 0;
-      color: #fff;
+      color: #303133;
       font-weight: 600;
-      line-height: 50px;
-      font-size: 14px;
-      font-family: Avenir, Helvetica Neue, Arial, Helvetica, sans-serif;
+      line-height: 60px;
+      font-size: 16px;
+      font-family: 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
       vertical-align: middle;
+      background: linear-gradient(135deg, #409eff 0%, #67c23a 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
   }
 

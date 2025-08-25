@@ -1,13 +1,11 @@
 <template>
   <div v-if="!item.hidden">
     <template
-      v-if="hasOneShowingChild(item.children, item) && (!onlyOneChild.children || onlyOneChild.noShowingChildren) && !item.alwaysShow"
+      v-if="hasOneShowingChild(item.children, item) && (!onlyOneChild.children || onlyOneChild.noShowingChildren) && !item.meta?.alwaysShow"
     >
       <app-link v-if="onlyOneChild.meta" :to="resolvePath(onlyOneChild.path)">
         <el-menu-item :index="resolvePath(onlyOneChild.path)" :class="{ 'submenu-title-noDropdown': !isNest }">
-          <el-icon v-if="onlyOneChild.meta.icon">
-            <component :is="onlyOneChild.meta.icon" />
-          </el-icon>
+          <icon-map v-if="onlyOneChild.meta.icon" :name="onlyOneChild.meta.icon" :size="18" />
           <template #title>
             <span>{{ onlyOneChild.meta.title }}</span>
           </template>
@@ -17,9 +15,7 @@
 
     <el-sub-menu v-else ref="subMenu" :index="resolvePath(item.path)" popper-append-to-body>
       <template #title>
-        <el-icon v-if="item.meta && item.meta.icon">
-          <component :is="item.meta.icon" />
-        </el-icon>
+        <icon-map v-if="item.meta && item.meta.icon" :name="item.meta.icon" :size="18" />
         <span>{{ item.meta && item.meta.title }}</span>
       </template>
       <sidebar-item
@@ -39,6 +35,7 @@ import { ref } from 'vue'
 import path from 'path-browserify'
 import { isExternal } from '@/utils/validate'
 import AppLink from './Link.vue'
+import IconMap from '@/components/common/IconMap.vue'
 
 interface Props {
   item: any
@@ -94,6 +91,45 @@ const resolvePath = (routePath: string) => {
 <style lang="scss" scoped>
 .nest-menu .el-submenu > .el-submenu__title,
 .el-submenu .el-menu-item {
-  min-height: 50px !important;
+  min-height: 48px !important;
+}
+
+// 图标和文字的间距优化
+:deep(.el-menu-item) {
+  display: flex;
+  align-items: center;
+  padding-left: 20px !important; // 统一一级菜单的padding-left
+  
+  .el-icon {
+    margin-right: 8px;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+:deep(.el-submenu__title) {
+  display: flex;
+  align-items: center;
+  padding-left: 20px !important; // 统一一级菜单的padding-left
+  
+  .el-icon {
+    margin-right: 8px;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+// 嵌套菜单的padding-left调整
+.nest-menu {
+  .el-menu-item,
+  .el-submenu__title {
+    padding-left: 40px !important; // 增加子菜单的padding-left
+  }
 }
 </style>

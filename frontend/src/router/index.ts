@@ -36,11 +36,19 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/',
+    redirect: '/dashboard'
+  },
+  {
+    path: '/dashboard',
     component: Layout,
-    redirect: '/dashboard',
+    meta: {
+      title: '仪表板',
+      icon: 'dashboard',
+      alwaysShow: true
+    },
     children: [
       {
-        path: 'dashboard',
+        path: '',
         name: 'Dashboard',
         component: () => import('@/views/dashboard/index.vue'),
         meta: {
@@ -191,27 +199,7 @@ const routes: RouteRecordRaw[] = [
           icon: 'list'
         }
       },
-      {
-        path: 'create',
-        name: 'CrawlerCreate',
-        component: () => import('@/views/crawler/Create.vue'),
-        meta: {
-          title: '创建配置',
-          icon: 'plus',
-          hidden: true
-        }
-      },
-      {
-        path: 'edit/:id',
-        name: 'CrawlerEdit',
-        component: () => import('@/views/crawler/Edit.vue'),
-        meta: {
-          title: '编辑配置',
-          icon: 'edit',
-          hidden: true,
-          activeMenu: '/crawler/list'
-        }
-      },
+
       {
         path: 'detail/:id',
         name: 'CrawlerDetail',
@@ -370,8 +358,41 @@ const routes: RouteRecordRaw[] = [
         name: 'AIConfig',
         component: () => import('@/views/ai/index.vue'),
         meta: {
-          title: 'AI配置管理',
+          title: '提示词管理',
           icon: 'config'
+        }
+      },
+      {
+        path: 'prompt/create',
+        name: 'PromptCreate',
+        component: () => import('@/views/ai/prompt/Create.vue'),
+        meta: {
+          title: '新建提示词',
+          icon: 'plus',
+          hidden: true,
+          activeMenu: '/ai'
+        }
+      },
+      {
+        path: 'prompt/edit/:key',
+        name: 'PromptEdit',
+        component: () => import('@/views/ai/prompt/Edit.vue'),
+        meta: {
+          title: '编辑提示词',
+          icon: 'edit',
+          hidden: true,
+          activeMenu: '/ai'
+        }
+      },
+      {
+        path: 'prompt/:key',
+        name: 'PromptDetail',
+        component: () => import('@/views/ai/prompt/Detail.vue'),
+        meta: {
+          title: '提示词详情',
+          icon: 'detail',
+          hidden: true,
+          activeMenu: '/ai'
         }
       }
     ]

@@ -30,8 +30,7 @@ const permissionMap: Record<string, string[]> = {
   '/content-tasks/detail': ['task:view'],
   '/content-tasks/monitor': ['task:view'],
   '/crawler': ['crawler:view'],
-  '/crawler/create': ['crawler:create'],
-  '/crawler/edit': ['crawler:edit'],
+
   '/xpath': ['xpath:view'],
   '/xpath/create': ['xpath:create'],
   '/xpath/edit': ['xpath:edit'],

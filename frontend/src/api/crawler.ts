@@ -194,10 +194,10 @@ class CrawlerApiService extends BaseApiService {
   }
 
   /**
-   * 过滤参数中的undefined和null值
+   * 过滤爬虫查询参数中的undefined和null值
    * @param params 原始参数
    */
-  private filterParams(params?: Record<string, any>): Record<string, string> {
+  protected filterParams(params?: Record<string, any>): Record<string, string> {
     if (!params) return {}
     
     const filtered: Record<string, string> = {}
@@ -501,6 +501,23 @@ class CrawlerApiService extends BaseApiService {
   }>> {
     const params = timeRange ? new URLSearchParams(timeRange).toString() : ''
     return apiAdapter.get(`${this.baseUrl}/${id}/metrics${params ? '?' + params : ''}`)
+  }
+
+  /**
+   * 创建爬虫配置（表单数据格式）
+   * @param formData 表单数据
+   */
+  async createCrawlerFormConfig(formData: Record<string, any>): Promise<StandardResponse<any>> {
+    return apiAdapter.post<any>(`${this.baseUrl}/configs`, formData)
+  }
+
+  /**
+   * 更新爬虫配置（表单数据格式）
+   * @param id 配置ID
+   * @param formData 表单数据
+   */
+  async updateCrawlerFormConfig(id: number, formData: Record<string, any>): Promise<StandardResponse<any>> {
+    return apiAdapter.put<any>(`${this.baseUrl}/configs/${id}`, formData)
   }
 }
 

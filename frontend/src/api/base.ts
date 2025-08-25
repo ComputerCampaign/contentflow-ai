@@ -15,7 +15,7 @@ export abstract class BaseApiService {
    * 过滤参数中的undefined和null值
    * @param params 原始参数
    */
-  private filterParams(params?: Record<string, any>): Record<string, string> {
+  protected filterParams(params?: Record<string, any>): Record<string, string> {
     if (!params) return {}
     const filtered: Record<string, string> = {}
     Object.keys(params).forEach(key => {
