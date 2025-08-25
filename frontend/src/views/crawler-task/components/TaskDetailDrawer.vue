@@ -257,6 +257,13 @@
           停止
         </el-button>
         <el-button
+          type="info"
+          @click="handleGenerateCommand"
+          :loading="commandLoading"
+        >
+          生成Shell命令
+        </el-button>
+        <el-button
           :icon="Download"
           @click="handleExport"
         >
@@ -265,6 +272,34 @@
       </div>
     </template>
   </el-drawer>
+
+  <!-- 命令显示对话框 -->
+  <el-dialog
+    v-model="commandDialogVisible"
+    title="任务执行命令"
+    width="60%"
+    :before-close="() => commandDialogVisible = false"
+  >
+    <div class="command-container">
+      <el-input
+        v-model="generatedCommand"
+        type="textarea"
+        :rows="6"
+        readonly
+        placeholder="生成的命令将显示在这里..."
+        class="command-input"
+      />
+    </div>
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button @click="commandDialogVisible = false">关闭</el-button>
+        <el-button type="primary" @click="copyCommand">
+          <el-icon><DocumentCopy /></el-icon>
+          复制命令
+        </el-button>
+      </div>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
@@ -275,9 +310,12 @@ import {
   VideoPlay,
   VideoPause,
   Download,
-  CircleClose
+  CircleClose,
+  Monitor,
+  DocumentCopy
 } from '@element-plus/icons-vue'
 import { useTaskStore } from '@/stores/task'
+import taskApi from '@/api/task'
 
 interface Props {
   modelValue: boolean
@@ -298,6 +336,9 @@ const taskStore = useTaskStore()
 // 响应式数据
 const taskResults = ref<any>(null)
 const resultsLoading = ref(false)
+const commandLoading = ref(false)
+const commandDialogVisible = ref(false)
+const generatedCommand = ref('')
 
 // 计算属性
 const visible = computed({
@@ -392,6 +433,38 @@ const handleStop = async () => {
 const handleExport = () => {
   // TODO: 实现导出功能
   ElMessage.info('导出功能开发中')
+}
+
+// 生成Shell命令
+const handleGenerateCommand = async () => {
+  if (!props.task) return
+  
+  try {
+    commandLoading.value = true
+    const response = await taskApi.getTaskCommand(props.task.id)
+    if (response.success) {
+      generatedCommand.value = response.data.command
+      commandDialogVisible.value = true
+    } else {
+      ElMessage.error(response.message || '获取命令失败')
+    }
+  } catch (error) {
+    console.error('获取任务命令失败:', error)
+    ElMessage.error('获取命令失败，请稍后重试')
+  } finally {
+    commandLoading.value = false
+  }
+}
+
+// 复制命令到剪贴板
+const copyCommand = async () => {
+  try {
+    await navigator.clipboard.writeText(generatedCommand.value)
+    ElMessage.success('命令已复制到剪贴板')
+  } catch (error) {
+    console.error('复制失败:', error)
+    ElMessage.error('复制失败，请手动复制')
+  }
 }
 
 const refreshResults = async () => {
@@ -538,5 +611,20 @@ watch(
   display: flex;
   gap: 12px;
   justify-content: flex-end;
+}
+
+.command-container {
+  margin: 16px 0;
+}
+
+.command-input {
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
 }
 </style>

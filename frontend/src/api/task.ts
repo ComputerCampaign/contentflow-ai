@@ -421,6 +421,14 @@ class TaskApiService extends BaseApiService {
   }>> {
     return apiAdapter.get(`${this.baseUrl}/${id}/metrics`)
   }
+
+  /**
+   * 获取任务执行命令
+   * @param id 任务ID
+   */
+  async getTaskCommand(id: number): Promise<StandardResponse<{ command: string }>> {
+    return apiAdapter.get(`${this.baseUrl}/${id}/command`)
+  }
 }
 
 // 创建并导出API服务实例
