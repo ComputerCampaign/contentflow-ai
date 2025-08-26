@@ -59,10 +59,12 @@
           </el-form-item>
           
           <el-form-item label="任务优先级" prop="priority">
-            <el-select v-model="form.priority" placeholder="请选择优先级">
-              <el-option label="低" value="low" />
-              <el-option label="中" value="medium" />
-              <el-option label="高" value="high" />
+            <el-select v-model="form.priority" placeholder="请选择任务优先级">
+              <el-option label="低 (1)" :value="1" />
+              <el-option label="普通 (2)" :value="2" />
+              <el-option label="高 (3)" :value="3" />
+              <el-option label="很高 (4)" :value="4" />
+              <el-option label="紧急 (5)" :value="5" />
             </el-select>
           </el-form-item>
           
@@ -194,7 +196,7 @@ const form = reactive({
   name: '',
   description: '',
   crawlerId: '',
-  priority: 'medium',
+  priority: 2,
   status: 'pending',
   mode: 'immediate',
   scheduledTime: '',
@@ -251,7 +253,7 @@ const handleSubmit = async () => {
     await formRef.value.validate()
     loading.value = true
     
-    await taskStore.updateTask(parseInt(route.params.id as string), {
+    await taskStore.updateTask(route.params.id as string, {
       ...form,
       priority: form.priority as any
     })
@@ -285,25 +287,41 @@ const handleCancel = async () => {
 const loadTaskData = async () => {
   try {
     const taskId = route.params.id as string
-    const task = await taskStore.fetchTaskById(parseInt(taskId))
+    console.log('🔍 正在加载任务ID:', taskId)
+    
+    const task = await taskStore.fetchTaskById(taskId)
+    console.log('📥 获取到的任务数据:', task)
+    
     taskData.value = task
     
+    if (!task) {
+      console.error('❌ 未获取到任务数据')
+      ElMessage.error('未找到指定的任务')
+      router.push('/crawler-tasks/list')
+      return
+    }
+    
     // 填充表单数据
-    Object.assign(form, {
-      name: task?.name || '',
-      description: task?.description || '',
-      crawlerId: task?.crawlerConfigId || '',
-      priority: task?.priority || 'medium',
-      status: task?.status || 'pending',
-      mode: task?.mode || 'immediate',
-      scheduledTime: task?.scheduledTime || '',
-      retryCount: task?.retryCount || 3,
-      timeout: task?.timeout || 30000,
-      concurrency: task?.concurrency || 1,
-      delay: task?.delay || 1000,
-      enableNotification: task?.enableNotification || false,
-      notificationEmail: task?.notificationEmail || ''
-    })
+    const taskInfo = task as any
+    const formData = {
+      name: taskInfo?.name || '',
+      description: taskInfo?.description || '',
+      crawlerId: taskInfo?.crawler_config_id || taskInfo?.crawlerConfigId || '',
+      priority: taskInfo?.priority || 2,
+      status: taskInfo?.status || 'pending',
+      mode: taskInfo?.config?.mode || taskInfo?.mode || 'immediate',
+      scheduledTime: taskInfo?.config?.scheduledTime || taskInfo?.scheduledTime || '',
+      retryCount: taskInfo?.config?.retryCount || taskInfo?.retryCount || 3,
+      timeout: taskInfo?.config?.timeout || taskInfo?.timeout || 300,
+      concurrency: taskInfo?.config?.concurrency || taskInfo?.concurrency || 1,
+      delay: taskInfo?.config?.delay || taskInfo?.delay || 1000,
+      enableNotification: taskInfo?.config?.enableNotification || taskInfo?.enableNotification || false,
+      notificationEmail: taskInfo?.config?.notificationEmail || taskInfo?.notificationEmail || ''
+    }
+    
+    console.log('📝 填充到表单的数据:', formData)
+    Object.assign(form, formData)
+    
   } catch (error) {
     console.error('加载任务数据失败:', error)
     ElMessage.error('加载任务数据失败')

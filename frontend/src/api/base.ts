@@ -48,10 +48,12 @@ export abstract class BaseApiService {
     pageSize?: number
     [key: string]: any
   }): Promise<StandardResponse<{
-    list: T[]
-    total: number
-    page: number
-    pageSize: number
+    tasks: T[]
+    pagination: {
+      page: number
+      per_page: number
+      total: number
+    }
   }>> {
     const queryParams = {
       page: 1,

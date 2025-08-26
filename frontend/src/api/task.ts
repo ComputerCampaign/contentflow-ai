@@ -5,14 +5,14 @@ import apiAdapter, { type StandardResponse } from '@/utils/api-adapter'
 export type TaskStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | 'paused'
 
 // 任务类型枚举
-export type TaskType = 'crawl' | 'publish' | 'sync' | 'backup' | 'cleanup'
+export type TaskType = 'crawl' | 'web_scraping' | 'crawler' | 'publish' | 'content_generation' | 'sync' | 'backup' | 'cleanup'
 
-// 任务优先级枚举
-export type TaskPriority = 'low' | 'normal' | 'high' | 'urgent'
+// 任务优先级枚举 (数字类型)
+export type TaskPriority = 1 | 2 | 3 | 4 | 5
 
 // 任务信息接口
 export interface Task {
-  id: number
+  id: string
   name: string
   description?: string
   type: TaskType
@@ -53,7 +53,7 @@ export interface Task {
 // 任务日志接口
 export interface TaskLog {
   id: number
-  taskId: number
+  taskId: string
   level: 'info' | 'warn' | 'error' | 'debug'
   message: string
   data?: Record<string, any>
@@ -66,7 +66,7 @@ export interface CreateTaskParams {
   description?: string
   type: TaskType
   priority?: TaskPriority
-  crawlerConfigId?: number
+  crawlerConfigId?: string
   scheduledAt?: string
   config?: Record<string, any>
 }
@@ -113,7 +113,7 @@ export interface TaskStats {
 
 // 任务执行结果
 export interface TaskResult {
-  taskId: number
+  taskId: string
   status: TaskStatus
   progress: number
   totalItems?: number
@@ -140,10 +140,12 @@ class TaskApiService extends BaseApiService {
    * @param params 查询参数
    */
   async getTasks(params?: TaskQueryParams): Promise<StandardResponse<{
-    list: Task[]
-    total: number
-    page: number
-    pageSize: number
+    tasks: Task[]
+    pagination: {
+      page: number
+      per_page: number
+      total: number
+    }
   }>> {
     return this.getPagedList<Task>(params)
   }
@@ -152,7 +154,7 @@ class TaskApiService extends BaseApiService {
    * 获取任务详情
    * @param id 任务ID
    */
-  async getTask(id: number): Promise<StandardResponse<Task>> {
+  async getTask(id: string): Promise<StandardResponse<Task>> {
     return this.getById<Task>(id)
   }
 
@@ -161,7 +163,35 @@ class TaskApiService extends BaseApiService {
    * @param params 创建参数
    */
   async createTask(params: CreateTaskParams): Promise<StandardResponse<Task>> {
-    return this.create<Task>(params)
+    // 根据任务类型选择正确的端点和参数格式
+    let endpoint = ''
+    let requestData: any = {}
+    
+    switch (params.type) {
+      case 'crawl':
+      case 'web_scraping':
+      case 'crawler':
+        endpoint = '/tasks/crawler'
+        // 转换为后端期望的格式
+        requestData = {
+          name: params.name,
+          url: params.config?.url || '',
+          crawler_config_id: params.crawlerConfigId,
+          description: params.description,
+          priority: params.priority || 5,
+          config: params.config || {}
+        }
+        break
+      case 'publish':
+      case 'content_generation':
+        endpoint = '/tasks/content-generation'
+        requestData = params
+        break
+      default:
+        throw new Error(`不支持的任务类型: ${params.type}`)
+    }
+    
+    return apiAdapter.post<Task>(endpoint, requestData)
   }
 
   /**
@@ -169,7 +199,7 @@ class TaskApiService extends BaseApiService {
    * @param id 任务ID
    * @param params 更新参数
    */
-  async updateTask(id: number, params: UpdateTaskParams): Promise<StandardResponse<Task>> {
+  async updateTask(id: string, params: UpdateTaskParams): Promise<StandardResponse<Task>> {
     return this.update<Task>(id, params)
   }
 
@@ -177,7 +207,7 @@ class TaskApiService extends BaseApiService {
    * 删除任务
    * @param id 任务ID
    */
-  async deleteTask(id: number): Promise<StandardResponse<void>> {
+  async deleteTask(id: string): Promise<StandardResponse<void>> {
     return this.delete<void>(id)
   }
 
@@ -185,7 +215,7 @@ class TaskApiService extends BaseApiService {
    * 批量删除任务
    * @param ids 任务ID数组
    */
-  async batchDeleteTasks(ids: number[]): Promise<StandardResponse<void>> {
+  async batchDeleteTasks(ids: string[]): Promise<StandardResponse<void>> {
     return this.batchDelete<void>(ids)
   }
 
@@ -193,7 +223,7 @@ class TaskApiService extends BaseApiService {
    * 执行任务
    * @param id 任务ID
    */
-  async executeTask(id: number): Promise<StandardResponse<TaskResult>> {
+  async executeTask(id: string): Promise<StandardResponse<TaskResult>> {
     return apiAdapter.post<TaskResult>(`${this.baseUrl}/${id}/execute`)
   }
 
@@ -201,7 +231,7 @@ class TaskApiService extends BaseApiService {
    * 暂停任务
    * @param id 任务ID
    */
-  async pauseTask(id: number): Promise<StandardResponse<void>> {
+  async pauseTask(id: string): Promise<StandardResponse<void>> {
     return apiAdapter.post<void>(`${this.baseUrl}/${id}/pause`)
   }
 
@@ -209,7 +239,7 @@ class TaskApiService extends BaseApiService {
    * 恢复任务
    * @param id 任务ID
    */
-  async resumeTask(id: number): Promise<StandardResponse<void>> {
+  async resumeTask(id: string): Promise<StandardResponse<void>> {
     return apiAdapter.post<void>(`${this.baseUrl}/${id}/resume`)
   }
 
@@ -217,7 +247,7 @@ class TaskApiService extends BaseApiService {
    * 取消任务
    * @param id 任务ID
    */
-  async cancelTask(id: number): Promise<StandardResponse<void>> {
+  async cancelTask(id: string): Promise<StandardResponse<void>> {
     return apiAdapter.post<void>(`${this.baseUrl}/${id}/cancel`)
   }
 
@@ -225,7 +255,7 @@ class TaskApiService extends BaseApiService {
    * 重试任务
    * @param id 任务ID
    */
-  async retryTask(id: number): Promise<StandardResponse<TaskResult>> {
+  async retryTask(id: string): Promise<StandardResponse<TaskResult>> {
     return apiAdapter.post<TaskResult>(`${this.baseUrl}/${id}/retry`)
   }
 
@@ -234,7 +264,7 @@ class TaskApiService extends BaseApiService {
    * @param id 任务ID
    * @param params 复制时的修改参数
    */
-  async duplicateTask(id: number, params?: Partial<CreateTaskParams>): Promise<StandardResponse<Task>> {
+  async duplicateTask(id: string, params?: Partial<CreateTaskParams>): Promise<StandardResponse<Task>> {
     return this.duplicate<Task>(id, params)
   }
 
@@ -242,7 +272,7 @@ class TaskApiService extends BaseApiService {
    * 批量执行任务
    * @param ids 任务ID数组
    */
-  async batchExecuteTasks(ids: number[]): Promise<StandardResponse<TaskResult[]>> {
+  async batchExecuteTasks(ids: string[]): Promise<StandardResponse<TaskResult[]>> {
     return this.batchAction<TaskResult[]>('execute', ids)
   }
 
@@ -250,7 +280,7 @@ class TaskApiService extends BaseApiService {
    * 批量暂停任务
    * @param ids 任务ID数组
    */
-  async batchPauseTasks(ids: number[]): Promise<StandardResponse<void>> {
+  async batchPauseTasks(ids: string[]): Promise<StandardResponse<void>> {
     return this.batchAction<void>('pause', ids)
   }
 
@@ -258,7 +288,7 @@ class TaskApiService extends BaseApiService {
    * 批量取消任务
    * @param ids 任务ID数组
    */
-  async batchCancelTasks(ids: number[]): Promise<StandardResponse<void>> {
+  async batchCancelTasks(ids: string[]): Promise<StandardResponse<void>> {
     return this.batchAction<void>('cancel', ids)
   }
 
@@ -267,7 +297,7 @@ class TaskApiService extends BaseApiService {
    * @param id 任务ID
    * @param params 查询参数
    */
-  async getTaskLogs(id: number, params?: {
+  async getTaskLogs(id: string, params?: {
     page?: number
     pageSize?: number
     level?: 'info' | 'warn' | 'error' | 'debug'
@@ -288,7 +318,7 @@ class TaskApiService extends BaseApiService {
    * @param id 任务ID
    * @param params 查询参数
    */
-  async getTaskResults(id: number, params?: {
+  async getTaskResults(id: string, params?: {
     page?: number
     pageSize?: number
   }): Promise<StandardResponse<{
@@ -327,7 +357,7 @@ class TaskApiService extends BaseApiService {
    * 获取任务执行状态
    * @param id 任务ID
    */
-  async getTaskStatus(id: number): Promise<StandardResponse<TaskResult>> {
+  async getTaskStatus(id: string): Promise<StandardResponse<TaskResult>> {
     return apiAdapter.get<TaskResult>(`${this.baseUrl}/${id}/status`)
   }
 
@@ -362,7 +392,7 @@ class TaskApiService extends BaseApiService {
    * @param id 任务ID
    * @param priority 优先级
    */
-  async setTaskPriority(id: number, priority: TaskPriority): Promise<StandardResponse<void>> {
+  async setTaskPriority(id: string, priority: TaskPriority): Promise<StandardResponse<void>> {
     return apiAdapter.put<void>(`${this.baseUrl}/${id}/priority`, { priority })
   }
 
@@ -385,7 +415,7 @@ class TaskApiService extends BaseApiService {
    * @param params 任务参数
    */
   async createTaskFromTemplate(
-    templateId: number,
+    templateId: string,
     params: Omit<CreateTaskParams, 'type' | 'config'>
   ): Promise<StandardResponse<Task>> {
     return apiAdapter.post<Task>(`${this.baseUrl}/templates/${templateId}/create`, params)
@@ -396,7 +426,7 @@ class TaskApiService extends BaseApiService {
    * @param params 导出参数
    */
   async exportTasks(params?: {
-    ids?: number[]
+    ids?: string[]
     status?: TaskStatus
     type?: TaskType
     startDate?: string
@@ -410,7 +440,7 @@ class TaskApiService extends BaseApiService {
    * 获取任务性能指标
    * @param id 任务ID
    */
-  async getTaskMetrics(id: number): Promise<StandardResponse<{
+  async getTaskMetrics(id: string): Promise<StandardResponse<{
     executionTime: number
     memoryUsage: number
     cpuUsage: number
@@ -426,7 +456,7 @@ class TaskApiService extends BaseApiService {
    * 获取任务执行命令
    * @param id 任务ID
    */
-  async getTaskCommand(id: number): Promise<StandardResponse<{ command: string }>> {
+  async getTaskCommand(id: string): Promise<StandardResponse<{ command: string }>> {
     return apiAdapter.get(`${this.baseUrl}/${id}/command`)
   }
 }

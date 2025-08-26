@@ -1,6 +1,6 @@
 <template>
   <div class="task-create">
-    <PageHeader title="创建任务" description="创建新的爬虫任务">
+    <PageHeader title="创建文本生成任务" description="创建新的文本生成任务">
       <template #actions>
         <el-button @click="handleCancel">取消</el-button>
         <el-button type="primary" @click="handleSubmit" :loading="loading">
@@ -42,97 +42,85 @@
             />
           </el-form-item>
           
-          <el-form-item label="爬虫配置" prop="crawlerId">
+          <el-form-item label="数据源任务" prop="sourceTaskId">
             <el-select
-              v-model="form.crawlerId"
-              placeholder="请选择爬虫配置"
+              v-model="form.sourceTaskId"
+              placeholder="请选择已完成的爬虫任务作为数据源"
               style="width: 100%"
               filterable
+              @change="handleSourceTaskChange"
             >
               <el-option
-                v-for="crawler in crawlerList"
-                :key="crawler.id"
-                :label="crawler.name"
-                :value="crawler.id"
-              />
+                v-for="task in sourceTaskList"
+                :key="task.id"
+                :label="task.name"
+                :value="task.id"
+              >
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span>{{ task.name }}</span>
+                  <span style="color: #999; font-size: 12px;">{{ formatDate(task.completed_at) }}</span>
+                </div>
+              </el-option>
             </el-select>
+            <div style="font-size: 12px; color: #999; margin-top: 4px;">只显示已完成的爬虫任务</div>
+          </el-form-item>
+          
+          <el-form-item label="AI模型配置" prop="aiModelConfigId">
+            <el-select
+              v-model="form.aiModelConfigId"
+              placeholder="请选择AI模型配置"
+              style="width: 100%"
+              filterable
+              @change="handleModelChange"
+            >
+              <el-option
+                v-for="model in aiModelList"
+                :key="model.id"
+                :label="model.name"
+                :value="model.id"
+              >
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span>{{ model.name }}</span>
+                  <span style="color: #999; font-size: 12px;">{{ model.model_type }}</span>
+                </div>
+              </el-option>
+            </el-select>
+            <div style="font-size: 12px; color: #999; margin-top: 4px;">选择用于文本生成的AI模型</div>
           </el-form-item>
           
           <el-form-item label="任务优先级" prop="priority">
-            <el-select v-model="form.priority" placeholder="请选择优先级">
-              <el-option label="低" value="low" />
-              <el-option label="中" value="medium" />
-              <el-option label="高" value="high" />
+            <el-select v-model="form.priority" placeholder="请选择任务优先级">
+              <el-option label="低 (1)" :value="1" />
+              <el-option label="普通 (2)" :value="2" />
+              <el-option label="高 (3)" :value="3" />
+              <el-option label="很高 (4)" :value="4" />
+              <el-option label="紧急 (5)" :value="5" />
             </el-select>
           </el-form-item>
         </el-card>
 
         <el-card class="form-section">
           <template #header>
-            <span class="section-title">执行配置</span>
+            <span class="section-title">生成配置</span>
           </template>
           
-          <el-form-item label="执行模式" prop="mode">
-            <el-radio-group v-model="form.mode">
-              <el-radio value="immediate">立即执行</el-radio>
-              <el-radio value="scheduled">定时执行</el-radio>
-              <el-radio value="manual">手动执行</el-radio>
-            </el-radio-group>
-          </el-form-item>
-          
-          <el-form-item
-            v-if="form.mode === 'scheduled'"
-            label="执行时间"
-            prop="scheduledTime"
-          >
-            <el-date-picker
-              v-model="form.scheduledTime"
-              type="datetime"
-              placeholder="选择执行时间"
-              format="YYYY-MM-DD HH:mm:ss"
-              value-format="YYYY-MM-DD HH:mm:ss"
+          <el-form-item label="生成提示词" prop="prompt">
+            <el-input
+              v-model="form.prompt"
+              type="textarea"
+              :rows="4"
+              placeholder="请输入文本生成的提示词，如：请总结以下内容的要点..."
+              maxlength="1000"
+              show-word-limit
             />
           </el-form-item>
           
-          <el-form-item label="重试次数" prop="retryCount">
+          <el-form-item label="最大生成长度" prop="maxLength">
             <el-input-number
-              v-model="form.retryCount"
-              :min="0"
-              :max="10"
-              placeholder="失败重试次数"
-            />
-          </el-form-item>
-          
-          <el-form-item label="超时时间" prop="timeout">
-            <el-input-number
-              v-model="form.timeout"
-              :min="10"
-              :max="3600"
-              placeholder="任务超时时间（秒）"
-            />
-          </el-form-item>
-        </el-card>
-
-        <el-card class="form-section">
-          <template #header>
-            <span class="section-title">高级设置</span>
-          </template>
-          
-          <el-form-item label="并发数" prop="concurrency">
-            <el-input-number
-              v-model="form.concurrency"
-              :min="1"
-              :max="20"
-              placeholder="并发执行数量"
-            />
-          </el-form-item>
-          
-          <el-form-item label="延迟设置" prop="delay">
-            <el-input-number
-              v-model="form.delay"
-              :min="0"
-              :max="10000"
-              placeholder="请求间隔延迟（毫秒）"
+              v-model="form.maxLength"
+              :min="100"
+              :max="4000"
+              placeholder="生成文本的最大长度"
             />
           </el-form-item>
           
@@ -168,6 +156,8 @@ import type { FormInstance, FormRules } from 'element-plus'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { useTaskStore } from '@/stores/task'
 import { useCrawlerStore } from '@/stores/crawler'
+import taskApi, { type TaskPriority } from '@/api/task'
+import aiModelApi from '@/api/ai-model'
 
 const router = useRouter()
 const route = useRoute()
@@ -176,21 +166,19 @@ const crawlerStore = useCrawlerStore()
 
 const formRef = ref<FormInstance>()
 const loading = ref(false)
-const crawlerList = ref<any[]>([])
+const sourceTaskList = ref<any[]>([])
+const aiModelList = ref<any[]>([])
 
 const form = reactive({
   name: '',
   description: '',
-  crawlerId: '',
-  priority: 'medium',
-  mode: 'immediate',
-  scheduledTime: '',
-  retryCount: 3,
-  timeout: 300,
-  concurrency: 1,
-  delay: 1000,
+  sourceTaskId: '',
+  aiModelConfigId: '',
+  prompt: '',
+  maxLength: 1000,
   enableNotification: false,
-  notificationEmail: ''
+  notificationEmail: '',
+  priority: 2 as TaskPriority
 })
 
 const rules: FormRules = {
@@ -198,20 +186,21 @@ const rules: FormRules = {
     { required: true, message: '请输入任务名称', trigger: 'blur' },
     { min: 2, max: 100, message: '任务名称长度在 2 到 100 个字符', trigger: 'blur' }
   ],
-  crawlerId: [
-    { required: true, message: '请选择爬虫配置', trigger: 'change' }
+  sourceTaskId: [
+    { required: true, message: '请选择数据源任务', trigger: 'change' }
   ],
-  priority: [
-    { required: true, message: '请选择任务优先级', trigger: 'change' }
+  aiModelConfigId: [
+    { required: true, message: '请选择AI模型配置', trigger: 'change' }
   ],
-  mode: [
-    { required: true, message: '请选择执行模式', trigger: 'change' }
-  ],
-  scheduledTime: [
-    { required: true, message: '请选择执行时间', trigger: 'change' }
+  prompt: [
+    { required: true, message: '请输入生成提示词', trigger: 'blur' },
+    { min: 10, max: 1000, message: '提示词长度在 10 到 1000 个字符', trigger: 'blur' }
   ],
   notificationEmail: [
     { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }
+  ],
+  priority: [
+    { required: true, message: '请选择任务优先级', trigger: 'change' }
   ]
 }
 
@@ -244,8 +233,7 @@ const handleSubmit = async () => {
     const taskType = getTaskType()
     await taskStore.createTask({
       ...form,
-      type: taskType as any,
-      priority: form.priority as any
+      type: taskType as any
     })
     ElMessage.success('任务创建成功')
     router.push(getTaskListPath(taskType))
@@ -275,18 +263,83 @@ const handleCancel = async () => {
   }
 }
 
-const loadCrawlerList = async () => {
+// 格式化日期
+const formatDate = (dateString: string) => {
+  if (!dateString) return '-'
+  return new Date(dateString).toLocaleString('zh-CN')
+}
+
+// 处理数据源任务变化
+const handleSourceTaskChange = (taskId: string) => {
+  const selectedTask = sourceTaskList.value.find(task => task.id === taskId)
+  if (selectedTask) {
+    // 可以根据选中的任务自动填充一些信息
+    if (!form.name) {
+      form.name = `${selectedTask.name}_文本生成`
+    }
+  }
+}
+
+// 处理AI模型变化
+const handleModelChange = (modelId: string) => {
+  const selectedModel = aiModelList.value.find(model => model.id === modelId)
+  if (selectedModel) {
+    console.log('选中的AI模型:', selectedModel.name)
+  }
+}
+
+// 加载已完成的爬虫任务列表
+const loadSourceTasks = async () => {
   try {
-    await crawlerStore.fetchCrawlerConfigs()
-    crawlerList.value = crawlerStore.crawlerConfigs
+    const response = await taskApi.getTasks({
+       type: 'crawl',
+       status: 'completed',
+       pageSize: 100
+     })
+     
+     if (response.success && response.data) {
+       sourceTaskList.value = response.data.list.map(task => ({
+         id: task.id,
+         name: task.name,
+         status: task.status,
+         createdAt: task.completedAt || task.createdAt,
+         description: task.description
+       }))
+    }
   } catch (error) {
-    console.error('加载爬虫配置失败:', error)
-    ElMessage.error('加载爬虫配置失败')
+    console.error('加载数据源任务失败:', error)
+    ElMessage.error('加载数据源任务失败')
+  }
+}
+
+// 加载AI模型配置列表
+const loadAIModels = async () => {
+  try {
+    const response = await aiModelApi.getActiveAIModels()
+    
+    if (response.success && response.data) {
+      aiModelList.value = response.data.models.map(model => ({
+         id: model.id,
+         name: model.name,
+         description: model.description,
+         model_key: model.model_key
+       }))
+    }
+  } catch (error) {
+    console.error('加载AI模型配置失败:', error)
+    ElMessage.error('加载AI模型配置失败')
   }
 }
 
 onMounted(() => {
-  loadCrawlerList()
+  loadSourceTasks()
+  loadAIModels()
+  
+  // 如果URL参数中有source_task_id，自动选择
+  const sourceTaskId = route.query.source_task_id as string
+  if (sourceTaskId) {
+    form.sourceTaskId = sourceTaskId
+  }
 })
 </script>
 

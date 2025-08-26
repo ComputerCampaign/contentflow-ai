@@ -214,22 +214,26 @@ const getStatusText = (status: string) => {
   return statusMap[status] || status
 }
 
-const getPriorityType = (priority: string) => {
-  const priorityMap: Record<string, string> = {
-    low: 'info',
-    medium: 'warning',
-    high: 'danger'
+const getPriorityType = (priority: number) => {
+  const priorityMap: Record<number, string> = {
+    1: 'info',
+    2: 'info',
+    3: 'warning',
+    4: 'warning',
+    5: 'danger'
   }
   return priorityMap[priority] || 'info'
 }
 
-const getPriorityText = (priority: string) => {
-  const priorityMap: Record<string, string> = {
-    low: '低',
-    medium: '中',
-    high: '高'
+const getPriorityText = (priority: number) => {
+  const priorityMap: Record<number, string> = {
+    1: '低 (1)',
+    2: '普通 (2)',
+    3: '高 (3)',
+    4: '很高 (4)',
+    5: '紧急 (5)'
   }
-  return priorityMap[priority] || priority
+  return priorityMap[priority] || `优先级 ${priority}`
 }
 
 // 事件处理方法
@@ -260,12 +264,12 @@ const handleCurrentChange = (page: number) => {
 
 const handleCreate = () => {
   // 跳转到创建页面，传递任务类型参数
-  router.push('/tasks/create?type=web_scraping')
+  router.push('/crawler-tasks/create')
 }
 
 const handleEdit = (task: any) => {
   // 跳转到编辑页面
-  router.push(`/tasks/edit/${task.id}`)
+  router.push(`/crawler-tasks/edit/${task.id}`)
 }
 
 const handleCreateContentTask = (task: any) => {

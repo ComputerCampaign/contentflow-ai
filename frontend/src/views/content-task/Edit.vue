@@ -59,10 +59,12 @@
           </el-form-item>
           
           <el-form-item label="任务优先级" prop="priority">
-            <el-select v-model="form.priority" placeholder="请选择优先级">
-              <el-option label="低" value="low" />
-              <el-option label="中" value="medium" />
-              <el-option label="高" value="high" />
+            <el-select v-model="form.priority" placeholder="请选择任务优先级">
+              <el-option label="低 (1)" :value="1" />
+              <el-option label="普通 (2)" :value="2" />
+              <el-option label="高 (3)" :value="3" />
+              <el-option label="很高 (4)" :value="4" />
+              <el-option label="紧急 (5)" :value="5" />
             </el-select>
           </el-form-item>
           
@@ -194,7 +196,7 @@ const form = reactive({
   name: '',
   description: '',
   crawlerId: '',
-  priority: 'medium',
+  priority: 2,
   status: 'pending',
   mode: 'immediate',
   scheduledTime: '',
@@ -251,7 +253,7 @@ const handleSubmit = async () => {
     await formRef.value.validate()
     loading.value = true
     
-    await taskStore.updateTask(parseInt(route.params.id as string), {
+    await taskStore.updateTask(route.params.id as string, {
       ...form,
       priority: form.priority as any
     })
@@ -285,7 +287,7 @@ const handleCancel = async () => {
 const loadTaskData = async () => {
   try {
     const taskId = route.params.id as string
-    const task = await taskStore.fetchTaskById(parseInt(taskId))
+    const task = await taskStore.fetchTaskById(taskId)
     taskData.value = task
     
     // 填充表单数据
@@ -293,7 +295,7 @@ const loadTaskData = async () => {
       name: task?.name || '',
       description: task?.description || '',
       crawlerId: task?.crawlerConfigId || '',
-      priority: task?.priority || 'medium',
+      priority: task?.priority || 2,
       status: task?.status || 'pending',
       mode: task?.mode || 'immediate',
       scheduledTime: task?.scheduledTime || '',

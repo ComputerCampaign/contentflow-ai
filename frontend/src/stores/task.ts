@@ -164,13 +164,20 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   // 根据ID获取任务详情
-  const fetchTaskById = async (taskId: number): Promise<Task | null> => {
+  const fetchTaskById = async (taskId: string): Promise<Task | null> => {
     try {
       const response = await taskApi.getTask(taskId)
       
+      console.log('📥 fetchTaskById 原始响应:', response)
+      
       if (response.success && response.data) {
-        currentTask.value = response.data
-        return response.data
+        // 后端返回的数据结构是 { data: { task: {...} } }
+        const responseData = response.data as any
+        const taskData = responseData.task || responseData
+        console.log('📊 解析后的任务数据:', taskData)
+        
+        currentTask.value = taskData
+        return taskData
       }
       return null
     } catch (error: any) {
@@ -205,7 +212,7 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   // 更新任务
-  const updateTask = async (taskId: number, taskData: UpdateTaskParams): Promise<boolean> => {
+  const updateTask = async (taskId: string, taskData: UpdateTaskParams): Promise<boolean> => {
     try {
       operationLoading.value = true
       const response = await taskApi.updateTask(taskId, taskData)
@@ -234,7 +241,7 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   // 删除任务
-  const deleteTask = async (taskId: number): Promise<boolean> => {
+  const deleteTask = async (taskId: string): Promise<boolean> => {
     try {
       await ElMessageBox.confirm(
         '确定要删除这个任务吗？删除后无法恢复。',
@@ -274,7 +281,7 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   // 执行任务
-  const executeTask = async (taskId: number): Promise<boolean> => {
+  const executeTask = async (taskId: string): Promise<boolean> => {
     try {
       operationLoading.value = true
       const response = await taskApi.executeTask(taskId)
@@ -298,7 +305,7 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   // 暂停任务
-  const pauseTask = async (taskId: number): Promise<boolean> => {
+  const pauseTask = async (taskId: string): Promise<boolean> => {
     try {
       operationLoading.value = true
       const response = await taskApi.pauseTask(taskId)
@@ -322,7 +329,7 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   // 恢复任务
-  const resumeTask = async (taskId: number): Promise<boolean> => {
+  const resumeTask = async (taskId: string): Promise<boolean> => {
     try {
       operationLoading.value = true
       const response = await taskApi.resumeTask(taskId)
@@ -346,7 +353,7 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   // 取消任务
-  const cancelTask = async (taskId: number): Promise<boolean> => {
+  const cancelTask = async (taskId: string): Promise<boolean> => {
     try {
       await ElMessageBox.confirm(
         '确定要取消这个任务吗？',
@@ -383,7 +390,7 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   // 重试任务
-  const retryTask = async (taskId: number): Promise<boolean> => {
+  const retryTask = async (taskId: string): Promise<boolean> => {
     try {
       operationLoading.value = true
       const response = await taskApi.retryTask(taskId)
@@ -407,7 +414,7 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   // 复制任务
-  const duplicateTask = async (taskId: number): Promise<boolean> => {
+  const duplicateTask = async (taskId: string): Promise<boolean> => {
     try {
       operationLoading.value = true
       const response = await taskApi.duplicateTask(taskId)
@@ -431,7 +438,7 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   // 获取任务日志
-  const fetchTaskLogs = async (taskId: number, params?: { page?: number; pageSize?: number }): Promise<void> => {
+  const fetchTaskLogs = async (taskId: string, params?: { page?: number; pageSize?: number }): Promise<void> => {
     try {
       logsLoading.value = true
       const response = await taskApi.getTaskLogs(taskId, params)
@@ -448,7 +455,7 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   // 获取任务结果
-  const fetchTaskResults = async (taskId: number, params?: { page?: number; pageSize?: number }): Promise<void> => {
+  const fetchTaskResults = async (taskId: string, params?: { page?: number; pageSize?: number }): Promise<void> => {
     try {
       resultsLoading.value = true
       const response = await taskApi.getTaskResults(taskId, params)
@@ -540,12 +547,12 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   // 启动任务
-  const startTask = async (taskId: number): Promise<boolean> => {
+  const startTask = async (taskId: string): Promise<boolean> => {
     return await executeTask(taskId)
   }
 
   // 停止任务
-  const stopTask = async (taskId: number): Promise<boolean> => {
+  const stopTask = async (taskId: string): Promise<boolean> => {
     return await cancelTask(taskId)
   }
 
@@ -620,7 +627,7 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   // 克隆任务
-  const cloneTask = async (taskId: number): Promise<boolean> => {
+  const cloneTask = async (taskId: string): Promise<boolean> => {
     try {
       operationLoading.value = true
       const response = await taskApi.duplicateTask(taskId)

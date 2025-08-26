@@ -42,6 +42,14 @@
             />
           </el-form-item>
           
+          <el-form-item label="目标URL" prop="url">
+            <el-input
+              v-model="form.url"
+              placeholder="请输入要爬取的目标URL"
+              maxlength="2000"
+            />
+          </el-form-item>
+          
           <el-form-item label="爬虫配置" prop="crawlerId">
             <el-select
               v-model="form.crawlerId"
@@ -59,10 +67,12 @@
           </el-form-item>
           
           <el-form-item label="任务优先级" prop="priority">
-            <el-select v-model="form.priority" placeholder="请选择优先级">
-              <el-option label="低" value="low" />
-              <el-option label="中" value="medium" />
-              <el-option label="高" value="high" />
+            <el-select v-model="form.priority" placeholder="请选择任务优先级">
+              <el-option label="低 (1)" :value="1" />
+              <el-option label="普通 (2)" :value="2" />
+              <el-option label="高 (3)" :value="3" />
+              <el-option label="很高 (4)" :value="4" />
+              <el-option label="紧急 (5)" :value="5" />
             </el-select>
           </el-form-item>
         </el-card>
@@ -168,6 +178,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { useTaskStore } from '@/stores/task'
 import { useCrawlerStore } from '@/stores/crawler'
+import crawlerApi from '@/api/crawler'
 
 const router = useRouter()
 const route = useRoute()
@@ -181,8 +192,9 @@ const crawlerList = ref<any[]>([])
 const form = reactive({
   name: '',
   description: '',
+  url: '',
   crawlerId: '',
-  priority: 'medium',
+  priority: 5,
   mode: 'immediate',
   scheduledTime: '',
   retryCount: 3,
@@ -197,6 +209,10 @@ const rules: FormRules = {
   name: [
     { required: true, message: '请输入任务名称', trigger: 'blur' },
     { min: 2, max: 100, message: '任务名称长度在 2 到 100 个字符', trigger: 'blur' }
+  ],
+  url: [
+    { required: true, message: '请输入目标URL', trigger: 'blur' },
+    { type: 'url', message: '请输入正确的URL格式', trigger: 'blur' }
   ],
   crawlerId: [
     { required: true, message: '请选择爬虫配置', trigger: 'change' }
@@ -243,9 +259,20 @@ const handleSubmit = async () => {
     
     const taskType = getTaskType()
     await taskStore.createTask({
-      ...form,
+      name: form.name,
+      description: form.description,
       type: taskType as any,
-      priority: form.priority as any
+      priority: form.priority as any,
+      crawlerConfigId: form.crawlerId as string,
+      config: {
+        url: form.url,
+        retryCount: form.retryCount,
+        timeout: form.timeout,
+        concurrency: form.concurrency,
+        delay: form.delay,
+        enableNotification: form.enableNotification,
+        notificationEmail: form.notificationEmail
+      }
     })
     ElMessage.success('任务创建成功')
     router.push(getTaskListPath(taskType))
@@ -277,11 +304,22 @@ const handleCancel = async () => {
 
 const loadCrawlerList = async () => {
   try {
-    await crawlerStore.fetchCrawlerConfigs()
-    crawlerList.value = crawlerStore.crawlerConfigs
+    const response = await crawlerApi.getCrawlerConfigs({
+      status: 'active',
+      pageSize: 100
+    })
+    
+    if (response.success && response.data) {
+      crawlerList.value = response.data.configs.map(config => ({
+        id: config.id,
+        name: config.name,
+        description: config.description,
+        targetUrl: config.targetUrl
+      }))
+    }
   } catch (error) {
-    console.error('加载爬虫配置失败:', error)
-    ElMessage.error('加载爬虫配置失败')
+    console.error('获取爬虫配置列表失败:', error)
+    ElMessage.error('获取爬虫配置列表失败')
   }
 }
 
