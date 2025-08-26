@@ -223,7 +223,7 @@ import { Plus, Delete } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { useTaskStore } from '@/stores/task'
-import taskApi, { type TaskPriority } from '@/api/task'
+import taskApi, { type TaskPriority, type TaskStatus } from '@/api/task'
 import aiModelApi from '@/api/ai-model'
 import promptApi from '@/api/prompt'
 
@@ -261,7 +261,7 @@ const form = reactive({
   enableNotification: false,
   notificationEmail: '',
   priority: 2 as TaskPriority,
-  status: 'pending'
+  status: 'pending' as TaskStatus
 })
 
 const rules: FormRules = {
@@ -412,7 +412,7 @@ const loadTaskData = async () => {
     // 填充表单数据
     form.name = task?.name || ''
     form.description = task?.description || ''
-    form.sourceTaskId = task?.config?.source_task_id || task?.sourceTaskId || ''
+    form.sourceTaskId = task?.config?.source_task_id || ''
     form.priority = task?.priority || 2
     form.status = task?.status || 'pending'
     form.maxLength = task?.config?.max_length || 1000
@@ -427,14 +427,6 @@ const loadTaskData = async () => {
         modelName: config.modelName || '',
         promptName: config.promptName || ''
       }))
-    } else {
-      // 兼容旧格式
-      form.aiModelConfigs = [{
-        modelId: task?.aiModelConfigId || '',
-        promptId: task?.promptId || '',
-        modelName: task?.aiModelConfigName || '',
-        promptName: task?.prompt || ''
-      }]
     }
   } catch (error) {
     console.error('加载任务数据失败:', error)

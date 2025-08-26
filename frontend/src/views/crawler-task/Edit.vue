@@ -180,6 +180,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { useTaskStore } from '@/stores/task'
 import { useCrawlerStore } from '@/stores/crawler'
+import { type TaskStatus } from '@/api/task'
 
 const router = useRouter()
 const route = useRoute()
@@ -197,7 +198,7 @@ const form = reactive({
   description: '',
   crawlerId: '',
   priority: 2,
-  status: 'pending',
+  status: 'pending' as TaskStatus,
   mode: 'immediate',
   scheduledTime: '',
   retryCount: 3,
@@ -308,7 +309,7 @@ const loadTaskData = async () => {
       description: taskInfo?.description || '',
       crawlerId: taskInfo?.crawler_config_id || taskInfo?.crawlerConfigId || '',
       priority: taskInfo?.priority || 2,
-      status: taskInfo?.status || 'pending',
+      status: (taskInfo?.status || 'pending') as TaskStatus,
       mode: taskInfo?.config?.mode || taskInfo?.mode || 'immediate',
       scheduledTime: taskInfo?.config?.scheduledTime || taskInfo?.scheduledTime || '',
       retryCount: taskInfo?.config?.retryCount || taskInfo?.retryCount || 3,

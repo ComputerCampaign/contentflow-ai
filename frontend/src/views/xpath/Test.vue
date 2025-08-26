@@ -461,7 +461,21 @@ const confirmSave = async () => {
       status: 'active',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      usageCount: 0
+      usageCount: 0,
+      usage_count: 0, // 补充 usage_count 属性
+      // 补充 XPathConfig 接口中缺失的属性
+      id: '', // 假设后端会生成，这里给个空字符串或临时值
+      rule_id: '', // 假设后端会生成
+      config_id: '', // 假设后端会生成
+      field_name: saveForm.name, // 使用名称作为字段名
+      rule_type: testForm.extractType, // 假设 rule_type 和 extractType 相同
+      enabled: true, // 默认启用
+      domain_patterns: [], // 默认空数组
+      is_public: false, // 默认不公开
+      user_id: '', // 假设后端会从会话中获取
+      last_used_at: null, // 默认null
+      created_at: new Date().toISOString(), // 补充 created_at
+      updated_at: new Date().toISOString() // 补充 updated_at
     } as XPathConfig
     
     const success = await xpathStore.createXPathConfig(configData)

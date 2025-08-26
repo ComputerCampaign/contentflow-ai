@@ -86,6 +86,16 @@ export interface UpdateTaskParams {
   priority?: TaskPriority
   scheduledAt?: string
   config?: Record<string, any>
+  // 文本生成任务专用字段
+  sourceTaskId?: string
+  aiModelConfigId?: string
+  aiModelConfigName?: string // AI模型配置名称
+  prompt?: string
+  maxLength?: number
+  enableNotification?: boolean
+  notificationEmail?: string
+  status?: TaskStatus
+  type?: TaskType
 }
 
 // 任务查询参数

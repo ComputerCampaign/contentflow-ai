@@ -41,7 +41,7 @@ export interface XPathTestConfig {
   url: string
   xpath: string
   rule_type?: 'text' | 'image' | 'attr' | 'href'
-  extractType?: 'text' | 'html' | 'attr' | 'href'
+  extractType?: 'text' | 'html' | 'attr' | 'href' | 'image'
   attrName?: string
   processing?: string[]
 }

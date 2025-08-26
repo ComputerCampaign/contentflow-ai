@@ -118,7 +118,17 @@ export class PromptApiService extends BaseApiService {
       total: number
     }
   }>> {
-    return this.getPagedList<Prompt>(params)
+    const response = await this.getPagedList<Prompt>(params)
+    if (response.success && response.data) {
+      return {
+        ...response,
+        data: {
+          prompts: response.data.tasks,
+          pagination: response.data.pagination
+        }
+      }
+    }
+    return response as any
   }
 
   /**
@@ -215,7 +225,17 @@ export class PromptApiService extends BaseApiService {
       total: number
     }
   }>> {
-    return this.getPagedList<Prompt>({ ...params, keyword })
+    const response = await this.getPagedList<Prompt>({ ...params, keyword })
+    if (response.success && response.data) {
+      return {
+        ...response,
+        data: {
+          prompts: response.data.tasks,
+          pagination: response.data.pagination
+        }
+      }
+    }
+    return response as any
   }
 }
 

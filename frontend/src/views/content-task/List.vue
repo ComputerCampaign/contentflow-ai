@@ -366,13 +366,26 @@ const handleFormSuccess = () => {
   handleRefresh()
 }
 
+// AI配置接口定义
+interface AIModelConfig {
+  modelId?: string
+  modelName?: string
+  promptName?: string
+  id?: string
+  model_id?: string
+  name?: string
+  model_name?: string
+  prompt?: string
+  prompt_name?: string
+}
+
 // 辅助方法
 const getAiConfigList = (config: any) => {
   if (!config) return []
   
   // 处理新的后端数据结构：config.ai_model_configs 数组
   if (config.ai_model_configs && Array.isArray(config.ai_model_configs)) {
-    return config.ai_model_configs.map(aiConfig => ({
+    return config.ai_model_configs.map((aiConfig: AIModelConfig) => ({
       id: aiConfig.modelId,
       name: aiConfig.modelName,
       prompt: aiConfig.promptName,
@@ -393,7 +406,7 @@ const getAiConfigList = (config: any) => {
   
   // 兼容旧格式：如果是配置数组
   if (Array.isArray(config)) {
-    return config.map(aiConfig => ({
+    return config.map((aiConfig: AIModelConfig) => ({
       id: aiConfig.id || aiConfig.model_id,
       name: aiConfig.model_name || aiConfig.name,
       prompt: aiConfig.prompt_name || aiConfig.prompt,
@@ -403,17 +416,7 @@ const getAiConfigList = (config: any) => {
     }))
   }
   
-  // 兼容旧格式：如果是包含ai_configs数组的对象
-  if (config.ai_configs && Array.isArray(config.ai_configs)) {
-    return config.ai_configs.map(aiConfig => ({
-      id: aiConfig.id || aiConfig.model_id,
-      name: aiConfig.model_name || aiConfig.name,
-      prompt: aiConfig.prompt_name || aiConfig.prompt,
-      display: aiConfig.prompt_name 
-        ? `${aiConfig.model_name || aiConfig.name} - ${aiConfig.prompt_name}`
-        : aiConfig.model_name || aiConfig.name
-    }))
-  }
+
   
   return []
 }

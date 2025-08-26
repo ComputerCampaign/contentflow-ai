@@ -243,7 +243,7 @@ const handleEdit = () => {
 const handleStart = async () => {
   try {
     actionLoading.value = true
-    await taskStore.startTask(parseInt(route.params.id as string))
+    await taskStore.startTask(route.params.id as string)
     ElMessage.success('任务已开始执行')
     await loadTaskData()
   } catch (error) {
@@ -257,7 +257,7 @@ const handleStart = async () => {
 const handlePause = async () => {
   try {
     actionLoading.value = true
-    await taskStore.pauseTask(parseInt(route.params.id as string))
+    await taskStore.pauseTask(route.params.id as string)
     ElMessage.success('任务已暂停')
     await loadTaskData()
   } catch (error) {
@@ -271,7 +271,7 @@ const handlePause = async () => {
 const handleResume = async () => {
   try {
     actionLoading.value = true
-    await taskStore.resumeTask(parseInt(route.params.id as string))
+    await taskStore.resumeTask(route.params.id as string)
     ElMessage.success('任务已恢复')
     await loadTaskData()
   } catch (error) {
@@ -295,7 +295,7 @@ const handleStop = async () => {
     )
     
     actionLoading.value = true
-    await taskStore.stopTask(parseInt(route.params.id as string))
+    await taskStore.stopTask(route.params.id as string)
     ElMessage.success('任务已停止')
     await loadTaskData()
   } catch (error) {
@@ -310,7 +310,7 @@ const handleStop = async () => {
 
 const handleClone = async () => {
   try {
-    await taskStore.cloneTask(parseInt(route.params.id as string))
+    await taskStore.cloneTask(route.params.id as string)
     ElMessage.success('任务克隆成功')
     router.push('/tasks/list')
   } catch (error) {
@@ -359,7 +359,7 @@ const handleDelete = async () => {
       }
     )
     
-    await taskStore.deleteTask(parseInt(route.params.id as string))
+    await taskStore.deleteTask(route.params.id as string)
     ElMessage.success('任务删除成功')
     router.push(getTaskListPath(taskData.value?.type || 'web_scraping'))
   } catch (error) {
@@ -373,7 +373,7 @@ const handleDelete = async () => {
 const loadTaskData = async () => {
   try {
     const taskId = route.params.id as string
-    const task = await taskStore.fetchTaskById(parseInt(taskId))
+    const task = await taskStore.fetchTaskById(taskId)
     taskData.value = task
     
     // 加载爬虫配置信息
@@ -395,7 +395,7 @@ const loadTaskData = async () => {
 const loadTaskLogs = async () => {
   try {
     const taskId = route.params.id as string
-    await taskStore.fetchTaskLogs(parseInt(taskId), { page: 1, pageSize: 50 })
+    await taskStore.fetchTaskLogs(taskId, { page: 1, pageSize: 50 })
     logs.value = taskStore.taskLogs
   } catch (error) {
     console.error('加载任务日志失败:', error)
