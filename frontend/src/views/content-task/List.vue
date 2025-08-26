@@ -62,6 +62,24 @@
         />
       </template>
       
+      <!-- AI配置列 -->
+      <template #aiConfig="{ row }">
+        <div v-if="!getAiConfigList(row.config)?.length" class="text-gray-400">
+          -
+        </div>
+        <div v-else class="ai-config-container">
+          <el-tag
+            v-for="config in getAiConfigList(row.config)"
+            :key="config.id || config.name"
+            size="small"
+            type="primary"
+            class="ai-config-tag"
+          >
+            {{ config.display }}
+          </el-tag>
+        </div>
+      </template>
+      
       <!-- 操作列 -->
       <template #actions="{ row }">
         <el-dropdown trigger="click">
@@ -164,10 +182,10 @@ const columns: TableColumn[] = [
     slot: 'progress'
   },
   {
-    prop: 'aiConfig.name',
+    prop: 'aiConfig',
     label: 'AI配置',
-    minWidth: 150,
-    showOverflowTooltip: true
+    minWidth: 200,
+    slot: 'aiConfig'
   },
   {
     prop: 'createdAt',
@@ -348,6 +366,58 @@ const handleFormSuccess = () => {
   handleRefresh()
 }
 
+// 辅助方法
+const getAiConfigList = (config: any) => {
+  if (!config) return []
+  
+  // 处理新的后端数据结构：config.ai_model_configs 数组
+  if (config.ai_model_configs && Array.isArray(config.ai_model_configs)) {
+    return config.ai_model_configs.map(aiConfig => ({
+      id: aiConfig.modelId,
+      name: aiConfig.modelName,
+      prompt: aiConfig.promptName,
+      display: aiConfig.promptName 
+        ? `${aiConfig.modelName} - ${aiConfig.promptName}`
+        : aiConfig.modelName
+    }))
+  }
+  
+  // 兼容旧格式：如果是单个配置对象
+  if (config.name && !Array.isArray(config)) {
+    return [{
+      id: config.id || config.name,
+      name: config.name,
+      display: config.name
+    }]
+  }
+  
+  // 兼容旧格式：如果是配置数组
+  if (Array.isArray(config)) {
+    return config.map(aiConfig => ({
+      id: aiConfig.id || aiConfig.model_id,
+      name: aiConfig.model_name || aiConfig.name,
+      prompt: aiConfig.prompt_name || aiConfig.prompt,
+      display: aiConfig.prompt_name 
+        ? `${aiConfig.model_name || aiConfig.name} - ${aiConfig.prompt_name}`
+        : aiConfig.model_name || aiConfig.name
+    }))
+  }
+  
+  // 兼容旧格式：如果是包含ai_configs数组的对象
+  if (config.ai_configs && Array.isArray(config.ai_configs)) {
+    return config.ai_configs.map(aiConfig => ({
+      id: aiConfig.id || aiConfig.model_id,
+      name: aiConfig.model_name || aiConfig.name,
+      prompt: aiConfig.prompt_name || aiConfig.prompt,
+      display: aiConfig.prompt_name 
+        ? `${aiConfig.model_name || aiConfig.name} - ${aiConfig.prompt_name}`
+        : aiConfig.model_name || aiConfig.name
+    }))
+  }
+  
+  return []
+}
+
 // 生命周期
 onMounted(() => {
   handleRefresh()
@@ -361,5 +431,19 @@ onMounted(() => {
   .el-progress {
     width: 100%;
   }
+}
+
+.ai-config-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.ai-config-tag {
+  margin: 2px 0;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

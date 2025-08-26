@@ -65,28 +65,7 @@
             <div style="font-size: 12px; color: #999; margin-top: 4px;">只显示已完成的爬虫任务</div>
           </el-form-item>
           
-          <el-form-item label="AI模型配置" prop="aiModelConfigId">
-            <el-select
-              v-model="form.aiModelConfigId"
-              placeholder="请选择AI模型配置"
-              style="width: 100%"
-              filterable
-              @change="handleModelChange"
-            >
-              <el-option
-                v-for="model in aiModelList"
-                :key="model.id"
-                :label="model.name"
-                :value="model.id"
-              >
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <span>{{ model.name }}</span>
-                  <span style="color: #999; font-size: 12px;">{{ model.model_type }}</span>
-                </div>
-              </el-option>
-            </el-select>
-            <div style="font-size: 12px; color: #999; margin-top: 4px;">选择用于文本生成的AI模型</div>
-          </el-form-item>
+
           
           <el-form-item label="任务优先级" prop="priority">
             <el-select v-model="form.priority" placeholder="请选择任务优先级">
@@ -101,19 +80,99 @@
 
         <el-card class="form-section">
           <template #header>
-            <span class="section-title">生成配置</span>
+            <div class="section-header">
+              <span class="section-title">生成配置</span>
+              <el-button
+                type="primary"
+                size="small"
+                :icon="Plus"
+                @click="addAIModelConfig"
+              >
+                添加AI模型配置
+              </el-button>
+            </div>
           </template>
           
-          <el-form-item label="生成提示词" prop="prompt">
-            <el-input
-              v-model="form.prompt"
-              type="textarea"
-              :rows="4"
-              placeholder="请输入文本生成的提示词，如：请总结以下内容的要点..."
-              maxlength="1000"
-              show-word-limit
-            />
-          </el-form-item>
+          <!-- AI模型配置列表 -->
+          <div class="ai-model-configs">
+            <div
+              v-for="(config, index) in form.aiModelConfigs"
+              :key="index"
+              class="ai-model-config-item"
+            >
+              <div class="config-header">
+                <span class="config-title">AI模型配置 {{ index + 1 }}</span>
+                <el-button
+                  v-if="form.aiModelConfigs.length > 1"
+                  type="danger"
+                  size="small"
+                  text
+                  :icon="Delete"
+                  @click="removeAIModelConfig(index)"
+                >
+                  删除
+                </el-button>
+              </div>
+              
+              <el-row :gutter="16">
+                <el-col :span="12">
+                  <el-form-item
+                    :label="`AI模型 ${index + 1}`"
+                    :prop="`aiModelConfigs.${index}.modelId`"
+                    :rules="[{ required: true, message: '请选择AI模型', trigger: 'change' }]"
+                  >
+                    <el-select
+                      v-model="config.modelId"
+                      placeholder="请选择AI模型配置"
+                      style="width: 100%"
+                      filterable
+                      @change="handleModelChange(config, index)"
+                    >
+                      <el-option
+                        v-for="model in aiModelList"
+                        :key="model.id"
+                        :label="model.name"
+                        :value="model.id"
+                      >
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                          <span>{{ model.name }}</span>
+                          <span style="color: #999; font-size: 12px;">{{ model.model_type }}</span>
+                        </div>
+                      </el-option>
+                    </el-select>
+                  </el-form-item>
+                </el-col>
+                
+                <el-col :span="12">
+                  <el-form-item
+                    :label="`提示词 ${index + 1}`"
+                    :prop="`aiModelConfigs.${index}.promptId`"
+                    :rules="[{ required: true, message: '请选择提示词', trigger: 'change' }]"
+                  >
+                    <el-select
+                      v-model="config.promptId"
+                      placeholder="请选择提示词模板"
+                      style="width: 100%"
+                      filterable
+                      @change="handlePromptChange(config, index)"
+                    >
+                      <el-option
+                        v-for="prompt in promptTemplateOptions"
+                        :key="prompt.value"
+                        :label="prompt.label"
+                        :value="prompt.value"
+                      >
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                          <span>{{ prompt.label }}</span>
+                          <span style="color: #999; font-size: 12px;">{{ prompt.description }}</span>
+                        </div>
+                      </el-option>
+                    </el-select>
+                  </el-form-item>
+                </el-col>
+              </el-row>
+            </div>
+          </div>
           
           <el-form-item label="最大生成长度" prop="maxLength">
             <el-input-number
@@ -152,12 +211,14 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus, Delete } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { useTaskStore } from '@/stores/task'
 import { useCrawlerStore } from '@/stores/crawler'
 import taskApi, { type TaskPriority } from '@/api/task'
 import aiModelApi from '@/api/ai-model'
+import promptApi from '@/api/prompt'
 
 const router = useRouter()
 const route = useRoute()
@@ -168,13 +229,26 @@ const formRef = ref<FormInstance>()
 const loading = ref(false)
 const sourceTaskList = ref<any[]>([])
 const aiModelList = ref<any[]>([])
+const promptTemplateOptions = ref<any[]>([])
+
+// AI模型配置接口
+interface AIModelConfig {
+  modelId: string
+  promptId: string
+  modelName?: string
+  promptName?: string
+}
 
 const form = reactive({
   name: '',
   description: '',
   sourceTaskId: '',
-  aiModelConfigId: '',
-  prompt: '',
+  aiModelConfigs: [{
+    modelId: '',
+    promptId: '',
+    modelName: '',
+    promptName: ''
+  }] as AIModelConfig[],
   maxLength: 1000,
   enableNotification: false,
   notificationEmail: '',
@@ -188,13 +262,6 @@ const rules: FormRules = {
   ],
   sourceTaskId: [
     { required: true, message: '请选择数据源任务', trigger: 'change' }
-  ],
-  aiModelConfigId: [
-    { required: true, message: '请选择AI模型配置', trigger: 'change' }
-  ],
-  prompt: [
-    { required: true, message: '请输入生成提示词', trigger: 'blur' },
-    { min: 10, max: 1000, message: '提示词长度在 10 到 1000 个字符', trigger: 'blur' }
   ],
   notificationEmail: [
     { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }
@@ -231,9 +298,41 @@ const handleSubmit = async () => {
     loading.value = true
     
     const taskType = getTaskType()
+    
+    // 构建AI模型配置数据
+    const aiModelConfigs = form.aiModelConfigs.map(config => {
+      const selectedModel = aiModelList.value.find(model => model.id === config.modelId)
+      const selectedPrompt = promptTemplateOptions.value.find(prompt => prompt.value === config.promptId)
+      
+      return {
+        modelId: config.modelId,
+        modelName: selectedModel ? selectedModel.name : config.modelId,
+        promptId: config.promptId,
+        promptName: selectedPrompt ? selectedPrompt.label : config.promptId
+      }
+    })
+    
+    // 使用第一个AI模型配置作为主要配置（向后兼容）
+    const primaryConfig = aiModelConfigs[0]
+    
     await taskStore.createTask({
-      ...form,
-      type: taskType as any
+      name: form.name,
+      description: form.description,
+      sourceTaskId: form.sourceTaskId,
+      aiModelConfigName: primaryConfig.modelName, // 使用模型配置的名称
+      prompt: primaryConfig.promptName,
+      maxLength: form.maxLength,
+      enableNotification: form.enableNotification,
+      notificationEmail: form.notificationEmail,
+      priority: form.priority,
+      type: 'content_generation', // 明确指定任务类型
+      config: {
+        prompt: primaryConfig.promptName,
+        max_length: form.maxLength,
+        enable_notification: form.enableNotification,
+        notification_email: form.notificationEmail,
+        ai_model_configs: aiModelConfigs // 传递完整的AI模型配置列表
+      }
     })
     ElMessage.success('任务创建成功')
     router.push(getTaskListPath(taskType))
@@ -273,18 +372,50 @@ const formatDate = (dateString: string) => {
 const handleSourceTaskChange = (taskId: string) => {
   const selectedTask = sourceTaskList.value.find(task => task.id === taskId)
   if (selectedTask) {
-    // 可以根据选中的任务自动填充一些信息
-    if (!form.name) {
-      form.name = `${selectedTask.name}_文本生成`
-    }
+    // 自动生成任务名称
+    generateTaskName(selectedTask)
+  }
+}
+
+// 自动生成任务名称
+const generateTaskName = (sourceTask: any) => {
+  if (sourceTask && !form.name) {
+    form.name = `${sourceTask.name}_文本生成`
+  }
+}
+
+// 添加AI模型配置
+const addAIModelConfig = () => {
+  form.aiModelConfigs.push({
+    modelId: '',
+    promptId: '',
+    modelName: '',
+    promptName: ''
+  })
+}
+
+// 删除AI模型配置
+const removeAIModelConfig = (index: number) => {
+  if (form.aiModelConfigs.length > 1) {
+    form.aiModelConfigs.splice(index, 1)
   }
 }
 
 // 处理AI模型变化
-const handleModelChange = (modelId: string) => {
-  const selectedModel = aiModelList.value.find(model => model.id === modelId)
+const handleModelChange = (config: AIModelConfig, index: number) => {
+  const selectedModel = aiModelList.value.find(model => model.id === config.modelId)
   if (selectedModel) {
-    console.log('选中的AI模型:', selectedModel.name)
+    config.modelName = selectedModel.name
+    console.log(`AI模型配置 ${index + 1} 选中:`, selectedModel.name)
+  }
+}
+
+// 处理提示词变化
+const handlePromptChange = (config: AIModelConfig, index: number) => {
+  const selectedPrompt = promptTemplateOptions.value.find(prompt => prompt.value === config.promptId)
+  if (selectedPrompt) {
+    config.promptName = selectedPrompt.label
+    console.log(`提示词配置 ${index + 1} 选中:`, selectedPrompt.label)
   }
 }
 
@@ -298,7 +429,7 @@ const loadSourceTasks = async () => {
      })
      
      if (response.success && response.data) {
-       sourceTaskList.value = response.data.list.map(task => ({
+       sourceTaskList.value = response.data.tasks.map(task => ({
          id: task.id,
          name: task.name,
          status: task.status,
@@ -331,14 +462,36 @@ const loadAIModels = async () => {
   }
 }
 
-onMounted(() => {
-  loadSourceTasks()
-  loadAIModels()
+// 加载提示词模板列表
+const loadPromptTemplates = async () => {
+  try {
+    const response = await promptApi.getPromptTemplateOptions()
+    
+    if (response.success && response.data) {
+      promptTemplateOptions.value = response.data.map(item => ({
+        value: item.key,
+        label: item.label,
+        description: item.template.system || '系统提示词模板'
+      }))
+    }
+  } catch (error) {
+    console.error('加载提示词模板失败:', error)
+    ElMessage.error('加载提示词模板失败')
+  }
+}
+
+onMounted(async () => {
+  await Promise.all([loadSourceTasks(), loadAIModels(), loadPromptTemplates()])
   
-  // 如果URL参数中有source_task_id，自动选择
+  // 如果URL参数中有source_task_id，自动选择并生成任务名称
   const sourceTaskId = route.query.source_task_id as string
   if (sourceTaskId) {
     form.sourceTaskId = sourceTaskId
+    // 找到对应的源任务并自动生成任务名称
+    const selectedTask = sourceTaskList.value.find(task => task.id === sourceTaskId)
+    if (selectedTask) {
+      generateTaskName(selectedTask)
+    }
   }
 })
 </script>
@@ -362,6 +515,39 @@ onMounted(() => {
   .section-title {
     font-weight: 600;
     color: var(--el-text-color-primary);
+  }
+  
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+.ai-model-configs {
+  .ai-model-config-item {
+    border: 1px solid var(--el-border-color-light);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+    background-color: var(--el-bg-color-page);
+    
+    &:last-child {
+      margin-bottom: 0;
+    }
+    
+    .config-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      
+      .config-title {
+        font-weight: 500;
+        color: var(--el-text-color-primary);
+        font-size: 14px;
+      }
+    }
   }
 }
 

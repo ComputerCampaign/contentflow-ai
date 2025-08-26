@@ -69,6 +69,14 @@ export interface CreateTaskParams {
   crawlerConfigId?: string
   scheduledAt?: string
   config?: Record<string, any>
+  // 文本生成任务专用字段
+  sourceTaskId?: string
+  aiModelConfigId?: string
+  aiModelConfigName?: string // AI模型配置名称
+  prompt?: string
+  maxLength?: number
+  enableNotification?: boolean
+  notificationEmail?: string
 }
 
 // 更新任务参数
@@ -185,7 +193,21 @@ class TaskApiService extends BaseApiService {
       case 'publish':
       case 'content_generation':
         endpoint = '/tasks/content-generation'
-        requestData = params
+        // 转换为后端期望的格式
+        requestData = {
+          name: params.name,
+          source_task_id: params.sourceTaskId,
+          ai_model_config_name: params.aiModelConfigName, // 必须是模型配置的名称
+          description: params.description,
+          priority: params.priority || 2,
+          config: {
+            prompt: params.prompt,
+            max_length: params.maxLength || 1000,
+            enable_notification: params.enableNotification || false,
+            notification_email: params.notificationEmail || '',
+            ...params.config
+          }
+        }
         break
       default:
         throw new Error(`不支持的任务类型: ${params.type}`)
