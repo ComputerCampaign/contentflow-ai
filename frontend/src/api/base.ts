@@ -99,14 +99,6 @@ export abstract class BaseApiService {
   }
 
   /**
-   * 批量删除数据
-   * @param ids 数据ID数组
-   */
-  async batchDelete<T = any>(ids: (string | number)[]): Promise<StandardResponse<T>> {
-    return apiAdapter.post<T>(`${this.baseUrl}/batch-delete`, { ids })
-  }
-
-  /**
    * 批量操作
    * @param action 操作类型
    * @param ids 数据ID数组
@@ -117,7 +109,8 @@ export abstract class BaseApiService {
     ids: (string | number)[],
     data?: Record<string, any>
   ): Promise<StandardResponse<T>> {
-    return apiAdapter.post<T>(`${this.baseUrl}/batch-${action}`, {
+    return apiAdapter.post<T>(`${this.baseUrl}/batch-action`, {
+      action,
       ids,
       ...data
     })

@@ -248,7 +248,7 @@ class TaskApiService extends BaseApiService {
    * @param ids 任务ID数组
    */
   async batchDeleteTasks(ids: string[]): Promise<StandardResponse<void>> {
-    return this.batchDelete<void>(ids)
+    return this.batchAction<void>('delete', ids)
   }
 
   /**

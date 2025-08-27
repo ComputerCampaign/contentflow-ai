@@ -1294,7 +1294,7 @@ def delete_task(task_id):
         if task.status == 'running':
             return jsonify({
                 'success': False,
-                'message': '运行中的任务无法删除'
+                'message': '运行中的任务无法删除' 
             }), 400
         
         # 执行逻辑删除
@@ -1311,6 +1311,112 @@ def delete_task(task_id):
         return jsonify({
             'success': False,
             'message': '删除任务失败'
+        }), 500
+
+@tasks_bp.route('/batch-action', methods=['POST'])
+@jwt_required()
+def batch_task_action():
+    """批量操作任务（删除、启动、暂停、取消）"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({
+                'success': False,
+                'message': '用户不存在'
+            }), 401
+
+        data = request.get_json()
+        if not data or 'ids' not in data or 'action' not in data:
+            return jsonify({
+                'success': False,
+                'message': '请求数据不完整，需要ids和action字段'
+            }), 400
+
+        task_ids = data['ids']
+        action = data['action']
+
+        if not isinstance(task_ids, list) or not task_ids:
+            return jsonify({
+                'success': False,
+                'message': 'ids必须是非空列表'
+            }), 400
+
+        if action not in ['delete', 'execute', 'pause', 'cancel']:
+            return jsonify({
+                'success': False,
+                'message': '无效的操作类型'
+            }), 400
+
+        # 批量查询任务
+        tasks = Task.query.filter(
+            Task.id.in_(task_ids),
+            Task.user_id == current_user.id,
+            Task.is_deleted == False
+        ).all()
+
+        if len(tasks) != len(task_ids):
+            # 找出不存在或不属于当前用户的任务ID
+            found_ids = {task.id for task in tasks}
+            missing_ids = [tid for tid in task_ids if tid not in found_ids]
+            return jsonify({
+                'success': False,
+                'message': f'部分任务不存在或无权操作: {missing_ids}'
+            }), 404
+
+        success_count = 0
+        failed_tasks = []
+
+        for task in tasks:
+            try:
+                if action == 'delete':
+                    if task.status == 'running':
+                        failed_tasks.append({'id': task.id, 'message': '运行中的任务无法删除'})
+                        continue
+                    task.soft_delete()
+                elif action == 'execute':
+                    if task.status == 'running':
+                        failed_tasks.append({'id': task.id, 'message': '任务已在运行中'})
+                        continue
+                    # 触发任务执行逻辑，这里简化为更新状态
+                    task.status = 'pending' # 假设触发后状态变为pending等待调度
+                    # TODO: 实际集成Airflow触发DAG的逻辑
+                elif action == 'pause':
+                    if task.status not in ['running', 'pending']:
+                        failed_tasks.append({'id': task.id, 'message': '只有运行中或待处理的任务才能暂停'})
+                        continue
+                    task.status = 'paused'
+                elif action == 'cancel':
+                    if task.status not in ['running', 'pending', 'paused']:
+                        failed_tasks.append({'id': task.id, 'message': '只有运行中、待处理或暂停的任务才能取消'})
+                        continue
+                    task.status = 'cancelled'
+                
+                task.updated_at = datetime.utcnow()
+                db.session.add(task)
+                success_count += 1
+            except Exception as e:
+                failed_tasks.append({'id': task.id, 'message': str(e)})
+
+        db.session.commit()
+
+        if failed_tasks:
+            return jsonify({
+                'success': False,
+                'message': f'部分任务操作失败，成功 {success_count} 个，失败 {len(failed_tasks)} 个。详情：{failed_tasks}',
+                'data': {'success_count': success_count, 'failed_tasks': failed_tasks}
+            }), 200
+        else:
+            return jsonify({
+                'success': True,
+                'message': f'成功对 {success_count} 个任务执行了 {action} 操作'
+            }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"批量操作任务失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': '批量操作失败'
         }), 500
 
 

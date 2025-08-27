@@ -268,7 +268,7 @@ class CrawlerApiService extends BaseApiService {
    * @param ids 配置ID数组
    */
   async batchDeleteCrawlerConfigs(ids: number[]): Promise<StandardResponse<void>> {
-    return this.batchDelete<void>(ids)
+    return this.batchAction<void>('delete', ids)
   }
 
   /**

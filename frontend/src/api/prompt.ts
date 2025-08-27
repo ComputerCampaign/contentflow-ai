@@ -186,7 +186,7 @@ export class PromptApiService extends BaseApiService {
    * @param ids 提示词ID数组
    */
   async batchDeletePrompts(ids: string[]): Promise<StandardResponse<void>> {
-    return this.batchDelete<void>(ids)
+    return this.batchAction<void>('delete', ids)
   }
 
   /**
