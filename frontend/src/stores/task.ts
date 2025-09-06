@@ -472,10 +472,11 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   // 获取任务统计
-  const fetchTaskStatistics = async (): Promise<void> => {
+  const fetchTaskStatistics = async (taskType?: TaskType): Promise<void> => {
     try {
       statisticsLoading.value = true
-      const response = await taskApi.getTaskStats()
+      const params = taskType ? { task_type: taskType } : undefined
+      const response = await taskApi.getTaskStats(params)
       
       if (response.success && response.data) {
         taskStatistics.value = response.data

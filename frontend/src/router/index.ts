@@ -98,17 +98,7 @@ const routes: RouteRecordRaw[] = [
           activeMenu: '/crawler-tasks/list'
         }
       },
-      {
-        path: 'detail/:id',
-        name: 'CrawlerTaskDetail',
-        component: () => import('@/views/crawler-task/Detail.vue'),
-        meta: {
-          title: '爬虫任务详情',
-          icon: 'detail',
-          hidden: true,
-          activeMenu: '/crawler-tasks/list'
-        }
-      },
+
       {
         path: 'monitor',
         name: 'CrawlerTaskMonitor',

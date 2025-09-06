@@ -7,7 +7,7 @@ API蓝图模块
 from flask import Blueprint
 from backend.api.auth import auth_bp
 from backend.api.tasks import tasks_bp
-from backend.api.crawler import crawler_bp
+from backend.api.crawler_configs import crawler_configs_bp
 from backend.api.monitoring import monitoring_bp
 from backend.api.xpath import xpath_bp
 # ai_config和ai_content_config已合并到ai_model中
@@ -29,7 +29,7 @@ def register_blueprints(app):
     app.register_blueprint(tasks_bp, url_prefix=f'{api_prefix}/tasks')
     
     # 注册爬虫配置API
-    app.register_blueprint(crawler_bp, url_prefix=f'{api_prefix}/crawler-configs')
+    app.register_blueprint(crawler_configs_bp, url_prefix=f'{api_prefix}/crawler-configs')
     
     # 注册XPath配置API
     app.register_blueprint(xpath_bp, url_prefix=f'{api_prefix}/xpath')
@@ -57,7 +57,7 @@ __all__ = [
     'register_blueprints',
     'auth_bp',
     'tasks_bp', 
-    'crawler_bp',
+    'crawler_configs_bp',
     'xpath_bp',
     'ai_config_bp',
     'ai_content_config_bp',

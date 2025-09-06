@@ -8,8 +8,9 @@ from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from backend.extensions import db, limiter
 from backend.models.user import User
-from backend.models.task import Task, TaskExecution
-from backend.models.crawler import CrawlerConfig, CrawlerResult
+from backend.models.task import Task
+from backend.models.crawler_configs import CrawlerConfig
+from backend.models.crawler_result import CrawlerResult
 
 from datetime import datetime, timedelta
 from sqlalchemy import func, and_
@@ -100,10 +101,7 @@ def get_overview_stats():
         user_config_ids = [config.id for config in CrawlerConfig.query.filter_by(user_id=current_user.id).all()]
         
         recent_activity = {
-            'task_executions': TaskExecution.query.filter(
-                TaskExecution.task_id.in_(user_task_ids),
-                TaskExecution.created_at >= last_24h
-            ).count() if user_task_ids else 0,
+            'task_executions': 0,  # TaskExecution功能已移除
             'crawler_results': CrawlerResult.query.filter(
                 CrawlerResult.config_id.in_(user_config_ids),
                 CrawlerResult.created_at >= last_24h
@@ -182,17 +180,9 @@ def get_system_stats():
         # 性能统计
         last_24h = datetime.utcnow() - timedelta(hours=24)
         performance_stats = {
-            'task_executions_24h': TaskExecution.query.filter(
-                TaskExecution.created_at >= last_24h
-            ).count(),
-            'successful_executions_24h': TaskExecution.query.filter(
-                TaskExecution.created_at >= last_24h,
-                TaskExecution.status == 'success'
-            ).count(),
-            'failed_executions_24h': TaskExecution.query.filter(
-                TaskExecution.created_at >= last_24h,
-                TaskExecution.status == 'failed'
-            ).count()
+            'task_executions_24h': 0,  # TaskExecution功能已移除
+            'successful_executions_24h': 0,  # TaskExecution功能已移除
+            'failed_executions_24h': 0  # TaskExecution功能已移除
         }
         
         return jsonify({
@@ -236,17 +226,8 @@ def get_performance_stats():
         # 获取用户的任务ID列表
         user_task_ids = [task.id for task in Task.query.filter_by(user_id=current_user.id, is_deleted=False).all()]
         
-        # 任务执行性能 - 使用简单字段查询
-        task_performance = db.session.query(
-            func.date(TaskExecution.created_at).label('date'),
-            func.count(TaskExecution.id).label('total'),
-            func.sum(func.case([(TaskExecution.status == 'success', 1)], else_=0)).label('success'),
-            func.sum(func.case([(TaskExecution.status == 'failed', 1)], else_=0)).label('failed'),
-            func.avg(TaskExecution.duration).label('avg_duration')
-        ).filter(
-            TaskExecution.task_id.in_(user_task_ids),
-            TaskExecution.created_at >= start_date
-        ).group_by(func.date(TaskExecution.created_at)).all() if user_task_ids else []
+        # 任务执行性能 - TaskExecution功能已移除
+        task_performance = []
         
         # 获取用户的配置ID列表
         user_config_ids = [config.id for config in CrawlerConfig.query.filter_by(user_id=current_user.id).all()]
@@ -265,14 +246,7 @@ def get_performance_stats():
 
         
         # 格式化数据
-        task_data = [{
-            'date': row.date.isoformat(),
-            'total': row.total,
-            'success': row.success or 0,
-            'failed': row.failed or 0,
-            'success_rate': (row.success or 0) / row.total if row.total > 0 else 0,
-            'avg_duration': float(row.avg_duration) if row.avg_duration else 0
-        } for row in task_performance]
+        task_data = []  # TaskExecution功能已移除
         
         crawler_data = [{
             'date': row.date.isoformat(),
@@ -381,22 +355,8 @@ def get_alerts():
         alerts = []
         
         # 检查用户相关的告警
-        # 1. 失败的任务执行 - 使用简单字段查询
-        last_hour = datetime.utcnow() - timedelta(hours=1)
-        user_task_ids = [task.id for task in Task.query.filter_by(user_id=current_user.id, is_deleted=False).all()]
-        failed_tasks = TaskExecution.query.filter(
-            TaskExecution.task_id.in_(user_task_ids),
-            TaskExecution.status == 'failed',
-            TaskExecution.created_at >= last_hour
-        ).count() if user_task_ids else 0
-        
-        if failed_tasks > 0:
-            alerts.append({
-                'type': 'warning',
-                'message': f'最近1小时内有{failed_tasks}个任务执行失败',
-                'timestamp': datetime.utcnow().isoformat(),
-                'category': 'task_execution'
-            })
+        # 1. 失败的任务执行 - TaskExecution功能已移除
+        # 不再检查任务执行失败告警
         
         # 2. 长时间运行的任务
         long_running_tasks = Task.query.filter(
@@ -471,10 +431,7 @@ def get_metrics():
                 'pending_tasks': Task.query.filter_by(
                     user_id=current_user.id, status='pending', is_deleted=False
                 ).count(),
-                'total_executions_today': TaskExecution.query.filter(
-                    TaskExecution.task_id.in_(user_task_ids),
-                    func.date(TaskExecution.created_at) == datetime.utcnow().date()
-                ).count() if user_task_ids else 0
+                'total_executions_today': 0  # TaskExecution功能已移除
             }
         }
         

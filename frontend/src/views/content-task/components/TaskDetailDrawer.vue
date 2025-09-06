@@ -119,16 +119,16 @@
             <div v-if="task.type === 'crawler'" class="crawler-results">
               <el-row :gutter="16" class="result-stats">
                 <el-col :span="6">
-                  <el-statistic title="处理项数" :value="taskResults.items_processed || 0" />
+                  <el-statistic title="处理项数" :value="taskResults?.execution_stats?.items_processed || 0" />
                 </el-col>
                 <el-col :span="6">
-                  <el-statistic title="成功项数" :value="taskResults.items_success || 0" />
+                  <el-statistic title="成功项数" :value="taskResults?.execution_stats?.items_success || 0" />
                 </el-col>
                 <el-col :span="6">
-                  <el-statistic title="失败项数" :value="taskResults.items_failed || 0" />
+                  <el-statistic title="失败项数" :value="taskResults?.execution_stats?.items_failed || 0" />
                 </el-col>
                 <el-col :span="6">
-                  <el-statistic title="执行时长" :value="taskResults.duration || 0" suffix="秒" />
+                  <el-statistic title="执行时长" :value="taskResults?.execution_stats?.duration || 0" suffix="秒" />
                 </el-col>
               </el-row>
               
@@ -156,16 +156,16 @@
             <div v-else-if="task.type === 'content_generation'" class="content-results">
               <el-row :gutter="16" class="result-stats">
                 <el-col :span="6">
-                  <el-statistic title="处理项数" :value="taskResults.items_processed || 0" />
+                  <el-statistic title="处理项数" :value="taskResults?.execution_stats?.items_processed || 0" />
                 </el-col>
                 <el-col :span="6">
-                  <el-statistic title="成功项数" :value="taskResults.items_success || 0" />
+                  <el-statistic title="成功项数" :value="taskResults?.execution_stats?.items_success || 0" />
                 </el-col>
                 <el-col :span="6">
-                  <el-statistic title="失败项数" :value="taskResults.items_failed || 0" />
+                  <el-statistic title="失败项数" :value="taskResults?.execution_stats?.items_failed || 0" />
                 </el-col>
                 <el-col :span="6">
-                  <el-statistic title="执行时长" :value="taskResults.duration || 0" suffix="秒" />
+                  <el-statistic title="执行时长" :value="taskResults?.execution_stats?.duration || 0" suffix="秒" />
                 </el-col>
               </el-row>
               
@@ -189,16 +189,16 @@
             <div v-else-if="task.type === 'combined'" class="combined-results">
               <el-row :gutter="16" class="result-stats">
                 <el-col :span="6">
-                  <el-statistic title="处理项数" :value="taskResults.items_processed || 0" />
+                  <el-statistic title="处理项数" :value="taskResults?.execution_stats?.items_processed || 0" />
                 </el-col>
                 <el-col :span="6">
-                  <el-statistic title="成功项数" :value="taskResults.items_success || 0" />
+                  <el-statistic title="成功项数" :value="taskResults?.execution_stats?.items_success || 0" />
                 </el-col>
                 <el-col :span="6">
-                  <el-statistic title="失败项数" :value="taskResults.items_failed || 0" />
+                  <el-statistic title="失败项数" :value="taskResults?.execution_stats?.items_failed || 0" />
                 </el-col>
                 <el-col :span="6">
-                  <el-statistic title="执行时长" :value="taskResults.duration || 0" suffix="秒" />
+                  <el-statistic title="执行时长" :value="taskResults?.execution_stats?.duration || 0" suffix="秒" />
                 </el-col>
               </el-row>
               
@@ -470,11 +470,21 @@ const copyCommand = async () => {
 const refreshResults = async () => {
   if (!props.task?.id) return
   
+  console.log('开始获取任务结果，任务ID:', props.task.id)
   resultsLoading.value = true
   try {
     await taskStore.fetchTaskResults(props.task.id, { page: 1, pageSize: 100 })
     taskResults.value = taskStore.taskResults || null
+    
+    // 添加调试信息
+    console.log('获取到的taskResults:', taskResults.value)
+    console.log('任务类型:', taskResults.value?.task_type)
+    console.log('是否有结果:', !!taskResults.value?.results)
+    console.log('结果数量:', taskResults.value?.results?.length || 0)
+    console.log('是否有执行统计:', !!taskResults.value?.execution_stats)
+    console.log('执行统计:', taskResults.value?.execution_stats)
   } catch (error) {
+    console.error('获取任务结果失败:', error)
     ElMessage.error('获取结果失败')
   } finally {
     resultsLoading.value = false

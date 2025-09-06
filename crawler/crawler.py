@@ -15,7 +15,7 @@ from crawler.config import crawler_config
 from crawler.logger import setup_logger
 
 # 设置日志
-logger = setup_logger(__name__, file_path=__file__)
+logger = setup_logger('crawler.crawler', file_path=__file__)
 
 # 简化的通知器类
 class SimpleNotifier:
@@ -74,6 +74,103 @@ def _update_task_status_via_api(task_id, status, result=None, error_message=None
         logger.error(f"💥 [CRAWLER] 调用后端接口更新任务状态失败: {str(e)}")
         # 不抛出异常，避免影响爬虫主流程
 
+def _upload_crawler_results(task_dir, task_id=None):
+    """上传爬虫结果到后端数据库
+    
+    Args:
+        task_dir (str): 任务目录路径
+        task_id (str, optional): 任务ID
+    """
+    try:
+        if not task_dir or not os.path.exists(task_dir):
+            logger.error(f"❌ [CRAWLER] 任务目录不存在: {task_dir}")
+            return False
+            
+        # 查找metadata.json文件
+        metadata_path = os.path.join(task_dir, 'metadata', 'metadata.json')
+        if not os.path.exists(metadata_path):
+            logger.error(f"❌ [CRAWLER] metadata.json文件不存在: {metadata_path}")
+            return False
+            
+        # 读取metadata文件
+        with open(metadata_path, 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+            
+        logger.info(f"📄 [CRAWLER] 读取metadata文件成功: {metadata_path}")
+        
+        # 获取task_id，优先使用传入的task_id，其次使用metadata中的task_id
+        actual_task_id = task_id or metadata.get('task_id')
+        
+        # 转换为爬虫结果格式
+        crawler_result = {
+            'task_id': actual_task_id,  # 在顶层设置task_id作为主要标识符
+            'url': metadata.get('url', ''),
+            'title': metadata.get('title', ''),
+            'content': metadata.get('description', ''),
+            'extracted_data': {
+                'images': metadata.get('images', []),
+                'texts': metadata.get('texts', []),
+                'links': metadata.get('links', []),
+                'comments': metadata.get('comments', []),
+                'comments_count': metadata.get('comments_count', 0),
+                'xpath_rules_used': metadata.get('xpath_rules_used', []),
+                'task_id': actual_task_id  # 在extracted_data中也保留task_id
+            },
+            'page_metadata': {
+                'crawl_time': metadata.get('crawl_time'),
+                'task_name': metadata.get('task_name'),
+                'download_result': metadata.get('download_result', [])
+            },
+            'status': 'success',
+            'error_message': None,
+            'response_code': 200,
+            'response_time': 1.5,
+            'content_type': 'text/html',
+            'content_length': len(str(metadata)),
+            'processing_time': 2.0,
+            'retry_count': 0,
+            'images': metadata.get('images', []),
+            'files': metadata.get('download_result', [])
+        }
+        
+        payload = {
+            'results': [crawler_result],
+        }
+            
+        # 上传到后端API
+        url = f"{os.getenv('BACKEND_API_URL', 'http://localhost:5002/api/v1')}/tasks/crawler/results/upload"
+        headers = {
+            'Content-Type': 'application/json',
+            'X-API-Key': os.getenv('AIRFLOW_API_KEY', 'airflow-secret-key')
+        }
+        
+        logger.info(f"🌐 [CRAWLER] 上传爬虫结果到后端API")
+        logger.info(f"   - URL: {url}")
+        logger.info(f"   - 数据条数: {len(payload['results'])}")
+        logger.info(f"   - API Key: {headers['X-API-Key'][:10]}...")
+        
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
+        
+        if response.status_code == 201:
+            logger.info(f"✅ [CRAWLER] 爬虫结果上传成功")
+            try:
+                response_data = response.json()
+                logger.info(f"   - 上传条数: {response_data.get('data', {}).get('uploaded_count', 0)}")
+                logger.info(f"   - 成功条数: {response_data.get('data', {}).get('success_count', 0)}")
+                logger.info(f"   - 失败条数: {response_data.get('data', {}).get('failed_count', 0)}")
+                return True
+            except:
+                logger.info(f"   - 后端响应: {response.text}")
+                return True
+        else:
+            logger.error(f"❌ [CRAWLER] 上传爬虫结果失败: HTTP {response.status_code}")
+            logger.error(f"   - 响应内容: {response.text}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"💥 [CRAWLER] 上传爬虫结果失败: {str(e)}")
+        return False
+
 class Crawler:
     """网页爬虫，用于抓取图片和标题信息"""
     
@@ -103,18 +200,19 @@ class Crawler:
         logger.info(f"爬虫初始化完成，输出目录: {self.crawler_core.output_dir}, 数据目录: {self.crawler_core.data_dir}")
         logger.info(f"邮件通知: {'已启用' if notifier.enabled else '未启用'}")
     
-    def crawl(self, url, rule_ids=None, task_name=None):
+    def crawl(self, url, rule_ids=None, task_name=None, task_id=None):
         """爬取指定URL的图片和标题
         
         Args:
             url (str): 要爬取的URL
             rule_ids (list, optional): XPath规则ID列表，用于指定使用哪些XPath规则
             task_name (str, optional): 任务名称，用作数据存储的文件夹名称
+            task_id (str, optional): 任务ID，用于存储到元数据中
             
         Returns:
             tuple: (是否成功, 任务名称, 任务目录)
         """
-        result = self.crawler_core.crawl_url(url, task_name, rule_ids=rule_ids)
+        result = self.crawler_core.crawl_url(url, task_name, rule_ids=rule_ids, task_id=task_id)
         if result.get('success'):
             return True, result.get('task_name'), result.get('task_dir')
         else:
@@ -214,10 +312,19 @@ def main():
         
         # 开始爬取，传入规则ID列表、任务ID和任务名称
         task_name = args.task_name if args.task_name else args.task_id
-        success, task_id, task_dir = crawler.crawl(args.url, rule_ids, task_name)
+        success, task_id, task_dir = crawler.crawl(args.url, rule_ids, task_name, args.task_id)
         
         # 打印爬取结果信息
         logger.info(f"🎯 [CRAWLER] 爬取结果 - 成功: {success}, 任务ID: {task_id}, 任务目录: {task_dir}")
+        
+        # 如果爬取成功，上传爬虫结果到数据库
+        if success and task_dir:
+            logger.info(f"📤 [CRAWLER] 准备上传爬虫结果到数据库")
+            upload_success = _upload_crawler_results(task_dir, args.task_id)
+            if upload_success:
+                logger.info(f"✅ [CRAWLER] 爬虫结果上传成功")
+            else:
+                logger.warning(f"⚠️ [CRAWLER] 爬虫结果上传失败，但不影响爬取任务")
         
         # 调用后端接口更新任务状态
         if args.task_id:

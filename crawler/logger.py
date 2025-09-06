@@ -25,10 +25,8 @@ def setup_logger(name: str, level: int = logging.INFO, file_path: Optional[str] 
     """
     logger = logging.getLogger(name)
     
-    # 如果已经配置过，直接返回
-    if logger.handlers:
-        return logger
-    
+    # 清除现有的处理器，重新配置
+    logger.handlers.clear()
     logger.setLevel(level)
     
     # 创建格式化器
@@ -47,7 +45,8 @@ def setup_logger(name: str, level: int = logging.INFO, file_path: Optional[str] 
     if file_path:
         # 确定日志目录
         if os.path.isfile(file_path):
-            log_dir = os.path.join(os.path.dirname(file_path), '..', '..', 'logs')
+            # 从 crawler/crawler/xxx.py 向上一级到 crawler/ 目录，然后添加 logs
+            log_dir = os.path.join(os.path.dirname(file_path), '..', 'logs')
         else:
             log_dir = os.path.join(os.getcwd(), 'logs')
         

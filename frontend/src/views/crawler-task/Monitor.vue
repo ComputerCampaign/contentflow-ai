@@ -234,6 +234,19 @@
             </div>
           </div>
         </div>
+        
+        <!-- 分页组件 -->
+        <div class="mt-4 flex justify-center">
+          <el-pagination
+            v-model:current-page="page"
+            v-model:page-size="pageSize"
+            :page-sizes="[5, 10, 20, 50]"
+            :total="total"
+            layout="total, sizes, prev, pager, next, jumper"
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange"
+          />
+        </div>
       </div>
     </el-card>
     
@@ -260,11 +273,14 @@ import {
   Close
 } from '@element-plus/icons-vue'
 import { useTaskStore } from '@/stores/task'
+import { useUserStore } from '@/stores/user'
+import taskApi from '@/api/task'
 import PageHeader from '@/components/common/PageHeader.vue'
 import TaskDetailDrawer from './components/TaskDetailDrawer.vue'
 
 // 状态管理
 const taskStore = useTaskStore()
+const userStore = useUserStore()
 
 // 响应式数据
 const loading = ref(false)
@@ -272,6 +288,11 @@ const autoRefresh = ref(true)
 const detailVisible = ref(false)
 const currentTask = ref<any>(null)
 const refreshTimer = ref<number | null>(null)
+
+// 分页相关数据
+const page = ref(1)
+const pageSize = ref(10)
+const total = ref(0)
 
 // 统计数据
 const stats = reactive({
@@ -342,48 +363,87 @@ const formatTime = (time: string | null) => {
 
 // 数据加载方法
 const loadTasks = async () => {
-  loading.value = true
+  console.log('开始执行loadTasks方法...')
   try {
-    const queryParams: any = {}
+    loading.value = true
     
+    // 构建查询参数
+    const queryParams: any = {
+      page: page.value,
+      pageSize: pageSize.value
+    }
+    
+    // 添加过滤条件
     if (filters.status) {
       queryParams.status = filters.status
     }
     if (filters.priority) {
       queryParams.priority = filters.priority
     }
-    if (filters.dateRange) {
+    if (filters.dateRange && filters.dateRange.length === 2) {
       queryParams.startTime = filters.dateRange[0]
       queryParams.endTime = filters.dateRange[1]
     }
     
-    await taskStore.fetchTasks(queryParams)
-    tasks.value = taskStore.tasks
+    console.log('请求参数:', queryParams)
+    console.log('调用taskStore.fetchTasks...')
     
-    // 更新统计数据
-    updateStats()
-  } catch (error) {
-    ElMessage.error('获取任务列表失败')
+    await taskStore.fetchTasks(queryParams)
+    
+    console.log('API响应:', { tasks: taskStore.tasks, pagination: taskStore.pagination })
+    
+    tasks.value = taskStore.tasks
+    // 同步分页信息
+    total.value = taskStore.pagination.total
+    
+    console.log('任务数据已更新:', {
+      tasksCount: tasks.value.length,
+      total: total.value
+    })
+  } catch (err) {
+    console.error('加载任务失败:', err)
+    ElMessage.error(err instanceof Error ? err.message : '加载任务失败')
   } finally {
     loading.value = false
   }
 }
 
+// 加载统计数据
+const loadStats = async () => {
+  try {
+    console.log('开始加载任务统计数据...')
+    const response = await taskApi.getTaskStats({ task_type: 'crawler' })
+    
+    if (response.success && response.data) {
+      console.log('任务统计数据加载成功:', response.data)
+      // 处理后端返回的数据结构 { status_stats: {...}, type_stats: {...} }
+      const responseData = response.data as any
+      const statusStats = responseData.status_stats || responseData || {}
+      stats.running = statusStats.running || 0
+      stats.pending = statusStats.pending || 0
+      stats.completed = statusStats.completed || 0
+      stats.failed = statusStats.failed || 0
+      
+      console.log('统计数据已更新:', stats)
+    } else {
+      console.error('获取统计数据失败:', response.message)
+      ElMessage.error('获取统计数据失败')
+    }
+  } catch (error) {
+    console.error('加载统计数据失败:', error)
+    ElMessage.error('加载统计数据失败')
+  }
+}
+
 const updateStats = () => {
-  const statusCounts = tasks.value.reduce((acc, task) => {
-    acc[task.status] = (acc[task.status] || 0) + 1
-    return acc
-  }, {} as Record<string, number>)
-  
-  stats.running = statusCounts.running || 0
-  stats.pending = statusCounts.pending || 0
-  stats.completed = statusCounts.completed || 0
-  stats.failed = statusCounts.failed || 0
+  // 现在使用独立的API加载统计数据，而不是基于当前分页数据计算
+  loadStats()
 }
 
 // 事件处理方法
 const handleRefresh = () => {
   loadTasks()
+  loadStats() // 同时刷新统计数据
 }
 
 const handleFilter = () => {
@@ -398,11 +458,24 @@ const handleReset = () => {
 }
 
 const handleAutoRefreshChange = (value: boolean) => {
+  autoRefresh.value = value
   if (value) {
     startAutoRefresh()
   } else {
     stopAutoRefresh()
   }
+}
+
+// 分页事件处理
+const handleSizeChange = (newSize: number) => {
+  pageSize.value = newSize
+  page.value = 1 // 重置到第一页
+  loadTasks()
+}
+
+const handleCurrentChange = (newPage: number) => {
+  page.value = newPage
+  loadTasks()
 }
 
 const startAutoRefresh = () => {
@@ -412,7 +485,8 @@ const startAutoRefresh = () => {
   
   refreshTimer.value = setInterval(() => {
     loadTasks()
-  }, 5000) // 每5秒刷新一次
+    loadStats() // 同时刷新统计数据
+  }, 60000) // 每1分钟刷新一次
 }
 
 const stopAutoRefresh = () => {
@@ -432,6 +506,7 @@ const handleStart = async (task: any) => {
     await taskStore.startTask(task.id)
     ElMessage.success('任务启动成功')
     loadTasks()
+    loadStats() // 更新统计数据
   } catch (error) {
     ElMessage.error('任务启动失败')
   }
@@ -442,6 +517,7 @@ const handlePause = async (task: any) => {
     await taskStore.pauseTask(task.id)
     ElMessage.success('任务暂停成功')
     loadTasks()
+    loadStats() // 更新统计数据
   } catch (error) {
     ElMessage.error('任务暂停失败')
   }
@@ -452,6 +528,7 @@ const handleStop = async (task: any) => {
     await taskStore.stopTask(task.id)
     ElMessage.success('任务停止成功')
     loadTasks()
+    loadStats() // 更新统计数据
   } catch (error) {
     ElMessage.error('任务停止失败')
   }
@@ -459,7 +536,29 @@ const handleStop = async (task: any) => {
 
 // 生命周期
 onMounted(() => {
+  console.log('Monitor页面已挂载，开始初始化...')
+  console.log('用户token:', userStore.token)
+  console.log('用户登录状态:', userStore.isLoggedIn)
+  console.log('用户信息:', userStore.userInfo)
+  console.log('用户权限:', userStore.permissions)
+  
+  // 检查用户是否有访问权限
+  if (!userStore.token || !userStore.isLoggedIn) {
+    console.warn('用户未登录，无法加载任务数据')
+    ElMessage.warning('请先登录后再访问此页面')
+    return
+  }
+  
+  if (!userStore.permissions.includes('task:view') && !userStore.permissions.includes('*') && !userStore.permissions.includes('admin:*')) {
+    console.warn('用户没有task:view权限，无法加载任务数据')
+    ElMessage.warning('您没有查看任务的权限')
+    return
+  }
+  
+  console.log('开始加载任务数据和统计数据...')
+  // 同时加载任务列表和统计数据
   loadTasks()
+  loadStats()
   if (autoRefresh.value) {
     startAutoRefresh()
   }

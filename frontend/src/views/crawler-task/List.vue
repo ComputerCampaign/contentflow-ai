@@ -68,12 +68,11 @@
           <el-button size="small" :icon="More" />
           <template #dropdown>
             <el-dropdown-menu>
+
               <el-dropdown-item :icon="Edit" @click="handleEdit(row)">
                 编辑
               </el-dropdown-item>
-              <el-dropdown-item :icon="CopyDocument" @click="handleClone(row)">
-                克隆
-              </el-dropdown-item>
+
               <el-dropdown-item :icon="Plus" @click="handleCreateContentTask(row)">
                 创建文本生成任务
               </el-dropdown-item>
@@ -117,10 +116,8 @@ import {
   Download,
   VideoPlay,
   VideoPause,
-  View,
   Edit,
-  More,
-  CopyDocument
+  More
 } from '@element-plus/icons-vue'
 import { useTaskStore } from '@/stores/task'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -297,15 +294,7 @@ const handleDelete = async (task: any) => {
   }
 }
 
-const handleClone = async (task: any) => {
-  try {
-    await taskStore.cloneTask(task.id)
-    ElMessage.success('克隆成功')
-    handleRefresh()
-  } catch (error) {
-    ElMessage.error('克隆失败')
-  }
-}
+
 
 const handleExport = () => {
   // TODO: 实现导出功能

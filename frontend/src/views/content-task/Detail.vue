@@ -382,8 +382,8 @@ const loadTaskData = async () => {
         crawlerData.value = crawler
       }
     
-    // 加载任务统计信息
-    await taskStore.fetchTaskStatistics()
+    // 加载任务统计信息（传递内容生成任务类型）
+    await taskStore.fetchTaskStatistics('content_generation')
     // taskStats.value = taskStore.taskStatistics
   } catch (error) {
     console.error('加载任务数据失败:', error)

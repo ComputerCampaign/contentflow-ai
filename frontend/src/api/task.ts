@@ -380,6 +380,7 @@ class TaskApiService extends BaseApiService {
     startDate?: string
     endDate?: string
     type?: TaskType
+    task_type?: TaskType
     crawlerConfigId?: number
   }): Promise<StandardResponse<TaskStats>> {
     return this.getStats<TaskStats>(params)

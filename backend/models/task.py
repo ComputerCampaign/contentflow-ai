@@ -66,7 +66,8 @@ class Task(db.Model):
     ai_content_config_id = db.Column(db.String(36))  # AI内容生成配置ID
 
     
-    # 移除关联关系 - 使用简化的数据库设计
+    # 关联关系
+    # 移除关系定义
     
     def __init__(self, name, type, user_id, config=None, **kwargs):
         self.name = name
@@ -147,7 +148,7 @@ class Task(db.Model):
         
         # 从crawler_config获取基础参数
         if self.crawler_config_id:
-            from backend.models.crawler import CrawlerConfig
+            from backend.models.crawler_configs import CrawlerConfig
             crawler_config = CrawlerConfig.query.get(self.crawler_config_id)
             if crawler_config:
                 config_dict = crawler_config.to_dict()
@@ -221,7 +222,7 @@ class Task(db.Model):
         
         # 添加爬虫配置信息
         if self.crawler_config_id:
-            from backend.models.crawler import CrawlerConfig
+            from backend.models.crawler_configs import CrawlerConfig
             crawler_config = CrawlerConfig.query.get(self.crawler_config_id)
             if crawler_config:
                 data['crawlerConfig'] = {
@@ -250,9 +251,8 @@ class Task(db.Model):
             data['xpathConfig'] = None
         
         if include_executions:
-            from backend.models.task import TaskExecution
-            executions = TaskExecution.query.filter_by(task_id=self.id).order_by(TaskExecution.created_at.desc()).limit(10).all()
-            data['executions'] = [exec.to_dict() for exec in executions]
+            # TaskExecution功能已移除
+            data['executions'] = []
         
         return data
     
@@ -260,82 +260,4 @@ class Task(db.Model):
         return f'<Task {self.name}>'
 
 
-class TaskExecution(db.Model):
-    """任务执行记录模型"""
-    
-    __tablename__ = 'task_executions'
-    
-    # 主键
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    
-    # 执行信息
-    dag_run_id = db.Column(db.String(100))  # Airflow DAG运行ID
-    status = db.Column(db.Enum('running', 'success', 'failed', 'cancelled', 
-                              name='execution_status'), nullable=False)
-    
-    # 时间信息
-    start_time = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    end_time = db.Column(db.DateTime)
-    duration = db.Column(db.Integer)  # 执行时长（秒）
-    
-    # 结果信息
-    result = db.Column(db.JSON)  # 执行结果
-    error_message = db.Column(db.Text)  # 错误信息
-    logs = db.Column(db.Text)  # 执行日志
-    
-    # 统计信息
-    items_processed = db.Column(db.Integer, default=0)
-    items_success = db.Column(db.Integer, default=0)
-    items_failed = db.Column(db.Integer, default=0)
-    
-    # 时间戳
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    
-    # 关联字段（移除外键约束）
-    task_id = db.Column(db.String(36), nullable=False)  # 任务ID
-    
-    def __init__(self, task_id, status='running', **kwargs):
-        self.task_id = task_id
-        self.status = status
-        
-        for key, value in kwargs.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
-    
-    def update_progress(self, items_processed=None, items_success=None, items_failed=None):
-        """更新执行进度"""
-        if items_processed is not None:
-            self.items_processed = items_processed
-        if items_success is not None:
-            self.items_success = items_success
-        if items_failed is not None:
-            self.items_failed = items_failed
-        db.session.commit()
-    
-    def get_success_rate(self):
-        """获取执行成功率"""
-        if self.items_processed == 0:
-            return 0
-        return round((self.items_success / self.items_processed) * 100, 2)
-    
-    def to_dict(self):
-        """转换为字典"""
-        return {
-            'execution_id': self.id,
-            'dag_run_id': self.dag_run_id,
-            'status': self.status,
-            'start_time': self.start_time.isoformat(),
-            'end_time': self.end_time.isoformat() if self.end_time else None,
-            'duration': self.duration,
-            'result': self.result,
-            'error_message': self.error_message,
-            'items_processed': self.items_processed,
-            'items_success': self.items_success,
-            'items_failed': self.items_failed,
-            'success_rate': self.get_success_rate(),
-            'created_at': self.created_at.isoformat(),
-            'task_id': self.task_id
-        }
-    
-    def __repr__(self):
-        return f'<TaskExecution {self.id}>'
+# TaskExecution模型已移除

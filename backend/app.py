@@ -11,8 +11,9 @@ from backend.config import Config
 from backend.extensions import db, jwt, limiter, migrate
 from backend.api import register_blueprints
 from backend.models.user import User
-from backend.models.task import Task, TaskExecution
-from backend.models.crawler import CrawlerConfig, CrawlerResult
+from backend.models.task import Task
+from backend.models.crawler_configs import CrawlerConfig
+from backend.models.crawler_result import CrawlerResult
 from backend.models.dashboard import Dashboard
 import logging
 from logging.handlers import RotatingFileHandler

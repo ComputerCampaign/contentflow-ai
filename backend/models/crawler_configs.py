@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-爬虫配置和结果模型
+爬虫配置模型
 """
 
 from backend.extensions import db
 from datetime import datetime
 import uuid
-import json
-
 
 class CrawlerConfig(db.Model):
     """爬虫配置模型 - 对应crawler.py的命令行参数"""
@@ -117,11 +115,7 @@ class CrawlerConfig(db.Model):
             errors.append("重试次数不能小于0")
         
         return errors
-    
-    def get_latest_results(self, limit=10):
-        """获取最新的爬取结果"""
-        from backend.models.crawler import CrawlerResult
-        return CrawlerResult.query.filter_by(config_id=self.id).order_by(CrawlerResult.created_at.desc()).limit(limit).all()
+
     
     def to_dict(self, include_results=False):
         """转换为字典"""
@@ -152,127 +146,7 @@ class CrawlerConfig(db.Model):
             'user_id': self.user_id
         }
         
-        if include_results:
-            data['recent_results'] = [result.to_dict() for result in self.get_latest_results(5)]
-        
         return data
     
     def __repr__(self):
         return f'<CrawlerConfig {self.name}>'
-
-
-class CrawlerResult(db.Model):
-    """爬虫结果模型"""
-    
-    __tablename__ = 'crawler_results'
-    
-    # 主键
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    
-    # 基本信息
-    url = db.Column(db.String(2000), nullable=False)
-    title = db.Column(db.String(500))
-    content = db.Column(db.Text)
-    
-    # 提取的数据
-    extracted_data = db.Column(db.JSON)  # 提取的结构化数据
-    page_metadata = db.Column(db.JSON)  # 页面元数据
-    
-    # 状态信息
-    status = db.Column(db.Enum('success', 'failed', 'partial', name='result_status'), 
-                      nullable=False)
-    error_message = db.Column(db.Text)
-    
-    # 技术信息
-    response_code = db.Column(db.Integer)
-    response_time = db.Column(db.Float)  # 响应时间（秒）
-    content_type = db.Column(db.String(100))
-    content_length = db.Column(db.Integer)
-    
-    # 处理信息
-    processing_time = db.Column(db.Float)  # 处理时间（秒）
-    retry_count = db.Column(db.Integer, default=0)
-    
-    # 文件信息
-    images = db.Column(db.JSON)  # 图片URL列表
-    files = db.Column(db.JSON)  # 文件URL列表
-    
-    # 时间戳
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    
-    # 关联字段（移除外键约束）
-    config_id = db.Column(db.String(36), nullable=False)  # 爬虫配置ID
-    task_execution_id = db.Column(db.String(36))  # 任务执行ID
-    
-    def __init__(self, url, config_id, status='success', **kwargs):
-        self.url = url
-        self.config_id = config_id
-        self.status = status
-        
-        for key, value in kwargs.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
-    
-    def set_success(self, title=None, content=None, extracted_data=None, **kwargs):
-        """设置成功结果"""
-        self.status = 'success'
-        self.title = title
-        self.content = content
-        self.extracted_data = extracted_data
-        
-        for key, value in kwargs.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
-    
-    def set_failure(self, error_message, **kwargs):
-        """设置失败结果"""
-        self.status = 'failed'
-        self.error_message = error_message
-        
-        for key, value in kwargs.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
-    
-    def get_content_preview(self, max_length=200):
-        """获取内容预览"""
-        if not self.content:
-            return ""
-        
-        content = self.content.strip()
-        if len(content) <= max_length:
-            return content
-        
-        return content[:max_length] + "..."
-    
-    def to_dict(self, include_content=False):
-        """转换为字典"""
-        data = {
-            'result_id': self.id,
-            'url': self.url,
-            'title': self.title,
-            'status': self.status,
-            'error_message': self.error_message,
-            'extracted_data': self.extracted_data,
-            'page_metadata': self.page_metadata,
-            'response_code': self.response_code,
-            'response_time': self.response_time,
-            'content_type': self.content_type,
-            'content_length': self.content_length,
-            'processing_time': self.processing_time,
-            'retry_count': self.retry_count,
-            'images': self.images,
-            'files': self.files,
-            'created_at': self.created_at.isoformat(),
-            'config_id': self.config_id,
-            'task_execution_id': self.task_execution_id
-        }
-        
-        if include_content:
-            data['content'] = self.content
-        else:
-            data['content_preview'] = self.get_content_preview()
-        
-        return data
-    
-    def __repr__(self):
-        return f'<CrawlerResult {self.url}>'

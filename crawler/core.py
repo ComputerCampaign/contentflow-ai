@@ -60,13 +60,14 @@ class CrawlerCore:
         else:
             logger.warning("XPath管理器未初始化")
     
-    def crawl_url(self, url: str, task_name: Optional[str] = None, rule_ids: Optional[List[str]] = None) -> Dict[str, Any]:
+    def crawl_url(self, url: str, task_name: Optional[str] = None, rule_ids: Optional[List[str]] = None, task_id: Optional[str] = None) -> Dict[str, Any]:
         """爬取单个URL
         
         Args:
             url: 要爬取的URL
             task_name: 任务名称，用于创建存储目录
             rule_ids: XPath规则ID列表，用于指定使用哪些XPath规则
+            task_id: 任务ID，用于标识爬虫任务
             
         Returns:
             爬取结果字典
@@ -157,6 +158,7 @@ class CrawlerCore:
                 'download_result': parse_result.get('download_result', {}),
                 'crawl_time': time.time(),
                 'task_name': task_name,
+                'task_id': task_id,
                 'xpath_rules_used': parse_result.get('xpath_rules_used', [])
             }
             
