@@ -8,12 +8,12 @@ AI内容生成模块日志配置
 import os
 import logging
 from logging.handlers import RotatingFileHandler
-from typing import Optional
+from typing import Optional, Union
 
 
 def setup_logger(name: str, 
                  level: int = logging.INFO,
-                 file_path: Optional[str] = None,
+                 file_path: Optional[Union[str, bool]] = None,
                  max_bytes: int = 10 * 1024 * 1024,  # 10MB
                  backup_count: int = 5) -> logging.Logger:
     """设置日志记录器
@@ -51,17 +51,19 @@ def setup_logger(name: str,
     # 文件处理器
     if file_path:
         # 确定日志文件路径
-        if os.path.isfile(file_path):
-            # 如果传入的是文件路径，使用其目录
-            log_dir = os.path.dirname(file_path)
-        else:
-            # 如果传入的是目录路径，直接使用
-            log_dir = file_path
+        if isinstance(file_path, bool) and file_path:
+            # 如果传入True，使用默认日志目录
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            log_dir = os.path.join(project_root, 'logs')
+        elif isinstance(file_path, str):
+            if os.path.isfile(file_path):
+                # 如果传入的是文件路径，使用其目录
+                log_dir = os.path.dirname(file_path)
+            else:
+                # 如果传入的是目录路径，直接使用
+                log_dir = file_path
         
         # 确保日志目录存在
-        if not log_dir:
-            log_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
-        
         os.makedirs(log_dir, exist_ok=True)
         
         # 创建日志文件路径
