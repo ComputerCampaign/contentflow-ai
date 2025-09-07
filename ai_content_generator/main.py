@@ -64,7 +64,7 @@ class AIContentGeneratorCLI:
             os.makedirs(output_dir, exist_ok=True)
             
             # 创建工作流编排器
-            orchestrator = WorkflowOrchestrator(args.config_dir)
+            orchestrator = WorkflowOrchestrator(args.config_dir, output_dir)
             
             # 根据模式执行相应工作流
             if args.mode == 'content':

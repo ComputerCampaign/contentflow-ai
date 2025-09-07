@@ -19,18 +19,20 @@ from ..utils.logger import setup_logger
 class WorkflowOrchestrator:
     """工作流编排器"""
     
-    def __init__(self, config_dir: str = None):
+    def __init__(self, config_dir: str = None, ai_content_dir: str = None):
         """
         初始化工作流编排器
         
         Args:
             config_dir: 配置文件目录路径
+            ai_content_dir: AI内容输出目录路径
         """
         self.config = ConfigManager(config_dir)
         self.content_generator = MultiPlatformGenerator(config_dir)
-        self.video_generator = VideoGenerator(config_dir)
+        self.video_generator = VideoGenerator(config_dir, ai_content_dir)
         self.file_manager = FileManager()
         self.logger = setup_logger(__name__, file_path=True)
+        self.ai_content_dir = ai_content_dir
         
         self.logger.info("工作流编排器初始化完成")
     

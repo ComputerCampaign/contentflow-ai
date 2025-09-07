@@ -24,8 +24,9 @@ default_args.update({
 dag = DAG(
     'crawler_task_pipeline_optimized',
     default_args=default_args,
+    max_active_runs=1,
     description='优化后的爬虫任务处理流水线 - 简化流程，集成结果上传',
-    schedule_interval=timedelta(minutes=20),  # 缩短调度间隔
+    schedule_interval=timedelta(minutes=1),  # 缩短调度间隔
     catchup=False,
     tags=['crawler', 'pipeline', 'optimized'],
 )
